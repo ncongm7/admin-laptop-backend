@@ -24,20 +24,11 @@ public class PhieuGiamGiaController {
         return new ResponseObject<>(service.getAll());
     }
 
-    @GetMapping("/tim-kiem/{ma}")
-    public ResponseObject<?> timKiem(@PathVariable("ma") String ma){
-        return new ResponseObject<>(service.searchByName3Case(ma));
-    }
 
     @DeleteMapping("/delete/{id1}")
     public ResponseObject<?> delete(@PathVariable("id1") UUID id1){
         service.delete(id1);
         return new ResponseObject<>(null, "Xoa thanh cong");
-    }
-
-    @GetMapping("/paging")
-    public ResponseObject<?> phanTrang(@RequestParam(value = "pageNo1", defaultValue = "0") Integer pageNo) {
-        return new ResponseObject<>(service.phanTrang(pageNo));
     }
 
     @GetMapping("/detail/{id1}")
