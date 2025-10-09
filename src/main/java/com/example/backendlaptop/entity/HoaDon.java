@@ -1,0 +1,91 @@
+package com.example.backendlaptop.entity;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.Setter;
+import org.hibernate.annotations.Nationalized;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.UUID;
+
+@Getter
+@Setter
+@Entity
+@Table(name = "hoa_don")
+public class HoaDon {
+    @Id
+    @Column(name = "id", nullable = false)
+    private UUID id;
+
+    @Size(max = 50)
+    @Column(name = "ma", length = 50)
+    private String ma;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_khach_hang")
+    private KhachHang idKhachHang;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_nhan_vien")
+    private NhanVien idNhanVien;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_phieu_giam_gia")
+    private PhieuGiamGia idPhieuGiamGia;
+
+    @Size(max = 50)
+    @Column(name = "ma_don_hang", length = 50)
+    private String maDonHang;
+
+    @Size(max = 255)
+    @Nationalized
+    @Column(name = "ten_khach_hang")
+    private String tenKhachHang;
+
+    @Size(max = 20)
+    @Column(name = "sdt", length = 20)
+    private String sdt;
+
+    @Size(max = 500)
+    @Nationalized
+    @Column(name = "dia_chi", length = 500)
+    private String diaChi;
+
+    @Column(name = "tong_tien", precision = 18, scale = 2)
+    private BigDecimal tongTien;
+
+    @Column(name = "tien_duoc_giam", precision = 18, scale = 2)
+    private BigDecimal tienDuocGiam;
+
+    @Column(name = "tong_tien_sau_giam", precision = 18, scale = 2)
+    private BigDecimal tongTienSauGiam;
+
+    @Column(name = "loai_hoa_don")
+    private Integer loaiHoaDon;
+
+    @Nationalized
+    @Lob
+    @Column(name = "ghi_chu")
+    private String ghiChu;
+
+    @Column(name = "ngay_tao")
+    private Instant ngayTao;
+
+    @Column(name = "ngay_thanh_toan")
+    private Instant ngayThanhToan;
+
+    @Column(name = "trang_thai_thanh_toan")
+    private Integer trangThaiThanhToan;
+
+    @Column(name = "trang_thai")
+    private Integer trangThai;
+
+    @Column(name = "so_diem_su_dung")
+    private Integer soDiemSuDung;
+
+    @Column(name = "so_tien_quy_doi", precision = 18, scale = 2)
+    private BigDecimal soTienQuyDoi;
+
+}
