@@ -27,22 +27,6 @@ public class PhieuGiamGiaService {
     public List<PhieuGiamGiaResponse> getAll(){
         return repository.findAll().stream().map(PhieuGiamGiaResponse::new).toList();
     }
-    public List<PhieuGiamGiaResponse> searchByName3Case(String keyword) {
-        String q = (keyword == null) ? "" : keyword.trim();
-        List<PhieuGiamGia> list = q.isEmpty()
-                ? repository.findAll()
-                : repository.findByMaContainingIgnoreCase(q);
-
-        return list.stream().map(PhieuGiamGiaResponse::new).toList();
-    }
-
-    public PageableObject<PhieuGiamGiaResponse> phanTrang(Integer pageNo) {
-        Pageable pageable = PageRequest.of(pageNo, 5);
-        Page<PhieuGiamGia>pagePhieuGiamGia = repository.findAll(pageable);
-        // map tu PhieuGiamGia => PhieuGiamGia Response
-        Page<PhieuGiamGiaResponse>pageResponse = pagePhieuGiamGia.map(PhieuGiamGiaResponse::new);
-        return new PageableObject<>(pageResponse);
-    }
 
     public void delete(UUID id) {
         repository.findById(id).orElseThrow(
