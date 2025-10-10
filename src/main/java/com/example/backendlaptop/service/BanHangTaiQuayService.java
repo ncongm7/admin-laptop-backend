@@ -1,11 +1,19 @@
 package com.example.backendlaptop.service;
 
 import com.example.backendlaptop.dto.banhang.ThemSanPhamRequest;
-import com.example.backendlaptop.entity.*;
+import com.example.backendlaptop.entity.ChiTietSanPham;
+import com.example.backendlaptop.entity.HoaDon;
+import com.example.backendlaptop.entity.HoaDonChiTiet;
+import com.example.backendlaptop.entity.KhachHang;
 import com.example.backendlaptop.expection.ApiException;
 import com.example.backendlaptop.model.TrangThaiHoaDon;
-import com.example.backendlaptop.repository.*;
+import com.example.backendlaptop.repository.ChiTietSanPhamRepository;
+import com.example.backendlaptop.repository.HoaDonChiTietRepository;
+import com.example.backendlaptop.repository.HoaDonRepository;
+import com.example.backendlaptop.repository.KhachHangRepository;
+import com.example.backendlaptop.repository.phanQuyenRe.NhanVienRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,13 +48,13 @@ public class BanHangTaiQuayService {
         hoaDon.setTrangThai(TrangThaiHoaDon.CHO_THANH_TOAN);
         hoaDon.setHoaDonChiTiets(new HashSet<>());
 
-        NhanVien nv = nhanVienRepository.findById(nhanVienId)
-                .orElseThrow(() -> new ApiException("Không tìm thấy nhân viên với ID: " + nhanVienId));
+        com.example.backendlaptop.entity.phanQuyen.NhanVien nv = nhanVienRepository.findById(nhanVienId)
+                .orElseThrow(() -> new ApiException("Không tìm thấy nhân viên với ID: " + nhanVienId, String.valueOf(HttpStatus.NOT_FOUND.value())));
         hoaDon.setIdNhanVien(nv);
 
         if (khachHangId != null) {
             KhachHang kh = khachHangRepository.findById(khachHangId)
-                    .orElseThrow(() -> new ApiException("Không tìm thấy khách hàng với ID: " + khachHangId));
+                    .orElseThrow(() -> new ApiException("Không tìm thấy khách hàng với ID: " + khachHangId, String.valueOf(HttpStatus.NOT_FOUND.value())));
             hoaDon.setIdKhachHang(kh);
             hoaDon.setTenKhachHang(kh.getHoTen());
         } else {
@@ -63,20 +71,20 @@ public class BanHangTaiQuayService {
     @Transactional
     public HoaDon themSanPhamVaoHoaDon(UUID hoaDonId, ThemSanPhamRequest request) {
         HoaDon hoaDon = hoaDonRepository.findById(hoaDonId)
-                .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn với ID: " + hoaDonId));
+                .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn với ID: " + hoaDonId, String.valueOf(HttpStatus.NOT_FOUND.value())));
 
         if (hoaDon.getTrangThai() != TrangThaiHoaDon.CHO_THANH_TOAN) {
-            throw new ApiException("Chỉ có thể thêm sản phẩm vào hóa đơn đang chờ thanh toán");
+            throw new ApiException("Chỉ có thể thêm sản phẩm vào hóa đơn đang chờ thanh toán", String.valueOf(HttpStatus.BAD_REQUEST.value()));
         }
 
         ChiTietSanPham ctsp = chiTietSanPhamRepository.findById(request.getChiTietSanPhamId())
-                .orElseThrow(() -> new ApiException("Không tìm thấy chi tiết sản phẩm với ID: " + request.getChiTietSanPhamId()));
+                .orElseThrow(() -> new ApiException("Không tìm thấy chi tiết sản phẩm với ID: " + request.getChiTietSanPhamId(), String.valueOf(HttpStatus.NOT_FOUND.value())));
 
         int soLuongTon = ctsp.getSoLuongTon() != null ? ctsp.getSoLuongTon() : 0;
         int soLuongTamGiu = ctsp.getSoLuongTamGiu() != null ? ctsp.getSoLuongTamGiu() : 0;
 
         if ((soLuongTon - soLuongTamGiu) < request.getSoLuong()) {
-            throw new ApiException("Không đủ số lượng tồn kho cho sản phẩm: " + ctsp.getSanPham().getTenSanPham());
+            throw new ApiException("Không đủ số lượng tồn kho cho sản phẩm: " + ctsp.getSanPham().getTenSanPham(), String.valueOf(HttpStatus.BAD_REQUEST.value()));
         }
 
         ctsp.setSoLuongTamGiu(soLuongTamGiu + request.getSoLuong());
@@ -86,7 +94,7 @@ public class BanHangTaiQuayService {
         hoaDonChiTiet.setChiTietSanPham(ctsp);
         hoaDonChiTiet.setSoLuong(request.getSoLuong());
         hoaDonChiTiet.setDonGia(ctsp.getGiaBan());
-        
+
         hoaDon.getHoaDonChiTiets().add(hoaDonChiTiet);
         hoaDon.setTongTien(tinhLaiTongTien(hoaDon));
 
@@ -97,11 +105,11 @@ public class BanHangTaiQuayService {
     @Transactional
     public HoaDon xoaSanPhamKhoiHoaDon(UUID hoaDonChiTietId) {
         HoaDonChiTiet hdct = hoaDonChiTietRepository.findById(hoaDonChiTietId)
-                .orElseThrow(() -> new ApiException("Không tìm thấy sản phẩm trong hóa đơn với ID: " + hoaDonChiTietId));
+                .orElseThrow(() -> new ApiException("Không tìm thấy sản phẩm trong hóa đơn với ID: " + hoaDonChiTietId, String.valueOf(HttpStatus.NOT_FOUND.value())));
 
         HoaDon hoaDon = hdct.getHoaDon();
         if (hoaDon.getTrangThai() != TrangThaiHoaDon.CHO_THANH_TOAN) {
-            throw new ApiException("Không thể xóa sản phẩm khỏi hóa đơn đã xử lý");
+            throw new ApiException("Không thể xóa sản phẩm khỏi hóa đơn đã xử lý", String.valueOf(HttpStatus.BAD_REQUEST.value()));
         }
 
         ChiTietSanPham ctsp = hdct.getChiTietSanPham();
@@ -110,7 +118,7 @@ public class BanHangTaiQuayService {
 
         hoaDon.getHoaDonChiTiets().remove(hdct);
         hoaDon.setTongTien(tinhLaiTongTien(hoaDon));
-        
+
         chiTietSanPhamRepository.save(ctsp);
         hoaDonChiTietRepository.delete(hdct);
 
@@ -120,10 +128,10 @@ public class BanHangTaiQuayService {
     @Transactional
     public HoaDon huyHoaDon(UUID hoaDonId) {
         HoaDon hoaDon = hoaDonRepository.findById(hoaDonId)
-                .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn với ID: " + hoaDonId));
+                .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn với ID: " + hoaDonId, String.valueOf(HttpStatus.NOT_FOUND.value())));
 
         if (hoaDon.getTrangThai() != TrangThaiHoaDon.CHO_THANH_TOAN) {
-            throw new ApiException("Chỉ có thể hủy hóa đơn đang chờ thanh toán");
+            throw new ApiException("Chỉ có thể hủy hóa đơn đang chờ thanh toán", String.valueOf(HttpStatus.BAD_REQUEST.value()));
         }
 
         for (HoaDonChiTiet hdct : hoaDon.getHoaDonChiTiets()) {
@@ -136,23 +144,23 @@ public class BanHangTaiQuayService {
         hoaDon.setTrangThai(TrangThaiHoaDon.DA_HUY);
         return hoaDonRepository.save(hoaDon);
     }
-    
+
     @Transactional
     public HoaDon thanhToanHoaDon(UUID hoaDonId) {
         HoaDon hoaDon = hoaDonRepository.findById(hoaDonId)
-                .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn với ID: " + hoaDonId));
+                .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn với ID: " + hoaDonId, String.valueOf(HttpStatus.NOT_FOUND.value())));
 
         if (hoaDon.getTrangThai() != TrangThaiHoaDon.CHO_THANH_TOAN) {
-            throw new ApiException("Hóa đơn này không ở trạng thái chờ thanh toán");
+            throw new ApiException("Hóa đơn này không ở trạng thái chờ thanh toán", String.valueOf(HttpStatus.BAD_REQUEST.value()));
         }
 
-        if(hoaDon.getHoaDonChiTiets().isEmpty()){
-            throw new ApiException("Không thể thanh toán hóa đơn trống");
+        if (hoaDon.getHoaDonChiTiets().isEmpty()) {
+            throw new ApiException("Không thể thanh toán hóa đơn trống", String.valueOf(HttpStatus.BAD_REQUEST.value()));
         }
 
         for (HoaDonChiTiet hdct : hoaDon.getHoaDonChiTiets()) {
             ChiTietSanPham ctsp = hdct.getChiTietSanPham();
-            
+
             int soLuongTon = ctsp.getSoLuongTon() != null ? ctsp.getSoLuongTon() : 0;
             int soLuongTamGiu = ctsp.getSoLuongTamGiu() != null ? ctsp.getSoLuongTamGiu() : 0;
             int soLuongMua = hdct.getSoLuong();
