@@ -19,8 +19,8 @@ public class ChiTietSanPham {
     @Column(name = "id", nullable = false)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_san_pham")
+    @ManyToOne()
+    @JoinColumn(name = "sp_id")
     private SanPham sanPham;
 
     @Size(max = 50)
@@ -43,5 +43,37 @@ public class ChiTietSanPham {
 
     @Column(name = "trang_thai")
     private Integer trangThai;
+
+    @Version
+    @Column(name = "version")
+    private Long version;
+
+    @ManyToOne()
+    @JoinColumn(name = "cpu_id")
+    private Cpu cpu;
+
+    @ManyToOne()
+    @JoinColumn(name = "gpu_id")
+    private Gpu gpu;
+
+    @ManyToOne()
+    @JoinColumn(name = "ram_id")
+    private Ram ram;
+
+    @ManyToOne()
+    @JoinColumn(name = "o_cung_id")
+    private OCung oCung;
+
+    @ManyToOne()
+    @JoinColumn(name = "mau_sac_id")
+    private MauSac mauSac;
+
+    @ManyToOne()
+    @JoinColumn(name = "loai_man_hinh_id")
+    private LoaiManHinh loaiManHinh;
+
+    @ManyToOne()
+    @JoinColumn(name = "pin_id")
+    private Pin pin;
 
 }

@@ -126,7 +126,10 @@ CREATE TABLE chi_tiet_san_pham (
                                    ma_ctsp VARCHAR(50) UNIQUE,
                                    gia_ban DECIMAL(18, 2),
                                    ghi_chu NVARCHAR(MAX),
-                                   trang_thai INT
+                                   so_luong_ton INT,
+                                   so_luong_tam_giu INT,
+                                   trang_thai INT,
+                                   version BIGINT
 );
 
 CREATE TABLE hinh_anh (
