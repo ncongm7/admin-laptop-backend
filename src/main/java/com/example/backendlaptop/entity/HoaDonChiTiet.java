@@ -13,16 +13,17 @@ import java.util.UUID;
 @Table(name = "hoa_don_chi_tiet")
 public class HoaDonChiTiet {
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", nullable = false)
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_don_hang")
-    private HoaDon idDonHang;
+    @JoinColumn(name = "id_hoa_don")
+    private HoaDon hoaDon;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_ctsp")
-    private ChiTietSanPham idCtsp;
+    private ChiTietSanPham chiTietSanPham;
 
     @Column(name = "so_luong")
     private Integer soLuong;

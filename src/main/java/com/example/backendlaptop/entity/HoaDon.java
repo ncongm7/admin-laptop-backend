@@ -1,5 +1,6 @@
 package com.example.backendlaptop.entity;
 
+import com.example.backendlaptop.model.TrangThaiHoaDon;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
@@ -8,6 +9,7 @@ import org.hibernate.annotations.Nationalized;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Set;
 import java.util.UUID;
 
 @Getter
@@ -16,6 +18,7 @@ import java.util.UUID;
 @Table(name = "hoa_don")
 public class HoaDon {
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", nullable = false)
     private UUID id;
 
@@ -34,6 +37,9 @@ public class HoaDon {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_phieu_giam_gia")
     private PhieuGiamGia idPhieuGiamGia;
+
+    @OneToMany(mappedBy = "hoaDon", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<HoaDonChiTiet> hoaDonChiTiets;
 
     @Size(max = 50)
     @Column(name = "ma_don_hang", length = 50)
@@ -79,8 +85,9 @@ public class HoaDon {
     @Column(name = "trang_thai_thanh_toan")
     private Integer trangThaiThanhToan;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "trang_thai")
-    private Integer trangThai;
+    private TrangThaiHoaDon trangThai;
 
     @Column(name = "so_diem_su_dung")
     private Integer soDiemSuDung;

@@ -15,8 +15,13 @@ import java.util.UUID;
 @Table(name = "chi_tiet_san_pham")
 public class ChiTietSanPham {
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", nullable = false)
     private UUID id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_san_pham")
+    private SanPham sanPham;
 
     @Size(max = 50)
     @Column(name = "ma_ctsp", length = 50)
@@ -29,6 +34,12 @@ public class ChiTietSanPham {
     @Lob
     @Column(name = "ghi_chu")
     private String ghiChu;
+
+    @Column(name = "so_luong_ton")
+    private Integer soLuongTon;
+
+    @Column(name = "so_luong_tam_giu")
+    private Integer soLuongTamGiu;
 
     @Column(name = "trang_thai")
     private Integer trangThai;

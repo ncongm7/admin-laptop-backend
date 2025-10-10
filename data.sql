@@ -1,3 +1,9 @@
+-- Thêm cột trạng thái cho Hóa Đơn
+-- 0: CHỜ THANH TOÁN, 1: ĐÃ HỦY, 2: ĐÃ THANH TOÁN
+
+
+
+
 /*
     SQL SCRIPT FOR LAPTOP E-COMMERCE DATABASE (REVISED TO MATCH ERD EXACTLY)
     ---------------------------------------------------------------------
@@ -528,26 +534,20 @@ INSERT INTO vai_tro (ma_vai_tro, ten_vai_tro, mo_ta) VALUES
 ('CUSTOMER', 'Khách hàng', 'Người dùng cuối mua sản phẩm');
 
 -- 10. Tài khoản
-select * from tai_khoan
-
 INSERT INTO tai_khoan (ma_vai_tro, ten_dang_nhap, mat_khau, email, trang_thai, ngay_tao, lan_dang_nhap_cuoi) VALUES
 ((SELECT id FROM vai_tro WHERE ma_vai_tro = 'ADMIN'), 'admin', 'admin123', 'admin@laptopstore.com', 1, GETDATE(), GETDATE()),
 ((SELECT id FROM vai_tro WHERE ma_vai_tro = 'MANAGER'), 'manager01', 'manager123', 'manager@laptopstore.com', 1, GETDATE(), GETDATE()),
 ((SELECT id FROM vai_tro WHERE ma_vai_tro = 'STAFF'), 'staff01', 'staff123', 'staff@laptopstore.com', 1, GETDATE(), GETDATE()),
 ((SELECT id FROM vai_tro WHERE ma_vai_tro = 'CASHIER'), 'cashier01', 'cashier123', 'cashier@laptopstore.com', 1, GETDATE(), GETDATE()),
-((SELECT id FROM vai_tro WHERE ma_vai_tro = 'CUSTOMER'), 'customer01', 'customer123', 'an.nguyen@email.com', 1, GETDATE(), GETDATE()),
-((SELECT id FROM vai_tro WHERE ma_vai_tro = 'CUSTOMER'), 'customer02', 'customer123', 'binh.tran@email.com', 1, GETDATE(), GETDATE()),
-((SELECT id FROM vai_tro WHERE ma_vai_tro = 'CUSTOMER'), 'customer03', 'customer123', 'cuong.le@email.com', 1, GETDATE(), GETDATE()),
-((SELECT id FROM vai_tro WHERE ma_vai_tro = 'CUSTOMER'), 'customer04', 'customer123', 'dung.pham@email.com', 1, GETDATE(), GETDATE()),
-((SELECT id FROM vai_tro WHERE ma_vai_tro = 'CUSTOMER'), 'customer05', 'customer123', 'em.hoang@email.com', 1, GETDATE(), GETDATE());
-select * from khach_hang
+((SELECT id FROM vai_tro WHERE ma_vai_tro = 'CUSTOMER'), 'customer01', 'customer123', 'customer@email.com', 1, GETDATE(), GETDATE());
+
 -- 11. Khách hàng
 INSERT INTO khach_hang (ma_tai_khoan, ma_khach_hang, ho_ten, so_dien_thoai, email, gioi_tinh, ngay_sinh, trang_thai) VALUES
 ((SELECT id FROM tai_khoan WHERE ten_dang_nhap = 'customer01'), 'KH001', 'Nguyễn Văn An', '0901234567', 'an.nguyen@email.com', 1, '1990-05-15', 1),
-((SELECT id FROM tai_khoan WHERE ten_dang_nhap = 'customer02'), 'KH002', 'Trần Thị Bình', '0901234568', 'binh.tran@email.com', 0, '1992-08-20', 1),
-((SELECT id FROM tai_khoan WHERE ten_dang_nhap = 'customer03'), 'KH003', 'Lê Văn Cường', '0901234569', 'cuong.le@email.com', 1, '1988-12-10', 1),
-((SELECT id FROM tai_khoan WHERE ten_dang_nhap = 'customer04'), 'KH004', 'Phạm Thị Dung', '0901234570', 'dung.pham@email.com', 0, '1995-03-25', 1),
-((SELECT id FROM tai_khoan WHERE ten_dang_nhap = 'customer05'), 'KH005', 'Hoàng Văn Em', '0901234571', 'em.hoang@email.com', 1, '1993-07-18', 1);
+((SELECT id FROM tai_khoan WHERE ten_dang_nhap = 'customer01'), 'KH002', 'Trần Thị Bình', '0901234568', 'binh.tran@email.com', 0, '1992-08-20', 1),
+((SELECT id FROM tai_khoan WHERE ten_dang_nhap = 'customer01'), 'KH003', 'Lê Văn Cường', '0901234569', 'cuong.le@email.com', 1, '1988-12-10', 1),
+((SELECT id FROM tai_khoan WHERE ten_dang_nhap = 'customer01'), 'KH004', 'Phạm Thị Dung', '0901234570', 'dung.pham@email.com', 0, '1995-03-25', 1),
+((SELECT id FROM tai_khoan WHERE ten_dang_nhap = 'customer01'), 'KH005', 'Hoàng Văn Em', '0901234571', 'em.hoang@email.com', 1, '1993-07-18', 1);
 
 -- 12. Nhân viên
 INSERT INTO nhan_vien (ma_tai_khoan, ma_nhan_vien, ho_ten, so_dien_thoai, email, gioi_tinh, anh_nhan_vien, chuc_vu, dia_chi, danh_gia, trang_thai) VALUES
@@ -629,8 +629,6 @@ INSERT INTO gio_hang (khach_hang_id, ngay_tao, ngay_cap_nhat, trang_thai_gio_han
 ((SELECT user_id FROM khach_hang WHERE ma_khach_hang = 'KH004'), GETDATE(), GETDATE(), 1),
 ((SELECT user_id FROM khach_hang WHERE ma_khach_hang = 'KH005'), GETDATE(), GETDATE(), 1);
 
-
-select * from gio_hang_chi_tiet
 -- 22. Giỏ hàng chi tiết
 INSERT INTO gio_hang_chi_tiet (gio_hang_id, chi_tiet_san_pham_id, so_luong, don_gia, ngay_them) VALUES
 ((SELECT id FROM gio_hang WHERE khach_hang_id = (SELECT user_id FROM khach_hang WHERE ma_khach_hang = 'KH001')), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP001'), 1, 25990000, GETDATE()),
@@ -760,3 +758,8 @@ INSERT INTO phan_hoi_danh_gia (danh_gia_id, nhan_vien_id, noi_dung, ngay_phan_ho
 ((SELECT id FROM danh_gia WHERE khach_hang_id = (SELECT user_id FROM khach_hang WHERE ma_khach_hang = 'KH005')), (SELECT user_id FROM nhan_vien WHERE ma_nhan_vien = 'NV002'), 'ThinkPad X1 là lựa chọn tuyệt vời cho doanh nhân', GETDATE());
 
 GO
+
+ALTER TABLE hoa_don ADD trang_thai INT DEFAULT 0;
+
+-- Thêm cột số lượng tạm giữ cho Chi Tiết Sản Phẩm để quản lý tồn kho khi tạo hóa đơn chờ
+ALTER TABLE chi_tiet_san_pham ADD so_luong_tam_giu INT DEFAULT 0;
