@@ -1,33 +1,35 @@
 package com.example.backendlaptop.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.Nationalized;
 
-import java.time.Instant;
 import java.util.UUID;
 
 @Getter
 @Setter
 @Entity
-@Table(name = "lich_su_bao_hanh")
-public class LichSuBaoHanh {
+@Table(name = "mau_sac")
+public class MauSac {
     @Id
     @Column(name = "id", nullable = false)
     private UUID id;
 
+    @Size(max = 50)
+    @Column(name = "ma_mau", length = 50)
+    private String maMau;
 
-    @Column(name = "ngay_tiep_nhan")
-    private Instant ngayTiepNhan;
-
-    @Column(name = "ngay_hoan_thanh")
-    private Instant ngayHoanThanh;
+    @Size(max = 100)
+    @Nationalized
+    @Column(name = "ten_mau", length = 100)
+    private String tenMau;
 
     @Nationalized
     @Lob
-    @Column(name = "mo_ta_loi")
-    private String moTaLoi;
+    @Column(name = "mo_ta")
+    private String moTa;
 
     @Column(name = "trang_thai")
     private Integer trangThai;

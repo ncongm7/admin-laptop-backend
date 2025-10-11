@@ -14,16 +14,11 @@ import java.util.UUID;
 @Table(name = "dot_giam_gia_chi_tiet")
 public class DotGiamGiaChiTiet {
     @Id
-    @org.hibernate.annotations.UuidGenerator
-    @Column(name = "id", columnDefinition = "uniqueidentifier")
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_km")
-    private DotGiamGia dotGiamGia;
 
-    @Column(name = "id_ctsp") // Sẽ cần cập nhật lại khi có entity ChiTietSanPham
-    private UUID idCtsp;
 
     @Column(name = "gia_ban_dau", precision = 18, scale = 2)
     private BigDecimal giaBanDau;

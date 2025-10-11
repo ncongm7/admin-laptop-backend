@@ -6,37 +6,30 @@ import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.Nationalized;
 
-import java.time.Instant;
 import java.util.UUID;
 
 @Getter
 @Setter
 @Entity
-@Table(name = "dot_giam_gia")
-public class DotGiamGia {
+@Table(name = "ram")
+public class Ram {
     @Id
-    @org.hibernate.annotations.UuidGenerator
-    @Column(name = "id", columnDefinition = "uniqueidentifier")
+    @Column(name = "id", nullable = false)
     private UUID id;
+
+    @Size(max = 50)
+    @Column(name = "ma_ram", length = 50)
+    private String maRam;
 
     @Size(max = 255)
     @Nationalized
-    @Column(name = "ten_km")
-    private String tenKm;
-
-    @Column(name = "gia_tri")
-    private Integer giaTri;
+    @Column(name = "ten_ram")
+    private String tenRam;
 
     @Nationalized
     @Lob
     @Column(name = "mo_ta")
     private String moTa;
-
-    @Column(name = "ngayBatDau")
-    private Instant ngayBatDau;
-
-    @Column(name = "ngayKetThuc")
-    private Instant ngayKetThuc;
 
     @Column(name = "trang_thai")
     private Integer trangThai;

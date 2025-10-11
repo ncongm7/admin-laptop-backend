@@ -1,3 +1,9 @@
+-- Thêm cột trạng thái cho Hóa Đơn
+-- 0: CHỜ THANH TOÁN, 1: ĐÃ HỦY, 2: ĐÃ THANH TOÁN
+
+
+
+
 /*
     SQL SCRIPT FOR LAPTOP E-COMMERCE DATABASE (REVISED TO MATCH ERD EXACTLY)
     ---------------------------------------------------------------------
@@ -752,3 +758,8 @@ INSERT INTO phan_hoi_danh_gia (danh_gia_id, nhan_vien_id, noi_dung, ngay_phan_ho
 ((SELECT id FROM danh_gia WHERE khach_hang_id = (SELECT user_id FROM khach_hang WHERE ma_khach_hang = 'KH005')), (SELECT user_id FROM nhan_vien WHERE ma_nhan_vien = 'NV002'), 'ThinkPad X1 là lựa chọn tuyệt vời cho doanh nhân', GETDATE());
 
 GO
+
+ALTER TABLE hoa_don ADD trang_thai INT DEFAULT 0;
+
+-- Thêm cột số lượng tạm giữ cho Chi Tiết Sản Phẩm để quản lý tồn kho khi tạo hóa đơn chờ
+ALTER TABLE chi_tiet_san_pham ADD so_luong_tam_giu INT DEFAULT 0;
