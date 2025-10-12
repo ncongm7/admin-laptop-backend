@@ -16,9 +16,6 @@ public class PhieuBaoHanh {
     @Column(name = "id", nullable = false)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_khach_hang")
-    private KhachHang idKhachHang;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_serial_da_ban")

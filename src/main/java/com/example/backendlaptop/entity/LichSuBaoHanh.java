@@ -17,9 +17,6 @@ public class LichSuBaoHanh {
     @Column(name = "id", nullable = false)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_bao_hanh")
-    private PhieuBaoHanh idBaoHanh;
 
     @Column(name = "ngay_tiep_nhan")
     private Instant ngayTiepNhan;

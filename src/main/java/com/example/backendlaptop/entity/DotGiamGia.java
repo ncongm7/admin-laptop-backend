@@ -15,7 +15,8 @@ import java.util.UUID;
 @Table(name = "dot_giam_gia")
 public class DotGiamGia {
     @Id
-    @Column(name = "id", nullable = false)
+    @org.hibernate.annotations.UuidGenerator
+    @Column(name = "id", columnDefinition = "uniqueidentifier")
     private UUID id;
 
     @Size(max = 255)

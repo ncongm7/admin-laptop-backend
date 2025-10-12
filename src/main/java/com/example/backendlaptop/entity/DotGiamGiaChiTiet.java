@@ -14,16 +14,11 @@ import java.util.UUID;
 @Table(name = "dot_giam_gia_chi_tiet")
 public class DotGiamGiaChiTiet {
     @Id
-    @Column(name = "id", nullable = false)
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_km")
-    private DotGiamGia idKm;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_ctsp")
-    private ChiTietSanPham idCtsp;
 
     @Column(name = "gia_ban_dau", precision = 18, scale = 2)
     private BigDecimal giaBanDau;
