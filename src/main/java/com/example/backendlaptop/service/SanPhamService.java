@@ -152,6 +152,81 @@ public class SanPhamService {
         sanPhamRepository.save(sanPham);
     }
     
+    // Tìm kiếm theo mã hoặc tên
+    @Transactional(readOnly = true)
+    public List<SanPhamResponse> searchByMaOrTen(String keyword) {
+        List<SanPham> sanPhams = sanPhamRepository.searchByMaOrTen(keyword);
+        return sanPhams.stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
+    }
+    
+    @Transactional(readOnly = true)
+    public Page<SanPhamResponse> searchByMaOrTen(String keyword, Pageable pageable) {
+        Page<SanPham> sanPhams = sanPhamRepository.searchByMaOrTen(keyword, pageable);
+        return sanPhams.map(this::convertToResponse);
+    }
+    
+    // Tìm kiếm nâng cao với validation
+    @Transactional(readOnly = true)
+    public List<SanPhamResponse> advancedSearch(
+            String keyword,
+            Integer trangThai,
+            Long minPrice,
+            Long maxPrice) {
+        
+        // Validate price range
+        validatePriceRange(minPrice, maxPrice);
+        
+        List<SanPham> sanPhams = sanPhamRepository.advancedSearch(
+            keyword, 
+            trangThai, 
+            minPrice, 
+            maxPrice
+        );
+        
+        return sanPhams.stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
+    }
+    
+    @Transactional(readOnly = true)
+    public Page<SanPhamResponse> advancedSearch(
+            String keyword,
+            Integer trangThai,
+            Long minPrice,
+            Long maxPrice,
+            Pageable pageable) {
+        
+        // Validate price range
+        validatePriceRange(minPrice, maxPrice);
+        
+        Page<SanPham> sanPhams = sanPhamRepository.advancedSearch(
+            keyword, 
+            trangThai, 
+            minPrice, 
+            maxPrice,
+            pageable
+        );
+        
+        return sanPhams.map(this::convertToResponse);
+    }
+    
+    // Validate price range
+    private void validatePriceRange(Long minPrice, Long maxPrice) {
+        if (minPrice != null && minPrice < 0) {
+            throw new ApiException("Giá tối thiểu không được nhỏ hơn 0");
+        }
+        
+        if (maxPrice != null && maxPrice < 0) {
+            throw new ApiException("Giá tối đa không được nhỏ hơn 0");
+        }
+        
+        if (minPrice != null && maxPrice != null && minPrice > maxPrice) {
+            throw new ApiException("Giá tối thiểu không được lớn hơn giá tối đa");
+        }
+    }
+    
     private SanPhamResponse convertToResponse(SanPham sanPham) {
         return MapperUtils.map(sanPham, SanPhamResponse.class);
     }

@@ -109,4 +109,54 @@ public class SanPhamController {
         sanPhamService.deleteSanPham(id);
         return ResponseEntity.noContent().build();
     }
+    
+    // Tìm kiếm theo mã hoặc tên
+    @GetMapping("/search/keyword")
+    public ResponseEntity<List<SanPhamResponse>> searchByMaOrTen(@RequestParam(required = false) String keyword) {
+        List<SanPhamResponse> responses = sanPhamService.searchByMaOrTen(keyword);
+        return ResponseEntity.ok(responses);
+    }
+    
+    @GetMapping("/search/keyword/page")
+    public ResponseEntity<Page<SanPhamResponse>> searchByMaOrTen(
+            @RequestParam(required = false) String keyword, 
+            Pageable pageable) {
+        Page<SanPhamResponse> responses = sanPhamService.searchByMaOrTen(keyword, pageable);
+        return ResponseEntity.ok(responses);
+    }
+    
+    // Tìm kiếm nâng cao - Tìm kiếm theo mã/tên, trạng thái, khoảng giá
+    @GetMapping("/search/advanced-filter")
+    public ResponseEntity<List<SanPhamResponse>> advancedSearch(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer trangThai,
+            @RequestParam(required = false) Long minPrice,
+            @RequestParam(required = false) Long maxPrice) {
+        
+        List<SanPhamResponse> responses = sanPhamService.advancedSearch(
+            keyword, 
+            trangThai, 
+            minPrice, 
+            maxPrice
+        );
+        return ResponseEntity.ok(responses);
+    }
+    
+    @GetMapping("/search/advanced-filter/page")
+    public ResponseEntity<Page<SanPhamResponse>> advancedSearch(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer trangThai,
+            @RequestParam(required = false) Long minPrice,
+            @RequestParam(required = false) Long maxPrice,
+            Pageable pageable) {
+        
+        Page<SanPhamResponse> responses = sanPhamService.advancedSearch(
+            keyword, 
+            trangThai, 
+            minPrice, 
+            maxPrice,
+            pageable
+        );
+        return ResponseEntity.ok(responses);
+    }
 }
