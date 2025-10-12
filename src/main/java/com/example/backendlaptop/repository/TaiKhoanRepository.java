@@ -1,9 +1,8 @@
-package com.example.backendlaptop.repository.phanQuyenRe;
+package com.example.backendlaptop.repository;
 
-import com.example.backendlaptop.entity.phanQuyen.TaiKhoan;
+import com.example.backendlaptop.entity.TaiKhoan;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.net.http.HttpResponse;
 import java.util.UUID;
 
 public interface TaiKhoanRepository extends JpaRepository<TaiKhoan, UUID> {

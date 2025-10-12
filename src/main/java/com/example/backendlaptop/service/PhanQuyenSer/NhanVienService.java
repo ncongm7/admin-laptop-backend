@@ -4,8 +4,8 @@ package com.example.backendlaptop.service.PhanQuyenSer;
 import com.example.backendlaptop.dto.phanQuyenDto.nhanVien.NhanVienDto;
 import com.example.backendlaptop.dto.phanQuyenDto.nhanVien.NhanVienRequest;
 
-import com.example.backendlaptop.entity.phanQuyen.NhanVien;
-import com.example.backendlaptop.repository.phanQuyenRe.NhanVienRepository;
+import com.example.backendlaptop.entity.NhanVien;
+import com.example.backendlaptop.repository.NhanVienRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;

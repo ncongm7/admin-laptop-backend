@@ -1,17 +1,14 @@
 package com.example.backendlaptop.service;
 
 import com.example.backendlaptop.dto.banhang.ThemSanPhamRequest;
-import com.example.backendlaptop.entity.ChiTietSanPham;
-import com.example.backendlaptop.entity.HoaDon;
-import com.example.backendlaptop.entity.HoaDonChiTiet;
-import com.example.backendlaptop.entity.KhachHang;
+import com.example.backendlaptop.entity.*;
 import com.example.backendlaptop.expection.ApiException;
 import com.example.backendlaptop.model.TrangThaiHoaDon;
 import com.example.backendlaptop.repository.ChiTietSanPhamRepository;
 import com.example.backendlaptop.repository.HoaDonChiTietRepository;
 import com.example.backendlaptop.repository.HoaDonRepository;
 import com.example.backendlaptop.repository.KhachHangRepository;
-import com.example.backendlaptop.repository.phanQuyenRe.NhanVienRepository;
+import com.example.backendlaptop.repository.NhanVienRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -48,7 +45,7 @@ public class BanHangTaiQuayService {
         hoaDon.setTrangThai(TrangThaiHoaDon.CHO_THANH_TOAN);
         hoaDon.setHoaDonChiTiets(new HashSet<>());
 
-        com.example.backendlaptop.entity.phanQuyen.NhanVien nv = nhanVienRepository.findById(nhanVienId)
+        NhanVien nv = nhanVienRepository.findById(nhanVienId)
                 .orElseThrow(() -> new ApiException("Không tìm thấy nhân viên với ID: " + nhanVienId, String.valueOf(HttpStatus.NOT_FOUND.value())));
         hoaDon.setIdNhanVien(nv);
 

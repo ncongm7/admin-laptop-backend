@@ -1,13 +1,12 @@
-package com.example.backendlaptop.repository.phanQuyenRe;
+package com.example.backendlaptop.repository;
 
 import com.example.backendlaptop.dto.phanQuyenDto.nhanVien.NhanVienDto;
-import com.example.backendlaptop.entity.phanQuyen.NhanVien;
+import com.example.backendlaptop.entity.NhanVien;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
-import java.net.http.HttpResponse;
 import java.util.List;
 import java.util.UUID;
 

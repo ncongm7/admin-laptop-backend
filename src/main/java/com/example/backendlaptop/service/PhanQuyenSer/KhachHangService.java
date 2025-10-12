@@ -2,9 +2,9 @@ package com.example.backendlaptop.service.PhanQuyenSer;
 
 import com.example.backendlaptop.dto.phanQuyenDto.khachHang.KhachHangDto;
 import com.example.backendlaptop.dto.phanQuyenDto.khachHang.KhachHangRequest;
-import com.example.backendlaptop.entity.phanQuyen.KhachHang;
-import com.example.backendlaptop.repository.phanQuyenRe.KhachHangRepository;
-import com.example.backendlaptop.repository.phanQuyenRe.TaiKhoanRepository;
+import com.example.backendlaptop.entity.KhachHang;
+import com.example.backendlaptop.repository.KhachHangRepository;
+import com.example.backendlaptop.repository.TaiKhoanRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
