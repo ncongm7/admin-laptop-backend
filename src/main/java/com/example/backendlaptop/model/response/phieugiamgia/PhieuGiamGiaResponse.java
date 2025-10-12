@@ -1,4 +1,4 @@
-package com.example.backendlaptop.model.response;
+package com.example.backendlaptop.model.response.phieugiamgia;
 
 import com.example.backendlaptop.entity.PhieuGiamGia;
 import lombok.Getter;

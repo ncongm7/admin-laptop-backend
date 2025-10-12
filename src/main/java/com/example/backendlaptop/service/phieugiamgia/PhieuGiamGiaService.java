@@ -1,24 +1,16 @@
-package com.example.backendlaptop.service;
+package com.example.backendlaptop.service.phieugiamgia;
 
 import com.example.backendlaptop.entity.PhieuGiamGia;
 import com.example.backendlaptop.expection.ApiException;
-import com.example.backendlaptop.model.request.PhieuGiamGiaRequest;
-import com.example.backendlaptop.model.response.PageableObject;
-import com.example.backendlaptop.model.response.PhieuGiamGiaResponse;
+import com.example.backendlaptop.model.request.phieugiamgia.PhieuGiamGiaRequest;
+import com.example.backendlaptop.model.response.phieugiamgia.PhieuGiamGiaResponse;
 import com.example.backendlaptop.repository.PhieuGiamGiaRepository;
 import com.example.backendlaptop.until.MapperUtils;
-import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-
 import org.springframework.stereotype.Service;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.PageRequest;
-import java.rmi.server.UID;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 public class PhieuGiamGiaService {
