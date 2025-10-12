@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.Nationalized;
 
 import java.time.Instant;
@@ -15,6 +16,7 @@ import java.util.UUID;
 @Table(name = "san_pham")
 public class SanPham {
     @Id
+    @ColumnDefault("newid()")
     @Column(name = "id", nullable = false)
     private UUID id;
 
@@ -50,5 +52,8 @@ public class SanPham {
     @Nationalized
     @Column(name = "nguoi_sua")
     private String nguoiSua;
+
+    @Column(name = "thoi_han_bh_thang")
+    private Integer thoiHanBhThang;
 
 }

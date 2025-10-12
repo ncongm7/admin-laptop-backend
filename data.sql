@@ -763,3 +763,24 @@ ALTER TABLE hoa_don ADD trang_thai INT DEFAULT 0;
 
 -- Thêm cột số lượng tạm giữ cho Chi Tiết Sản Phẩm để quản lý tồn kho khi tạo hóa đơn chờ
 ALTER TABLE chi_tiet_san_pham ADD so_luong_tam_giu INT DEFAULT 0;
+
+//LONG 12-10 thêm code
+BEGIN TRAN;
+
+        -- 1) Thêm cột nếu chưa có (cho phép NULL, chưa ràng buộc gì)
+        IF COL_LENGTH('dbo.san_pham', 'thoi_han_bh_thang') IS NULL
+        BEGIN
+        ALTER TABLE dbo.san_pham ADD thoi_han_bh_thang INT NULL;
+        END;
+
+        -- 2) Chỉ fill cho những sản phẩm chưa có giá trị (đặt tạm = 12 tháng)
+        UPDATE dbo.san_pham
+        SET thoi_han_bh_thang = 12
+        WHERE thoi_han_bh_thang IS NULL;
+
+        COMMIT TRAN;
+        CREATE UNIQUE INDEX UX_PBH_OnePerSdb
+            ON dbo.phieu_bao_hanh(id_serial_da_ban)
+            WHERE id_serial_da_ban IS NOT NULL;
+
+
