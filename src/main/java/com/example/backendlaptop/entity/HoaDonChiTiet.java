@@ -18,7 +18,7 @@ public class HoaDonChiTiet {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_hoa_don")
+    @JoinColumn(name = "id_don_hang")
     private HoaDon hoaDon;
 
     @ManyToOne(fetch = FetchType.LAZY)
