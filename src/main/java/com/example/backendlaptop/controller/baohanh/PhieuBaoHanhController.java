@@ -26,6 +26,10 @@ public class PhieuBaoHanhController {
         service.delete(id1);
         return new ResponseObject<>(null, "Xoa thanh cong");
     }
+    @GetMapping("/detail/{id1}")
+    public ResponseObject<?> detail(@PathVariable("id1") UUID id1) {
+        return new ResponseObject<>(service.detail(id1));
+    }
 }
 
 
