@@ -11,11 +11,14 @@ import java.util.UUID;
 
 @Repository
 public interface ChiTietSanPhamRepository extends JpaRepository<ChiTietSanPham, UUID> {
-
+    
+    List<ChiTietSanPham> findBySanPham_Id(UUID sanPhamId);
+    
+    boolean existsByMaCtsp(String maCtsp);
 
     // code của long
     @Query("SELECT ctsp FROM ChiTietSanPham ctsp "
-            + "WHERE ctsp.sp.id = :sanPhamId " // Lọc theo Sản Phẩm (từ combobox)
+            + "WHERE ctsp.sanPham.id = :sanPhamId " // Lọc theo Sản Phẩm (từ combobox)
             + "AND ctsp.id NOT IN ("
             + "    SELECT dggct.idCtsp.id FROM DotGiamGiaChiTiet dggct"
             + "    WHERE dggct.dotGiamGia.id = :dotGiamGiaId" // Lọc các CTSP đã tham gia DGGD hiện tại
@@ -24,5 +27,4 @@ public interface ChiTietSanPhamRepository extends JpaRepository<ChiTietSanPham, 
             @Param("dotGiamGiaId") UUID dotGiamGiaId,
             @Param("sanPhamId") UUID sanPhamId
     );
-
 }
