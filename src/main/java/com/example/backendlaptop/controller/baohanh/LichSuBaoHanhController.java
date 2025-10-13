@@ -1,10 +1,10 @@
 package com.example.backendlaptop.controller.baohanh;
 
-import com.example.backendlaptop.model.request.baohanh.LichSuBaoHanhRequest;
+import com.example.backendlaptop.model.request.baohanh.LichSuBaoHanhAddRequest;
+import com.example.backendlaptop.model.request.baohanh.LichSuBaoHanhUpdateRequest;
 import com.example.backendlaptop.model.request.phieugiamgia.PhieuGiamGiaRequest;
 import com.example.backendlaptop.model.response.ResponseObject;
 import com.example.backendlaptop.model.response.baohanh.LichSuBaoHanhResponse;
-import com.example.backendlaptop.repository.PhieuBaoHanhRepository;
 import com.example.backendlaptop.service.baohanh.LichSuBaoHanhService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,10 +31,14 @@ public class LichSuBaoHanhController {
         return new ResponseObject<>(null, "Xoa thanh cong");
     }
     @PostMapping(value = "/add", consumes = "application/json", produces = "application/json")
-    public ResponseObject<LichSuBaoHanhResponse> add(@Valid @RequestBody LichSuBaoHanhRequest req) {
+    public ResponseObject<LichSuBaoHanhResponse> add(@Valid @RequestBody LichSuBaoHanhAddRequest req) {
         LichSuBaoHanhResponse res = service.add(req.idPhieuBaoHanh, req.moTaLoi);
         return new ResponseObject<>(res, "Thêm thành công");
     }
-
+    @PutMapping("/update/{id}")
+    public ResponseObject<?> update(@PathVariable("id") UUID id1,@Valid @RequestBody LichSuBaoHanhUpdateRequest request){
+        service.update(request,id1);
+        return new ResponseObject<>(null, "Update thanh cong");
+    }
 
 }

@@ -4,6 +4,7 @@ import com.example.backendlaptop.entity.LichSuBaoHanh;
 import com.example.backendlaptop.entity.PhieuBaoHanh;
 import com.example.backendlaptop.entity.PhieuGiamGia;
 import com.example.backendlaptop.expection.ApiException;
+import com.example.backendlaptop.model.request.baohanh.LichSuBaoHanhUpdateRequest;
 import com.example.backendlaptop.model.request.phieugiamgia.PhieuGiamGiaRequest;
 import com.example.backendlaptop.model.response.baohanh.LichSuBaoHanhResponse;
 import com.example.backendlaptop.model.response.baohanh.PhieuBaoHanhResponse;
@@ -75,6 +76,13 @@ public class LichSuBaoHanhService {
 
         LichSuBaoHanh saved = repository.save(e);
         return new LichSuBaoHanhResponse(saved);
+    }
+    public void update(LichSuBaoHanhUpdateRequest request, UUID id){
+        MapperUtils.mapToExisting(request,PhieuGiamGia.class);
+        LichSuBaoHanh   lichSuBaoHanhexist = repository.findById(id).get();
+        MapperUtils.mapToExisting(request,lichSuBaoHanhexist);
+        lichSuBaoHanhexist.setId(id);
+        repository.save(lichSuBaoHanhexist);
     }
 
 }

@@ -765,7 +765,7 @@ ALTER TABLE hoa_don ADD trang_thai INT DEFAULT 0;
 ALTER TABLE chi_tiet_san_pham ADD so_luong_tam_giu INT DEFAULT 0;
 
 //LONG 12-10 thêm code
-BEGIN TRAN;
+        BEGIN TRAN;
 
         -- 1) Thêm cột nếu chưa có (cho phép NULL, chưa ràng buộc gì)
         IF COL_LENGTH('dbo.san_pham', 'thoi_han_bh_thang') IS NULL

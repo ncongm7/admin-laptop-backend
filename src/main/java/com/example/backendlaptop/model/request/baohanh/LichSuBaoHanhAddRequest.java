@@ -6,7 +6,7 @@ import lombok.Data;
 
 import java.util.UUID;
 @Data
-public class LichSuBaoHanhRequest {
+public class LichSuBaoHanhAddRequest {
     @NotNull(message = "Thiếu id phiếu bảo hành")
     public UUID idPhieuBaoHanh;
 
