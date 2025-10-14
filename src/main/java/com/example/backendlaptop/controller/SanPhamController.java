@@ -17,6 +17,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/san-pham")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "*")
 public class SanPhamController {
     
     private final SanPhamService sanPhamService;
