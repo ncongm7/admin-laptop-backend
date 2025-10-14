@@ -766,24 +766,57 @@ ALTER TABLE hoa_don ADD trang_thai INT DEFAULT 0;
 
 -- Thêm cột số lượng tạm giữ cho Chi Tiết Sản Phẩm để quản lý tồn kho khi tạo hóa đơn chờ
 ALTER TABLE chi_tiet_san_pham ADD so_luong_tam_giu INT DEFAULT 0;
-
-//LONG 12-10 thêm code
-        BEGIN TRAN;
+-- long
+    BEGIN TRAN;
 
         -- 1) Thêm cột nếu chưa có (cho phép NULL, chưa ràng buộc gì)
         IF COL_LENGTH('dbo.san_pham', 'thoi_han_bh_thang') IS NULL
-        BEGIN
-        ALTER TABLE dbo.san_pham ADD thoi_han_bh_thang INT NULL;
-        END;
+    BEGIN
+    ALTER TABLE dbo.san_pham ADD thoi_han_bh_thang INT NULL;
+    PRINT 'Cột thoi_han_bh_thang đã được thêm vào dbo.san_pham.';
+    END
+    ELSE
+    BEGIN
+            PRINT 'Cột thoi_han_bh_thang đã tồn tại, bỏ qua bước thêm cột.';
+    END;
+
+    COMMIT TRAN;
+    GO
+    -- GO: Kết thúc Batch 1. Cột 'thoi_han_bh_thang' CHẮC CHẮN đã tồn tại trước khi chạy lệnh tiếp theo.
+
+    -- BATCH 2: Cập nhật giá trị cho cột mới
+    BEGIN TRAN;
 
         -- 2) Chỉ fill cho những sản phẩm chưa có giá trị (đặt tạm = 12 tháng)
-        UPDATE dbo.san_pham
-        SET thoi_han_bh_thang = 12
-        WHERE thoi_han_bh_thang IS NULL;
+    UPDATE dbo.san_pham
+    SET thoi_han_bh_thang = 12
+    WHERE thoi_han_bh_thang IS NULL;
 
-        COMMIT TRAN;
-        CREATE UNIQUE INDEX UX_PBH_OnePerSdb
-            ON dbo.phieu_bao_hanh(id_serial_da_ban)
-            WHERE id_serial_da_ban IS NOT NULL;
+    PRINT 'Đã cập nhật thoi_han_bh_thang = 12 tháng cho các sản phẩm NULL.';
+
+    COMMIT TRAN;
+    GO
+
+    /*************************************************/
+    /* BƯỚC 2: Thiết lập Quan hệ 1-1 (UNIQUE INDEX)  */
+    /*************************************************/
+    -- BATCH 3: Thiết lập UNIQUE INDEX để đảm bảo mỗi serial đã bán chỉ có 1 phiếu bảo hành
+
+    -- Xóa Index cũ nếu nó đã tồn tại để tránh lỗi (tùy chọn)
+    IF EXISTS (SELECT * FROM sys.indexes WHERE name = 'UX_PBH_OnePerSdb' AND object_id = OBJECT_ID('dbo.phieu_bao_hanh'))
+    BEGIN
+    DROP INDEX UX_PBH_OnePerSdb ON dbo.phieu_bao_hanh;
+    PRINT 'Đã xóa Index UX_PBH_OnePerSdb cũ.';
+    END;
+
+    -- Tạo lại UNIQUE INDEX để thiết lập quan hệ 1-1 giữa phieu_bao_hanh và id_serial_da_ban (tương đương imei đã bán)
+    CREATE UNIQUE INDEX UX_PBH_OnePerSdb
+        ON dbo.phieu_bao_hanh(id_serial_da_ban)
+        -- WHERE id_serial_da_ban IS NOT NULL: Dùng để loại trừ các giá trị NULL khỏi ràng buộc UNIQUE (chỉ áp dụng cho SQL Server)
+        WHERE id_serial_da_ban IS NOT NULL;
+
+    PRINT 'Đã tạo UNIQUE INDEX UX_PBH_OnePerSdb thành công để đảm bảo quan hệ 1-1.';
+
+    GO
 
 
