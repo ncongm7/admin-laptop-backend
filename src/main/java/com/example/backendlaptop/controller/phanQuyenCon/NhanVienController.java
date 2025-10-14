@@ -4,6 +4,7 @@ import com.example.backendlaptop.dto.phanQuyenDto.nhanVien.NhanVienRequest;
 import com.example.backendlaptop.service.PhanQuyenSer.NhanVienService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -29,27 +30,24 @@ public class NhanVienController {
 
     @PutMapping("/sua-nhan-vien/{id}")
     public ResponseEntity<Object> update(@PathVariable("id") UUID id, @RequestBody NhanVienRequest nhanVienRequest) {
-        nhanVienService.suaNV(id, nhanVienRequest );
-        return ResponseEntity.ok().build();
+        try {
+            nhanVienService.suaNV(id, nhanVienRequest);
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
+        }
 
     }
 
     @PostMapping("/add-nhan-vien")
     public ResponseEntity<Object> add(@RequestBody NhanVienRequest nhanVienRequest) {
-        nhanVienService.addNV(nhanVienRequest);
-        return ResponseEntity.ok().build();
+        try {
+            nhanVienService.addNV(nhanVienRequest);
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
+        }
     }
 
     @GetMapping("/phan-trang-nv/{pageOne}/{pageSize}")
-    public ResponseEntity<Object> phanTrangNhanVien(@PathVariable("pageOne") Integer pageOne, @PathVariable("pageSize") Integer pageSize) {
-        return ResponseEntity.ok(nhanVienService.phanTrangNV(pageOne, pageSize).getContent());
-
-
-    }
-
-    @GetMapping("/getOne/{id}")
-    public ResponseEntity<Object> getOne(@PathVariable("id") UUID id) {
-        return ResponseEntity.ok(nhanVienService.getOne(id));
-    }
-
-}
+    public ResponseEntity<Object> phanTr
