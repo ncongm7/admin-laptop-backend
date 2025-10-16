@@ -18,7 +18,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/chi-tiet-san-pham")
 @RequiredArgsConstructor
-
+@CrossOrigin(origins = "*")
 public class ChiTietSanPhamController {
     
     private final ChiTietSanPhamService chiTietSanPhamService;
