@@ -14,6 +14,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/mau-sac")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "*")
 public class MauSacController {
     
     private final MauSacRepository mauSacRepository;

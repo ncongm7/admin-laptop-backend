@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -283,6 +284,40 @@ public class ChiTietSanPhamService {
     public Page<ChiTietSanPhamResponse> getAllChiTietSanPham(Pageable pageable) {
         Page<ChiTietSanPham> chiTietSanPhams = chiTietSanPhamRepository.findAll(pageable);
         return chiTietSanPhams.map(this::convertToResponse);
+    }
+    
+    @Transactional(readOnly = true)
+    public Page<ChiTietSanPhamResponse> searchChiTietSanPham(
+            String keyword,
+            String cpu,
+            String gpu,
+            String ram,
+            String color,
+            String storage,
+            String screen,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            Pageable pageable) {
+
+        Page<ChiTietSanPham> page = chiTietSanPhamRepository.search(
+                blankToNull(keyword),
+                blankToNull(cpu),
+                blankToNull(gpu),
+                blankToNull(ram),
+                blankToNull(color),
+                blankToNull(storage),
+                blankToNull(screen),
+                minPrice,
+                maxPrice,
+                pageable);
+
+        return page.map(this::convertToResponse);
+    }
+
+    private String blankToNull(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
     }
     
     public void deleteChiTietSanPham(UUID id) {

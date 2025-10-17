@@ -14,6 +14,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/o-cung")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "*")
 public class OCungController {
     
     private final OCungRepository oCungRepository;

@@ -14,6 +14,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/loai-man-hinh")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "*")
 public class LoaiManHinhController {
     
     private final LoaiManHinhRepository loaiManHinhRepository;

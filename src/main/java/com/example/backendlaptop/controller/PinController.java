@@ -14,6 +14,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/pin")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "*")
 public class PinController {
     
     private final PinRepository pinRepository;

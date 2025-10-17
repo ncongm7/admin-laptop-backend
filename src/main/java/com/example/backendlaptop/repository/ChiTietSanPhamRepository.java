@@ -1,7 +1,11 @@
 package com.example.backendlaptop.repository;
 
 import com.example.backendlaptop.entity.ChiTietSanPham;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -12,5 +16,45 @@ public interface ChiTietSanPhamRepository extends JpaRepository<ChiTietSanPham, 
     
     List<ChiTietSanPham> findBySanPham_Id(UUID sanPhamId);
     
+    @Query("""
+        SELECT c FROM ChiTietSanPham c
+        LEFT JOIN c.cpu cpu
+        LEFT JOIN c.gpu gpu
+        LEFT JOIN c.ram ram
+        LEFT JOIN c.oCung oCung
+        LEFT JOIN c.mauSac mauSac
+        LEFT JOIN c.loaiManHinh loaiManHinh
+        LEFT JOIN c.pin pin
+        LEFT JOIN c.sanPham sp
+        WHERE (:keyword IS NULL OR :keyword = '' OR 
+               LOWER(c.maCtsp) LIKE LOWER(CONCAT('%',:keyword,'%')) OR 
+               LOWER(sp.tenSanPham) LIKE LOWER(CONCAT('%',:keyword,'%')) OR
+               LOWER(cpu.tenCpu) LIKE LOWER(CONCAT('%',:keyword,'%')) OR
+               LOWER(gpu.tenGpu) LIKE LOWER(CONCAT('%',:keyword,'%')) OR
+               LOWER(ram.tenRam) LIKE LOWER(CONCAT('%',:keyword,'%')) OR
+               LOWER(mauSac.tenMau) LIKE LOWER(CONCAT('%',:keyword,'%')) OR
+               LOWER(oCung.dungLuong) LIKE LOWER(CONCAT('%',:keyword,'%')) OR
+               LOWER(loaiManHinh.kichThuoc) LIKE LOWER(CONCAT('%',:keyword,'%')))
+          AND (:cpu IS NULL OR :cpu = '' OR LOWER(cpu.tenCpu) LIKE LOWER(CONCAT('%',:cpu,'%')))
+          AND (:gpu IS NULL OR :gpu = '' OR LOWER(gpu.tenGpu) LIKE LOWER(CONCAT('%',:gpu,'%')))
+          AND (:ram IS NULL OR :ram = '' OR LOWER(ram.tenRam) LIKE LOWER(CONCAT('%',:ram,'%')))
+          AND (:color IS NULL OR :color = '' OR LOWER(mauSac.tenMau) LIKE LOWER(CONCAT('%',:color,'%')))
+          AND (:storage IS NULL OR :storage = '' OR LOWER(oCung.dungLuong) LIKE LOWER(CONCAT('%',:storage,'%')))
+          AND (:screen IS NULL OR :screen = '' OR LOWER(loaiManHinh.kichThuoc) LIKE LOWER(CONCAT('%',:screen,'%')))
+          AND (:minPrice IS NULL OR c.giaBan >= :minPrice)
+          AND (:maxPrice IS NULL OR c.giaBan <= :maxPrice)
+        """)
+    Page<ChiTietSanPham> search(
+            @Param("keyword") String keyword,
+            @Param("cpu") String cpu,
+            @Param("gpu") String gpu,
+            @Param("ram") String ram,
+            @Param("color") String color,
+            @Param("storage") String storage,
+            @Param("screen") String screen,
+            @Param("minPrice") java.math.BigDecimal minPrice,
+            @Param("maxPrice") java.math.BigDecimal maxPrice,
+            Pageable pageable);
+
     boolean existsByMaCtsp(String maCtsp);
 }

@@ -14,6 +14,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/ram")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "*")
 public class RamController {
     
     private final RamRepository ramRepository;

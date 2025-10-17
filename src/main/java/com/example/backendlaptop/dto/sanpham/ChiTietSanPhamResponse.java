@@ -3,6 +3,7 @@ package com.example.backendlaptop.dto.sanpham;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.UUID;
 
 @Data
@@ -49,4 +50,8 @@ public class ChiTietSanPhamResponse {
     private UUID idPin;
     private String dungLuongPin;
     private String maPin;
+    
+    // Date fields
+    private Instant createdAt;
+    private Instant updatedAt;
 }

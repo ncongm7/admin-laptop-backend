@@ -14,6 +14,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/gpu")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "*")
 public class GpuController {
     
     private final GpuRepository gpuRepository;

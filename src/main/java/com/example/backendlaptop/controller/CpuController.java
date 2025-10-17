@@ -14,6 +14,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/cpu")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "*")
 public class CpuController {
     
     private final CpuRepository cpuRepository;

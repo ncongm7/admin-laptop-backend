@@ -34,4 +34,8 @@ public class MauSac {
     @Column(name = "trang_thai")
     private Integer trangThai;
 
+    @Size(max = 7)
+    @Column(name = "hex_code", length = 7)
+    private String hexCode;
+
 }

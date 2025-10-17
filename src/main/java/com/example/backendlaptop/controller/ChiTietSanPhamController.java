@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -63,6 +64,25 @@ public class ChiTietSanPhamController {
     public ResponseEntity<Page<ChiTietSanPhamResponse>> getAllChiTietSanPham(Pageable pageable) {
         Page<ChiTietSanPhamResponse> responses = chiTietSanPhamService.getAllChiTietSanPham(pageable);
         return ResponseEntity.ok(responses);
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<Page<ChiTietSanPhamResponse>> searchChiTietSanPham(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String cpu,
+            @RequestParam(required = false) String gpu,
+            @RequestParam(required = false) String ram,
+            @RequestParam(required = false) String color,
+            @RequestParam(required = false) String storage,
+            @RequestParam(required = false) String screen,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            Pageable pageable) {
+
+        Page<ChiTietSanPhamResponse> results = chiTietSanPhamService.searchChiTietSanPham(
+                keyword, cpu, gpu, ram, color, storage, screen, minPrice, maxPrice, pageable);
+
+        return ResponseEntity.ok(results);
     }
     
     @PutMapping("/{id}/trang-thai")
