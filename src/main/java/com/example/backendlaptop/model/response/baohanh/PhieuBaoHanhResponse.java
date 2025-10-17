@@ -45,9 +45,9 @@ public class PhieuBaoHanhResponse {
             HoaDonChiTiet hdct = serialDaBan.getIdHoaDonChiTiet();
             if (hdct != null &&
                     hdct.getChiTietSanPham() != null &&
-                    hdct.getChiTietSanPham().getSp() != null) {
+                    hdct.getChiTietSanPham().getSanPham() != null) {
 
-                this.tenSP = hdct.getChiTietSanPham().getSp().getTenSanPham();
+                this.tenSP = hdct.getChiTietSanPham().getSanPham().getTenSanPham();
             } else {
                 this.tenSP = "Sản phẩm không xác định";
             }

@@ -22,35 +22,7 @@ public class ChiTietSanPham {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sp_id")
-    private SanPham sp;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cpu_id")
-    private Cpu cpu;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "ram_id")
-    private Ram ram;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "o_cung_id")
-    private OCung oCung;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "gpu_id")
-    private Gpu gpu;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "loai_man_hinh_id")
-    private LoaiManHinh loaiManHinh;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "pin_id")
-    private Pin pin;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "mau_sac_id")
-    private MauSac mauSac;
+    private SanPham sanPham;
 
     @Size(max = 50)
     @Column(name = "ma_ctsp", length = 50)
@@ -66,5 +38,44 @@ public class ChiTietSanPham {
 
     @Column(name = "trang_thai")
     private Integer trangThai;
+
+    @Column(name = "so_luong_ton")
+    private Integer soLuongTon;
+    
+    @Column(name = "so_luong_tam_giu")
+    private Integer soLuongTamGiu;
+
+    @Version
+    @Column(name = "version")
+    private Long version;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cpu_id")
+    private Cpu cpu;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "gpu_id")
+    private Gpu gpu;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ram_id")
+    private Ram ram;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "o_cung_id")
+    private OCung oCung;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "mau_sac_id")
+    private MauSac mauSac;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "loai_man_hinh_id")
+    private LoaiManHinh loaiManHinh;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pin_id")
+    private Pin pin;
+
 
 }
