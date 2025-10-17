@@ -763,7 +763,7 @@ INSERT INTO phan_hoi_danh_gia (danh_gia_id, nhan_vien_id, noi_dung, ngay_phan_ho
 GO
 
 ALTER TABLE hoa_don ADD trang_thai INT DEFAULT 0;
-
+---COde db mới của long
 -- Thêm cột số lượng tạm giữ cho Chi Tiết Sản Phẩm để quản lý tồn kho khi tạo hóa đơn chờ
 ALTER TABLE chi_tiet_san_pham ADD so_luong_tam_giu INT DEFAULT 0;
 -- long

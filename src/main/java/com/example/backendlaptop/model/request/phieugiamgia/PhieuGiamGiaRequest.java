@@ -22,7 +22,7 @@ public class PhieuGiamGiaRequest {
     private String tenPhieuGiamGia;
 
     @NotNull(message = "Loại phiếu giảm giá không được để trống")
-    private Integer loaiPhieuGiamGia; // 0 = %, 1 = tiền mặt,...
+    private Integer loaiPhieuGiamGia;
 
     @DecimalMin(value = "0.0", message = "Giá trị giảm phải >= 0")
     private BigDecimal giaTriGiamGia;
@@ -47,7 +47,5 @@ public class PhieuGiamGiaRequest {
     private Boolean riengTu = false;
 
     private String moTa;
-
-    private Integer trangThai = 1; // 1 = hoạt động, 0 = ngưng
 }
 
