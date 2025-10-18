@@ -42,6 +42,7 @@ public class ChiTietSanPhamResponse {
     private UUID idMauSac;
     private String tenMauSac;
     private String maMauSac;
+    private String hexCode;
     
     private UUID idLoaiManHinh;
     private String kichThuocManHinh;

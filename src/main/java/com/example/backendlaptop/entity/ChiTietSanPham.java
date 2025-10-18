@@ -5,6 +5,8 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.Nationalized;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -77,9 +79,11 @@ public class ChiTietSanPham {
     @JoinColumn(name = "pin_id")
     private Pin pin;
 
-    @Column(name = "ngay_tao")
+    @CreationTimestamp
+    @Column(name = "ngay_tao", updatable = false)
     private Instant ngayTao;
 
+    @UpdateTimestamp
     @Column(name = "ngay_sua")
     private Instant ngaySua;
 

@@ -378,6 +378,7 @@ public class ChiTietSanPhamService {
             response.setIdMauSac(chiTietSanPham.getMauSac().getId());
             response.setTenMauSac(chiTietSanPham.getMauSac().getTenMau());
             response.setMaMauSac(chiTietSanPham.getMauSac().getMaMau());
+            response.setHexCode(chiTietSanPham.getMauSac().getHexCode());
         }
         
         // Set thông tin loại màn hình
@@ -393,6 +394,10 @@ public class ChiTietSanPhamService {
             response.setDungLuongPin(chiTietSanPham.getPin().getDungLuongPin());
             response.setMaPin(chiTietSanPham.getPin().getMaPin());
         }
+        
+        // Set timestamp fields
+        response.setCreatedAt(chiTietSanPham.getNgayTao());
+        response.setUpdatedAt(chiTietSanPham.getNgaySua());
         
         return response;
     }
