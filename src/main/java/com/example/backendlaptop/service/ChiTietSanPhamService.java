@@ -58,47 +58,76 @@ public class ChiTietSanPhamService {
         return convertToResponse(savedChiTietSanPham);
     }
     
+    @Transactional
     public List<ChiTietSanPhamResponse> taoBienTheSanPham(TaoBienTheSanPhamRequest request) {
-        // Kiểm tra sản phẩm tồn tại
-        SanPham sanPham = sanPhamRepository.findById(request.getIdSanPham())
-                .orElseThrow(() -> new ApiException("Không tìm thấy sản phẩm với ID: " + request.getIdSanPham()));
-        
-        // Tạo tất cả các tổ hợp có thể từ các thuộc tính đặc trưng được chọn
-        List<List<UUID>> allCombinations = generateAllCombinations(request);
-        
-        List<ChiTietSanPhamResponse> createdVariants = new ArrayList<>();
-        
-        for (List<UUID> combination : allCombinations) {
-            ChiTietSanPham chiTietSanPham = new ChiTietSanPham();
-            chiTietSanPham.setSanPham(sanPham);
-            chiTietSanPham.setMaCtsp(generateMaCtsp(sanPham.getMaSanPham(), combination));
-            chiTietSanPham.setGiaBan(request.getGiaBan());
-            chiTietSanPham.setGhiChu(request.getGhiChu());
-            chiTietSanPham.setSoLuongTon(request.getSoLuongTon());
-            chiTietSanPham.setSoLuongTamGiu(request.getSoLuongTamGiu());
-            chiTietSanPham.setTrangThai(request.getTrangThai());
+        try {
+            // Kiểm tra sản phẩm tồn tại
+            SanPham sanPham = sanPhamRepository.findById(request.getIdSanPham())
+                    .orElseThrow(() -> new ApiException("Không tìm thấy sản phẩm với ID: " + request.getIdSanPham()));
             
-            // Set các thuộc tính đặc trưng từ combination
-            setThuocTinhDacTrungFromCombination(chiTietSanPham, combination, request);
+            // Validate request data
+            if (request.getGiaBan() == null || request.getGiaBan().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new ApiException("Giá bán phải lớn hơn 0");
+            }
             
-            ChiTietSanPham savedChiTietSanPham = chiTietSanPhamRepository.save(chiTietSanPham);
-            createdVariants.add(convertToResponse(savedChiTietSanPham));
+            if (request.getSoLuongTon() == null || request.getSoLuongTon() < 0) {
+                throw new ApiException("Số lượng tồn không được âm");
+            }
+            
+            // Tạo tất cả các tổ hợp có thể từ các thuộc tính đặc trưng được chọn
+            List<List<UUID>> allCombinations = generateAllCombinations(request);
+            
+            if (allCombinations.isEmpty()) {
+                throw new ApiException("Không có tổ hợp nào được tạo từ các thuộc tính đã chọn");
+            }
+            
+            List<ChiTietSanPhamResponse> createdVariants = new ArrayList<>();
+            
+            for (List<UUID> combination : allCombinations) {
+                ChiTietSanPham chiTietSanPham = new ChiTietSanPham();
+                chiTietSanPham.setSanPham(sanPham);
+                chiTietSanPham.setMaCtsp(generateMaCtsp(sanPham.getMaSanPham(), combination));
+                chiTietSanPham.setGiaBan(request.getGiaBan());
+                chiTietSanPham.setGhiChu(request.getGhiChu());
+                chiTietSanPham.setSoLuongTon(request.getSoLuongTon());
+                chiTietSanPham.setSoLuongTamGiu(request.getSoLuongTamGiu() != null ? request.getSoLuongTamGiu() : 0);
+                chiTietSanPham.setTrangThai(request.getTrangThai());
+                
+                // Set các thuộc tính đặc trưng từ combination
+                setThuocTinhDacTrungFromCombination(chiTietSanPham, combination, request);
+                
+                try {
+                    ChiTietSanPham savedChiTietSanPham = chiTietSanPhamRepository.save(chiTietSanPham);
+                    createdVariants.add(convertToResponse(savedChiTietSanPham));
+                } catch (Exception e) {
+                    throw new ApiException("Lỗi khi lưu biến thể: " + e.getMessage());
+                }
+            }
+            
+            return createdVariants;
+        } catch (Exception e) {
+            throw new ApiException("Lỗi khi tạo biến thể: " + e.getMessage());
         }
-        
-        return createdVariants;
     }
     
     private List<List<UUID>> generateAllCombinations(TaoBienTheSanPhamRequest request) {
         List<List<UUID>> allCombinations = new ArrayList<>();
         
-        // Lấy tất cả các thuộc tính đặc trưng được chọn
-        List<UUID> cpuIds = request.getSelectedCpuIds() != null ? request.getSelectedCpuIds() : new ArrayList<>();
-        List<UUID> gpuIds = request.getSelectedGpuIds() != null ? request.getSelectedGpuIds() : new ArrayList<>();
-        List<UUID> ramIds = request.getSelectedRamIds() != null ? request.getSelectedRamIds() : new ArrayList<>();
-        List<UUID> oCungIds = request.getSelectedOCungIds() != null ? request.getSelectedOCungIds() : new ArrayList<>();
-        List<UUID> mauSacIds = request.getSelectedMauSacIds() != null ? request.getSelectedMauSacIds() : new ArrayList<>();
-        List<UUID> loaiManHinhIds = request.getSelectedLoaiManHinhIds() != null ? request.getSelectedLoaiManHinhIds() : new ArrayList<>();
-        List<UUID> pinIds = request.getSelectedPinIds() != null ? request.getSelectedPinIds() : new ArrayList<>();
+        // Lấy tất cả các thuộc tính đặc trưng được chọn, thêm null nếu không có chọn
+        List<UUID> cpuIds = request.getSelectedCpuIds() != null && !request.getSelectedCpuIds().isEmpty() 
+            ? request.getSelectedCpuIds() : Arrays.asList((UUID) null);
+        List<UUID> gpuIds = request.getSelectedGpuIds() != null && !request.getSelectedGpuIds().isEmpty() 
+            ? request.getSelectedGpuIds() : Arrays.asList((UUID) null);
+        List<UUID> ramIds = request.getSelectedRamIds() != null && !request.getSelectedRamIds().isEmpty() 
+            ? request.getSelectedRamIds() : Arrays.asList((UUID) null);
+        List<UUID> oCungIds = request.getSelectedOCungIds() != null && !request.getSelectedOCungIds().isEmpty() 
+            ? request.getSelectedOCungIds() : Arrays.asList((UUID) null);
+        List<UUID> mauSacIds = request.getSelectedMauSacIds() != null && !request.getSelectedMauSacIds().isEmpty() 
+            ? request.getSelectedMauSacIds() : Arrays.asList((UUID) null);
+        List<UUID> loaiManHinhIds = request.getSelectedLoaiManHinhIds() != null && !request.getSelectedLoaiManHinhIds().isEmpty() 
+            ? request.getSelectedLoaiManHinhIds() : Arrays.asList((UUID) null);
+        List<UUID> pinIds = request.getSelectedPinIds() != null && !request.getSelectedPinIds().isEmpty() 
+            ? request.getSelectedPinIds() : Arrays.asList((UUID) null);
         
         // Tạo tất cả các tổ hợp có thể
         for (UUID cpuId : cpuIds) {
@@ -122,11 +151,19 @@ public class ChiTietSanPhamService {
     }
     
     private String generateMaCtsp(String maSanPham, List<UUID> combination) {
-        // Tạo mã chi tiết sản phẩm dựa trên mã sản phẩm và các thuộc tính đặc trưng
+        // Tạo mã chi tiết sản phẩm ngắn gọn hơn
         StringBuilder maCtsp = new StringBuilder(maSanPham);
-        for (UUID id : combination) {
-            maCtsp.append("-").append(id.toString().substring(0, 8));
-        }
+        
+        // Tạo hash ngắn từ combination để tránh mã quá dài
+        int hashCode = combination.hashCode();
+        String shortHash = Integer.toHexString(Math.abs(hashCode)).substring(0, Math.min(6, Integer.toHexString(Math.abs(hashCode)).length()));
+        
+        maCtsp.append("-V").append(shortHash.toUpperCase());
+        
+        // Thêm timestamp để đảm bảo unique
+        long timestamp = System.currentTimeMillis() % 10000;
+        maCtsp.append("-").append(timestamp);
+        
         return maCtsp.toString();
     }
     
