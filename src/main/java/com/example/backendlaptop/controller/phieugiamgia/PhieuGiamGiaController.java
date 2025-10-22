@@ -1,15 +1,12 @@
-package com.example.backendlaptop.controller;
+package com.example.backendlaptop.controller.phieugiamgia;
 
-import com.example.backendlaptop.model.request.PhieuGiamGiaRequest;
-import com.example.backendlaptop.model.response.PhieuGiamGiaResponse;
+import com.example.backendlaptop.model.request.phieugiamgia.PhieuGiamGiaRequest;
 import com.example.backendlaptop.model.response.ResponseObject;
-import com.example.backendlaptop.service.PhieuGiamGiaService;
+import com.example.backendlaptop.service.phieugiamgia.PhieuGiamGiaService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController

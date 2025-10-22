@@ -1,9 +1,12 @@
 package com.example.backendlaptop.entity;
 
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.Nationalized;
 
 import java.time.Instant;
@@ -12,9 +15,11 @@ import java.util.UUID;
 @Getter
 @Setter
 @Entity
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 @Table(name = "tai_khoan")
 public class TaiKhoan {
     @Id
+    @ColumnDefault("newid()")
     @Column(name = "id", nullable = false)
     private UUID id;
 
