@@ -32,11 +32,37 @@ public class NhanVienService {
     }
 
     public void addNV(NhanVienRequest nhanVienRequest) {
+        // Normalize
+        String ma = nhanVienRequest.getMaNhanVien() != null ? nhanVienRequest.getMaNhanVien().trim() : null;
+        String email = nhanVienRequest.getEmail() != null ? nhanVienRequest.getEmail().trim().toLowerCase() : null;
+        String sdt = nhanVienRequest.getSoDienThoai() != null ? nhanVienRequest.getSoDienThoai().trim() : null;
+
+        if (ma == null || ma.isEmpty()) {
+            throw new IllegalArgumentException("Mã nhân viên không được để trống");
+        }
+        if (email == null || email.isEmpty()) {
+            throw new IllegalArgumentException("Email không được để trống");
+        }
+        if (sdt == null || sdt.isEmpty()) {
+            throw new IllegalArgumentException("Số điện thoại không được để trống");
+        }
+
+        // Duplicate checks
+        if (nhanVienRepository.existsByMaNhanVienIgnoreCase(ma)) {
+            throw new IllegalArgumentException("Mã nhân viên đã tồn tại");
+        }
+        if (nhanVienRepository.existsByEmailIgnoreCase(email)) {
+            throw new IllegalArgumentException("Email đã tồn tại");
+        }
+        if (nhanVienRepository.existsBySoDienThoai(sdt)) {
+            throw new IllegalArgumentException("Số điện thoại đã tồn tại");
+        }
+
         NhanVien nhanVien = new NhanVien();
-        nhanVien.setMaNhanVien(nhanVienRequest.getMaNhanVien());
+        nhanVien.setMaNhanVien(ma);
         nhanVien.setHoTen(nhanVienRequest.getHoTen());
-        nhanVien.setSoDienThoai(nhanVienRequest.getSoDienThoai());
-        nhanVien.setEmail(nhanVienRequest.getEmail());
+        nhanVien.setSoDienThoai(sdt);
+        nhanVien.setEmail(email);
         nhanVien.setGioiTinh(nhanVienRequest.getGioiTinh());
         nhanVien.setAnhNhanVien(nhanVienRequest.getAnhNhanVien());
         nhanVien.setChucVu(nhanVienRequest.getChucVu());
@@ -51,11 +77,38 @@ public class NhanVienService {
         nhanVienRepository.deleteById(id);
     }
     public void suaNV(UUID id, NhanVienRequest nhanVienRequest) {
-        var nhanVien = nhanVienRepository.findById(id).orElseThrow(()-> new RuntimeException("Nhân viên k tồn tại"));
-        nhanVien.setMaNhanVien(nhanVienRequest.getMaNhanVien());
+        var nhanVien = nhanVienRepository.findById(id).orElseThrow(() -> new RuntimeException("Nhân viên không tồn tại"));
+
+        // Normalize
+        String ma = nhanVienRequest.getMaNhanVien() != null ? nhanVienRequest.getMaNhanVien().trim() : null;
+        String email = nhanVienRequest.getEmail() != null ? nhanVienRequest.getEmail().trim().toLowerCase() : null;
+        String sdt = nhanVienRequest.getSoDienThoai() != null ? nhanVienRequest.getSoDienThoai().trim() : null;
+
+        if (ma == null || ma.isEmpty()) {
+            throw new IllegalArgumentException("Mã nhân viên không được để trống");
+        }
+        if (email == null || email.isEmpty()) {
+            throw new IllegalArgumentException("Email không được để trống");
+        }
+        if (sdt == null || sdt.isEmpty()) {
+            throw new IllegalArgumentException("Số điện thoại không được để trống");
+        }
+
+        // Duplicate checks excluding current id
+        if (nhanVienRepository.existsMaNhanVienForUpdate(ma, id)) {
+            throw new IllegalArgumentException("Mã nhân viên đã tồn tại");
+        }
+        if (nhanVienRepository.existsEmailForUpdate(email, id)) {
+            throw new IllegalArgumentException("Email đã tồn tại");
+        }
+        if (nhanVienRepository.existsPhoneForUpdate(sdt, id)) {
+            throw new IllegalArgumentException("Số điện thoại đã tồn tại");
+        }
+
+        nhanVien.setMaNhanVien(ma);
         nhanVien.setHoTen(nhanVienRequest.getHoTen());
-        nhanVien.setSoDienThoai(nhanVienRequest.getSoDienThoai());
-        nhanVien.setEmail(nhanVienRequest.getEmail());
+        nhanVien.setSoDienThoai(sdt);
+        nhanVien.setEmail(email);
         nhanVien.setGioiTinh(nhanVienRequest.getGioiTinh());
         nhanVien.setAnhNhanVien(nhanVienRequest.getAnhNhanVien());
         nhanVien.setChucVu(nhanVienRequest.getChucVu());
