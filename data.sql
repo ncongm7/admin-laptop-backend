@@ -870,7 +870,7 @@ ALTER TABLE mau_sac
 ALTER TABLE mau_sac
     ADD hex_code varchar(7);
 --hien
-ALTER TABLE dbo.nhan_vien DROP CONSTRAINT [UQ__nhan_vie__FFC64A2B9DDD06F3];
+DECLARE @c NVARCHAR(255) = (SELECT name FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID('nhan_vien') AND referenced_object_id = OBJECT_ID('tai_khoan')); EXEC('ALTER TABLE nhan_vien DROP CONSTRAINT [' + @c + ']');
 --NHIỀU MÃ TÀI KHOẢN NULL
 CREATE UNIQUE INDEX UX_NhanVien_MaTaiKhoan_NotNull
     ON dbo.nhan_vien(ma_tai_khoan)
