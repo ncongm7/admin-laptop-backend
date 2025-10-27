@@ -594,6 +594,23 @@ BEGIN TRAN;
         GO
 
         BEGIN TRAN;
+select*
+from dia_chi
+
+--linh thêm mới
+ALTER TABLE dia_chi
+    ADD ho_ten NVARCHAR(100),
+    so_dien_thoai VARCHAR(15),
+    xa NVARCHAR(100),
+    tinh NVARCHAR(100);
+	-- Xóa constraint cũ
+ALTER TABLE khach_hang DROP CONSTRAINT UQ__khach_ha__FFC64A2B0AE193BD;  -- hoặc dùng đúng tên constraint thực tế
+
+-- Tạo lại unique index có điều kiện (filtered index)
+CREATE UNIQUE INDEX UQ_khach_hang_ma_tai_khoan_notnull
+ON khach_hang(ma_tai_khoan)
+WHERE ma_tai_khoan IS NOT NULL;
+
 
             -- 2) Chỉ fill cho những sản phẩm chưa có giá trị (đặt tạm = 12 tháng)
         UPDATE dbo.san_pham
@@ -637,7 +654,7 @@ BEGIN TRAN;
             WHERE thoi_han_bh_thang IS NULL;
 
             COMMIT TRAN;
-            
+
             ---------------------------------------------------------------------------------
             CREATE UNIQUE INDEX UX_PBH_OnePerSdb
                 ON dbo.phieu_bao_hanh(id_serial_da_ban)
@@ -696,7 +713,7 @@ ADD created_at DATETIME2;
 ALTER TABLE o_cung
 ADD update_at DATETIME2
 
-ALTER TABLE loai_man_hinh 
+ALTER TABLE loai_man_hinh
 ADD created_at DATETIME2;
 
 ALTER TABLE loai_man_hinh

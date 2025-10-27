@@ -32,6 +32,27 @@ public class KhachHangService {
         return khachHangRepository.findById(id).orElse(null);
     }
 
+//    tìm kiếm khách hàng
+    public List<KhachHangDto> timKiem(String ten, String sdt){
+        return khachHangRepository.searchByMultiField(ten,sdt);
+    }
+
+//   Tuwju tao ma
+public String generateMaKhachHang() {
+    String lastCode = khachHangRepository.findLastMaKhachHangOfYear();
+    int year = java.time.Year.now().getValue();
+    int nextNumber = 1;
+
+    if (lastCode != null && lastCode.startsWith("KH" + year)) {
+        // Lấy phần số cuối cùng sau dấu '-'
+        String numberPart = lastCode.substring(lastCode.lastIndexOf('-') + 1);
+        nextNumber = Integer.parseInt(numberPart) + 1;
+    }
+
+    // Định dạng mã: KH2025-001
+    return String.format("KH%d-%03d", year, nextNumber);
+}
+//Thêm khách hàng
     public void addKH(KhachHangRequest khachHangRequest) {
         var khachHang = new KhachHang();
         khachHang.setMaKhachHang(khachHangRequest.getMaKhachHang());
@@ -68,6 +89,8 @@ public class KhachHangService {
         Page<KhachHangDto> khachHangDtoPage =khachHangRepository.phanTrangKH(pageable);
         return khachHangDtoPage;
     }
+
+
 
 
 }
