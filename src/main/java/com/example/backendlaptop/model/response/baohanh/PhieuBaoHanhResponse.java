@@ -24,7 +24,7 @@ public class PhieuBaoHanhResponse {
     public PhieuBaoHanhResponse(PhieuBaoHanh entity){
         this.id = entity.getId();
 
-        // ⚠️ PHẦN SỬA LỖI KHÁCH HÀNG (Nguyên nhân trực tiếp gây lỗi hiện tại)
+
         if (entity.getIdKhachHang() != null) {
             this.hoTenKhachHang = entity.getIdKhachHang().getHoTen();
             this.soDienThoai = entity.getIdKhachHang().getSoDienThoai();
@@ -34,7 +34,6 @@ public class PhieuBaoHanhResponse {
             this.soDienThoai = null;
         }
 
-        // ✅ NÊN SỬA LUÔN CẢ PHẦN SẢN PHẨM VÀ SERIAL (dễ bị null tương tự)
 
         // Sửa Serial
         SerialDaBan serialDaBan = entity.getIdSerialDaBan();
@@ -45,9 +44,9 @@ public class PhieuBaoHanhResponse {
             HoaDonChiTiet hdct = serialDaBan.getIdHoaDonChiTiet();
             if (hdct != null &&
                     hdct.getChiTietSanPham() != null &&
-                    hdct.getChiTietSanPham().getSp() != null) {
+                    hdct.getChiTietSanPham().getSanPham() != null) {
 
-                this.tenSP = hdct.getChiTietSanPham().getSp().getTenSanPham();
+                this.tenSP = hdct.getChiTietSanPham().getSanPham().getTenSanPham();
             } else {
                 this.tenSP = "Sản phẩm không xác định";
             }

@@ -4,10 +4,12 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.Nationalized;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.UUID;
 
 @Getter
@@ -16,41 +18,13 @@ import java.util.UUID;
 @Table(name = "chi_tiet_san_pham")
 public class ChiTietSanPham {
     @Id
-    @ColumnDefault("newid()")
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", nullable = false)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne()
     @JoinColumn(name = "sp_id")
-    private SanPham sp;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cpu_id")
-    private Cpu cpu;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "ram_id")
-    private Ram ram;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "o_cung_id")
-    private OCung oCung;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "gpu_id")
-    private Gpu gpu;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "loai_man_hinh_id")
-    private LoaiManHinh loaiManHinh;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "pin_id")
-    private Pin pin;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "mau_sac_id")
-    private MauSac mauSac;
+    private SanPham sanPham;
 
     @Size(max = 50)
     @Column(name = "ma_ctsp", length = 50)
@@ -64,18 +38,58 @@ public class ChiTietSanPham {
     @Column(name = "ghi_chu")
     private String ghiChu;
 
-    @ColumnDefault("0")
+
+
     @Column(name = "so_luong_ton")
     private Integer soLuongTon;
 
-    @ColumnDefault("0")
+
     @Column(name = "so_luong_tam_giu")
     private Integer soLuongTamGiu;
 
     @Column(name = "trang_thai")
     private Integer trangThai;
 
+
+    @Version
     @Column(name = "version")
     private Long version;
+
+    @ManyToOne()
+    @JoinColumn(name = "cpu_id")
+    private Cpu cpu;
+
+    @ManyToOne()
+    @JoinColumn(name = "gpu_id")
+    private Gpu gpu;
+
+    @ManyToOne()
+    @JoinColumn(name = "ram_id")
+    private Ram ram;
+
+    @ManyToOne()
+    @JoinColumn(name = "o_cung_id")
+    private OCung oCung;
+
+    @ManyToOne()
+    @JoinColumn(name = "mau_sac_id")
+    private MauSac mauSac;
+
+    @ManyToOne()
+    @JoinColumn(name = "loai_man_hinh_id")
+    private LoaiManHinh loaiManHinh;
+
+    @ManyToOne()
+    @JoinColumn(name = "pin_id")
+    private Pin pin;
+
+    @CreationTimestamp
+    @Column(name = "ngay_tao", updatable = false)
+    private Instant ngayTao;
+
+    @UpdateTimestamp
+    @Column(name = "ngay_sua")
+    private Instant ngaySua;
+
 
 }

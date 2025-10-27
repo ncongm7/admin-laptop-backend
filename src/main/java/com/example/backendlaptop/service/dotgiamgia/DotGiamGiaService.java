@@ -6,6 +6,7 @@ import com.example.backendlaptop.model.request.dotgiamgia.DotGiamGiaRequest;
 import com.example.backendlaptop.model.response.dotgiamgia.DotGiamGiaResponse;
 import com.example.backendlaptop.repository.DotGiamGiaChiTietRepository;
 import com.example.backendlaptop.repository.DotGiamGiaRepository;
+import com.example.backendlaptop.until.CheckNgayBatDauKetThuc;
 import com.example.backendlaptop.until.MapperUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -34,8 +35,10 @@ public class DotGiamGiaService {
         repository.deleteById(id);
     }
 
-    public void add(DotGiamGiaRequest request) {
-        DotGiamGia dotGiamGia = MapperUtils.map(request, DotGiamGia.class);
+    public void add(DotGiamGiaRequest req) {
+        DotGiamGia dotGiamGia = MapperUtils.map(req, DotGiamGia.class);
+        int status = CheckNgayBatDauKetThuc.status(req.getNgayBatDau(), req.getNgayKetThuc());
+        dotGiamGia.setTrangThai(status);
         repository.save(dotGiamGia);
     }
 
@@ -44,6 +47,8 @@ public class DotGiamGiaService {
         var dot = repository.findById(id).orElseThrow(() -> new ApiException("Not Found", "NF"));
         MapperUtils.mapToExisting(request, dot);
         dot.setId(id);
+        int status = CheckNgayBatDauKetThuc.status(request.getNgayBatDau(), request.getNgayKetThuc());
+        dot.setTrangThai(status);
         repository.save(dot);
 
         // Reprice toàn bộ chi tiết thuộc đợt + làm đẹp giá xuống 1.000

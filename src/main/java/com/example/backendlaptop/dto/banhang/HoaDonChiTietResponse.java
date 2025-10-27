@@ -27,8 +27,8 @@ public class HoaDonChiTietResponse {
         // Lấy thông tin sản phẩm
         if (hoaDonChiTiet.getChiTietSanPham() != null) {
             this.maChiTietSanPham = hoaDonChiTiet.getChiTietSanPham().getMaCtsp();
-            if (hoaDonChiTiet.getChiTietSanPham().getSp() != null) {
-                this.tenSanPham = hoaDonChiTiet.getChiTietSanPham().getSp().getTenSanPham();
+            if (hoaDonChiTiet.getChiTietSanPham().getSanPham() != null) {
+                this.tenSanPham = hoaDonChiTiet.getChiTietSanPham().getSanPham().getTenSanPham();
             }
         }
         
