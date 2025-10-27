@@ -1,8 +1,8 @@
-package com.example.backendlaptop.controller;
+package com.example.backendlaptop.controller.banhang;
 
 import com.example.backendlaptop.dto.giohang.GioHangRequest;
 import com.example.backendlaptop.model.response.ResponseObject;
-import com.example.backendlaptop.service.GioHangService;
+import com.example.backendlaptop.service.banhang.GioHangService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;

@@ -1,11 +1,11 @@
-package com.example.backendlaptop.service;
+package com.example.backendlaptop.service.banhang;
 
 import com.example.backendlaptop.dto.giohang.GioHangRequest;
 import com.example.backendlaptop.dto.giohang.GioHangResponse;
 import com.example.backendlaptop.entity.GioHang;
 import com.example.backendlaptop.entity.KhachHang;
 import com.example.backendlaptop.expection.ApiException;
-import com.example.backendlaptop.repository.GioHangRepository;
+import com.example.backendlaptop.repository.banhang.GioHangRepository;
 import com.example.backendlaptop.repository.KhachHangRepository;
 import com.example.backendlaptop.until.MapperUtils;
 import org.springframework.beans.factory.annotation.Autowired;

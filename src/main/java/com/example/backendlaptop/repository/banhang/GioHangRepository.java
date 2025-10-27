@@ -1,4 +1,4 @@
-package com.example.backendlaptop.repository;
+package com.example.backendlaptop.repository.banhang;
 
 import com.example.backendlaptop.entity.GioHang;
 import org.springframework.data.jpa.repository.JpaRepository;

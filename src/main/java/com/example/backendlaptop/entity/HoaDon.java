@@ -85,7 +85,7 @@ public class HoaDon {
     @Column(name = "trang_thai_thanh_toan")
     private Integer trangThaiThanhToan;
 
-    @Enumerated(EnumType.STRING)
+    @Enumerated(EnumType.ORDINAL)
     @Column(name = "trang_thai")
     private TrangThaiHoaDon trangThai;
 

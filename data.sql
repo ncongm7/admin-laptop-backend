@@ -13,11 +13,10 @@
       correcting discrepancies and adding all missing attributes.
 */
 
--- CREATE DATABASE QuanLyBanHangLaptop_TheoERD;
--- GO
--- USE QuanLyBanHangLaptop_TheoERD;
--- GO
-
+ CREATE DATABASE QuanLyBanHangLaptop_TheoERD1;
+ GO
+ USE QuanLyBanHangLaptop_TheoERD1;
+go
 -- ===================================================================================
 -- I. CÁC BẢNG DANH MỤC CỐT LÕI
 -- ===================================================================================
@@ -27,6 +26,7 @@ CREATE TABLE phuong_thuc_thanh_toan (
                                         ten_phuong_thuc NVARCHAR(255),
                                         loai_phuong_thuc NVARCHAR(100)
 );
+
 
 CREATE TABLE cpu ( id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(), ma_cpu VARCHAR(50) UNIQUE, ten_cpu NVARCHAR(255), mo_ta NVARCHAR(MAX), trang_thai INT );
 CREATE TABLE ram ( id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(), ma_ram VARCHAR(50) UNIQUE, ten_ram NVARCHAR(255), mo_ta NVARCHAR(MAX), trang_thai INT );
@@ -535,6 +535,7 @@ INSERT INTO vai_tro (ma_vai_tro, ten_vai_tro, mo_ta) VALUES
 
 -- 10. Tài khoản
 INSERT INTO tai_khoan (ma_vai_tro, ten_dang_nhap, mat_khau, email, trang_thai, ngay_tao, lan_dang_nhap_cuoi) VALUES
+((SELECT id FROM vai_tro WHERE ma_vai_tro = 'CUSTOMER'), 'customer02', 'customer123', 'customer2@email.com', 1, GETDATE(), GETDATE()),
 ((SELECT id FROM vai_tro WHERE ma_vai_tro = 'ADMIN'), 'admin', 'admin123', 'admin@laptopstore.com', 1, GETDATE(), GETDATE()),
 ((SELECT id FROM vai_tro WHERE ma_vai_tro = 'MANAGER'), 'manager01', 'manager123', 'manager@laptopstore.com', 1, GETDATE(), GETDATE()),
 ((SELECT id FROM vai_tro WHERE ma_vai_tro = 'STAFF'), 'staff01', 'staff123', 'staff@laptopstore.com', 1, GETDATE(), GETDATE()),
@@ -543,8 +544,8 @@ INSERT INTO tai_khoan (ma_vai_tro, ten_dang_nhap, mat_khau, email, trang_thai, n
 
 -- 11. Khách hàng
 INSERT INTO khach_hang (ma_tai_khoan, ma_khach_hang, ho_ten, so_dien_thoai, email, gioi_tinh, ngay_sinh, trang_thai) VALUES
-((SELECT id FROM tai_khoan WHERE ten_dang_nhap = 'customer01'), 'KH001', 'Nguyễn Văn An', '0901234567', 'an.nguyen@email.com', 1, '1990-05-15', 1),
-((SELECT id FROM tai_khoan WHERE ten_dang_nhap = 'customer01'), 'KH002', 'Trần Thị Bình', '0901234568', 'binh.tran@email.com', 0, '1992-08-20', 1),
+--((SELECT id FROM tai_khoan WHERE ten_dang_nhap = 'customer01'), 'KH001', 'Nguyễn Văn An', '0901234567', 'an.nguyen@email.com', 1, '1990-05-15', 1),
+((SELECT id FROM tai_khoan WHERE ten_dang_nhap = 'customer02'), 'KH002', 'Trần Thị Bình', '0901234568', 'binh.tran@email.com', 0, '1992-08-20', 1),
 ((SELECT id FROM tai_khoan WHERE ten_dang_nhap = 'customer01'), 'KH003', 'Lê Văn Cường', '0901234569', 'cuong.le@email.com', 1, '1988-12-10', 1),
 ((SELECT id FROM tai_khoan WHERE ten_dang_nhap = 'customer01'), 'KH004', 'Phạm Thị Dung', '0901234570', 'dung.pham@email.com', 0, '1995-03-25', 1),
 ((SELECT id FROM tai_khoan WHERE ten_dang_nhap = 'customer01'), 'KH005', 'Hoàng Văn Em', '0901234571', 'em.hoang@email.com', 1, '1993-07-18', 1);
@@ -759,10 +760,64 @@ INSERT INTO phan_hoi_danh_gia (danh_gia_id, nhan_vien_id, noi_dung, ngay_phan_ho
 
 GO
 
-ALTER TABLE hoa_don ADD trang_thai INT DEFAULT 0;
+--ALTER TABLE hoa_don ADD trang_thai INT DEFAULT 0;
 
--- Thêm cột số lượng tạm giữ cho Chi Tiết Sản Phẩm để quản lý tồn kho khi tạo hóa đơn chờ
-ALTER TABLE chi_tiet_san_pham ADD so_luong_tam_giu INT DEFAULT 0;
+---- Thêm cột số lượng tạm giữ cho Chi Tiết Sản Phẩm để quản lý tồn kho khi tạo hóa đơn chờ
+--ALTER TABLE chi_tiet_san_pham ADD so_luong_tam_giu INT DEFAULT 0;
+-- long
+    BEGIN TRAN;
+
+        -- 1) Thêm cột nếu chưa có (cho phép NULL, chưa ràng buộc gì)
+        IF COL_LENGTH('dbo.san_pham', 'thoi_han_bh_thang') IS NULL
+    BEGIN
+    ALTER TABLE dbo.san_pham ADD thoi_han_bh_thang INT NULL;
+    PRINT 'Cột thoi_han_bh_thang đã được thêm vào dbo.san_pham.';
+    END
+    ELSE
+    BEGIN
+            PRINT 'Cột thoi_han_bh_thang đã tồn tại, bỏ qua bước thêm cột.';
+    END;
+
+    COMMIT TRAN;
+    GO
+    -- GO: Kết thúc Batch 1. Cột 'thoi_han_bh_thang' CHẮC CHẮN đã tồn tại trước khi chạy lệnh tiếp theo.
+
+    -- BATCH 2: Cập nhật giá trị cho cột mới
+    BEGIN TRAN;
+
+        -- 2) Chỉ fill cho những sản phẩm chưa có giá trị (đặt tạm = 12 tháng)
+    UPDATE dbo.san_pham
+    SET thoi_han_bh_thang = 12
+    WHERE thoi_han_bh_thang IS NULL;
+
+    PRINT 'Đã cập nhật thoi_han_bh_thang = 12 tháng cho các sản phẩm NULL.';
+
+    COMMIT TRAN;
+    GO
+
+    /*************************************************/
+    /* BƯỚC 2: Thiết lập Quan hệ 1-1 (UNIQUE INDEX)  */
+    /*************************************************/
+    -- BATCH 3: Thiết lập UNIQUE INDEX để đảm bảo mỗi serial đã bán chỉ có 1 phiếu bảo hành
+
+    -- Xóa Index cũ nếu nó đã tồn tại để tránh lỗi (tùy chọn)
+    IF EXISTS (SELECT * FROM sys.indexes WHERE name = 'UX_PBH_OnePerSdb' AND object_id = OBJECT_ID('dbo.phieu_bao_hanh'))
+    BEGIN
+    DROP INDEX UX_PBH_OnePerSdb ON dbo.phieu_bao_hanh;
+    PRINT 'Đã xóa Index UX_PBH_OnePerSdb cũ.';
+    END;
+
+    -- Tạo lại UNIQUE INDEX để thiết lập quan hệ 1-1 giữa phieu_bao_hanh và id_serial_da_ban (tương đương imei đã bán)
+    CREATE UNIQUE INDEX UX_PBH_OnePerSdb
+        ON dbo.phieu_bao_hanh(id_serial_da_ban)
+        -- WHERE id_serial_da_ban IS NOT NULL: Dùng để loại trừ các giá trị NULL khỏi ràng buộc UNIQUE (chỉ áp dụng cho SQL Server)
+        WHERE id_serial_da_ban IS NOT NULL;
+
+    PRINT 'Đã tạo UNIQUE INDEX UX_PBH_OnePerSdb thành công để đảm bảo quan hệ 1-1.';
+
+    GO
+
+    select * from phieu_giam_gia
 
 //LONG 12-10 thêm code
         BEGIN TRAN;

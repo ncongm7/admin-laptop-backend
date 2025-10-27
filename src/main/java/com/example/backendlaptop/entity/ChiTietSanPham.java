@@ -64,7 +64,18 @@ public class ChiTietSanPham {
     @Column(name = "ghi_chu")
     private String ghiChu;
 
+    @ColumnDefault("0")
+    @Column(name = "so_luong_ton")
+    private Integer soLuongTon;
+
+    @ColumnDefault("0")
+    @Column(name = "so_luong_tam_giu")
+    private Integer soLuongTamGiu;
+
     @Column(name = "trang_thai")
     private Integer trangThai;
+
+    @Column(name = "version")
+    private Long version;
 
 }
