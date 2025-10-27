@@ -47,5 +47,6 @@ public class PhieuGiamGiaRequest {
     private Boolean riengTu = false;
 
     private String moTa;
+    @NotNull(message = "Trạng thái (bật/tắt) không được để trống")
+    private Integer trangThai; // 0 = Tắt, 1 = Bật
 }
-

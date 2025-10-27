@@ -11,7 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -20,49 +19,39 @@ public class PhieuGiamGiaService {
     @Autowired
     private PhieuGiamGiaRepository repository;
 
-    // --- Phương thức Validate Dùng Chung ---
-    /**
-     * Kiểm tra tính hợp lệ của request, bao gồm ngày tháng và tính duy nhất của mã.
-     *
-     * @param request Dữ liệu voucher.
-     * @param id ID của voucher (null nếu là add, có giá trị nếu là update).
-     * @throws IllegalArgumentException nếu có lỗi logic (ngày tháng/trùng mã).
-     */
+    private void validate(PhieuGiamGiaRequest req, UUID idForUpdate) {
+        // 1) Validate ngày (ném lỗi nếu sai)
+        CheckNgayBatDauKetThuc.status(req.getNgayBatDau(), req.getNgayKetThuc()); // chỉ để validate
 
-    /** Validate chung và trả về trạng thái 0/1/2 (dùng hàm bạn đã có). */
-    private int validateAndStatus(PhieuGiamGiaRequest req, UUID idForUpdate) {
-        // 1) Ngày: dùng hàm đã có (ném lỗi nếu sai) + nhận trạng thái
-        int status = CheckNgayBatDauKetThuc.status(req.getNgayBatDau(), req.getNgayKetThuc());
-
-        // 2) Mã: trim + unique (cho add/update)
+        // 2) Unique code
         String ma = req.getMa().trim();
         var dup = repository.findByMaIgnoreCase(ma);
         if (dup.isPresent() && (idForUpdate == null || !dup.get().getId().equals(idForUpdate))) {
             throw new IllegalArgumentException("Trùng mã");
         }
 
-        // 3) Loại % (0) ⇒ giá trị giảm ∈ [0, 100]
+        // 3) % thì 0..100
         if (Integer.valueOf(0).equals(req.getLoaiPhieuGiamGia())) {
-            if (req.getGiaTriGiamGia() == null) {
+            if (req.getGiaTriGiamGia() == null)
                 throw new IllegalArgumentException("Giá trị giảm (%) không được để trống");
-            }
             var v = req.getGiaTriGiamGia();
             if (v.compareTo(new java.math.BigDecimal("0")) < 0 ||
-                    v.compareTo(new java.math.BigDecimal("100")) > 0) {
+                v.compareTo(new java.math.BigDecimal("100")) > 0) {
                 throw new IllegalArgumentException("Giá trị giảm (%) phải trong khoảng 0 đến 100");
             }
         }
-        return status;
     }
 
     public void add(PhieuGiamGiaRequest req) {
-        int trangThai = validateAndStatus(req, null);
+        validate(req, null);
 
         PhieuGiamGia e = MapperUtils.map(req, PhieuGiamGia.class);
         e.setMa(req.getMa().trim());
-        e.setTrangThai(trangThai);
 
-        // 1 = VND ⇒ cap = value
+        // Công tắc quản trị
+        e.setTrangThai(req.getTrangThai() == null ? 1 : req.getTrangThai()); // 1=Bật mặc định
+
+        // VND: cap = value (giữ đúng với FE hiện tại)
         if (Integer.valueOf(1).equals(e.getLoaiPhieuGiamGia())) {
             e.setSoTienGiamToiDa(e.getGiaTriGiamGia());
         }
@@ -73,11 +62,15 @@ public class PhieuGiamGiaService {
         PhieuGiamGia existed = repository.findById(id)
                 .orElseThrow(() -> new ApiException("Not Found", "NF"));
 
-        int trangThai = validateAndStatus(req, id);
+        validate(req, id);
 
         MapperUtils.mapToExisting(req, existed);
         existed.setMa(req.getMa().trim());
-        existed.setTrangThai(trangThai);
+
+        // Công tắc quản trị: nhận từ request (nếu null thì giữ nguyên)
+        if (req.getTrangThai() != null) {
+            existed.setTrangThai(req.getTrangThai());
+        }
 
         if (Integer.valueOf(1).equals(existed.getLoaiPhieuGiamGia())) {
             existed.setSoTienGiamToiDa(existed.getGiaTriGiamGia());
