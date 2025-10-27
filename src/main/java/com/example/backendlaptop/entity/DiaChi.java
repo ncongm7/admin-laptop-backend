@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.GenericGenerator;
 import org.hibernate.annotations.Nationalized;
 
 import java.util.UUID;
@@ -14,6 +15,8 @@ import java.util.UUID;
 @Table(name = "dia_chi")
 public class DiaChi {
     @Id
+    @GeneratedValue(generator = "uuid2")
+    @GenericGenerator(name = "uuid2", strategy = "org.hibernate.id.UUIDGenerator")
     @Column(name = "id", nullable = false)
     private UUID id;
 
@@ -28,5 +31,19 @@ public class DiaChi {
 
     @Column(name = "mac_dinh")
     private Boolean macDinh;
+
+    @Column(name = "ho_ten")
+    private String hoTen;
+
+
+    @Column(name = "so_dien_thoai")
+    private String sdt;
+
+    @Column(name = "xa")
+    private String xa;
+
+    @Column(name = "tinh")
+    private String tinh;
+
 
 }
