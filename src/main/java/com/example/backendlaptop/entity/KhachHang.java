@@ -1,12 +1,10 @@
 package com.example.backendlaptop.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.GenericGenerator;
 import org.hibernate.annotations.Nationalized;
 
 import java.time.LocalDate;
@@ -18,8 +16,14 @@ import java.util.UUID;
 @Table(name = "khach_hang")
 public class KhachHang {
     @Id
-    @Column(name = "user_id", nullable = false)
+    @GeneratedValue(generator = "uuid2")
+    @GenericGenerator(name = "uuid2", strategy = "org.hibernate.id.UUIDGenerator")
+    @Column(name = "user_id", columnDefinition = "uniqueidentifier")
     private UUID id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ma_tai_khoan")
+    private TaiKhoan maTaiKhoan;
 
     @Size(max = 50)
     @Column(name = "ma_khach_hang", length = 50)

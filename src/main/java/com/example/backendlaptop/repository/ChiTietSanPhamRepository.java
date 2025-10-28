@@ -13,9 +13,9 @@ import java.util.UUID;
 
 @Repository
 public interface ChiTietSanPhamRepository extends JpaRepository<ChiTietSanPham, UUID> {
-    
+
     List<ChiTietSanPham> findBySanPham_Id(UUID sanPhamId);
-    
+
     @Query("""
         SELECT c FROM ChiTietSanPham c
         LEFT JOIN c.cpu cpu
@@ -56,5 +56,18 @@ public interface ChiTietSanPhamRepository extends JpaRepository<ChiTietSanPham, 
             @Param("maxPrice") java.math.BigDecimal maxPrice,
             Pageable pageable);
 
+
     boolean existsByMaCtsp(String maCtsp);
+
+    // code của long
+    @Query("SELECT ctsp FROM ChiTietSanPham ctsp "
+            + "WHERE ctsp.sanPham.id = :sanPhamId " // Lọc theo Sản Phẩm (từ combobox)
+            + "AND ctsp.id NOT IN ("
+            + "    SELECT dggct.idCtsp.id FROM DotGiamGiaChiTiet dggct"
+            + "    WHERE dggct.dotGiamGia.id = :dotGiamGiaId" // Lọc các CTSP đã tham gia DGGD hiện tại
+            + ")")
+    List<ChiTietSanPham> findAvailableProductsBySanPhamId(
+            @Param("dotGiamGiaId") UUID dotGiamGiaId,
+            @Param("sanPhamId") UUID sanPhamId
+    );
 }

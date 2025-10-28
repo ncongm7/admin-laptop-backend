@@ -38,14 +38,18 @@ public class ChiTietSanPham {
     @Column(name = "ghi_chu")
     private String ghiChu;
 
+
+
     @Column(name = "so_luong_ton")
     private Integer soLuongTon;
+
 
     @Column(name = "so_luong_tam_giu")
     private Integer soLuongTamGiu;
 
     @Column(name = "trang_thai")
     private Integer trangThai;
+
 
     @Version
     @Column(name = "version")
@@ -86,5 +90,6 @@ public class ChiTietSanPham {
     @UpdateTimestamp
     @Column(name = "ngay_sua")
     private Instant ngaySua;
+
 
 }
