@@ -732,3 +732,10 @@ ADD update_at DATETIME2
 
 ALTER TABLE mau_sac
 ADD hex_code varchar(7);
+
+--- Hiền thay đổi
+CREATE UNIQUE INDEX UX_NhanVien_MaTaiKhoan_NotNull
+ON dbo.nhan_vien(ma_tai_khoan)
+WHERE ma_tai_khoan IS NOT NULL;
+
+ALTER TABLE dbo.nhan_vien DROP CONSTRAINT [UQ__nhan_vie__FFC64A2B26837423];
