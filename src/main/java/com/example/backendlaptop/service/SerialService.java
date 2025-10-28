@@ -135,8 +135,17 @@ public class SerialService {
     }
     
     public List<SerialResponse> getSerialsByCtspId(UUID ctspId) {
+        System.out.println("SerialService: getSerialsByCtspId called for ctspId: " + ctspId);
         List<Serial> serials = serialRepository.findByCtspId(ctspId);
-        return serials.stream().map(this::mapToResponse).toList();
+        System.out.println("Found " + serials.size() + " serials");
+        
+        for (Serial serial : serials) {
+            System.out.println("Serial: " + serial.getSerialNo() + ", Status: " + serial.getTrangThai());
+        }
+        
+        List<SerialResponse> responses = serials.stream().map(this::mapToResponse).toList();
+        System.out.println("Returning " + responses.size() + " serial responses");
+        return responses;
     }
     
     public SerialResponse getSerialById(UUID id) {
@@ -165,9 +174,11 @@ public class SerialService {
     public void updateSerialStatus(UUID id, Integer trangThai) {
         Serial serial = serialRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Serial không tồn tại"));
-        
+
         serial.setTrangThai(trangThai);
         serialRepository.save(serial);
+        // Update stock count for the variant (subtract hidden serials)
+        updateStockCount(serial.getCtsp().getId());
     }
     
     public void deleteSerial(UUID id) {
