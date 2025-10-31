@@ -1,9 +1,11 @@
 package com.example.backendlaptop.dto.banhang;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -17,5 +19,12 @@ public class ThanhToanRequest {
     private String ghiChu;
     
     private String maGiaoDich;
+    
+    /**
+     * Danh sách các Serial Number đã được quét/xác thực cho từng sản phẩm
+     * YÊU CẦU: Mỗi sản phẩm trong hóa đơn phải có đủ serial number
+     */
+    @Valid
+    private List<SerialThanhToanItem> serialNumbers;
 }
 

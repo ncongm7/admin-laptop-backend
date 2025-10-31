@@ -738,4 +738,19 @@ CREATE UNIQUE INDEX UX_NhanVien_MaTaiKhoan_NotNull
 ON dbo.nhan_vien(ma_tai_khoan)
 WHERE ma_tai_khoan IS NOT NULL;
 
+
+---------------------- ngày 31-10-2025----------
 ALTER TABLE dbo.nhan_vien DROP CONSTRAINT [UQ__nhan_vie__FFC64A2B26837423];
+INSERT INTO phuong_thuc_thanh_toan (id, ten_phuong_thuc, loai_phuong_thuc)
+VALUES 
+    (NEWID(), N'Tiền mặt', N'TIEN_MAT'),
+    (NEWID(), N'Chuyển khoản', N'CHUYEN_KHOAN'),
+    (NEWID(), N'Thẻ tín dụng/Ghi nợ', N'THE'),
+    (NEWID(), N'Ví điện tử (MoMo, ZaloPay...)', N'VI_DIEN_TU'),
+    (NEWID(), N'Quẹt thẻ', N'QUET_THE');
+
+ALTER TABLE serial_da_ban
+DROP CONSTRAINT DF__serial_da__ngay___17F790F9;
+GO
+
+

@@ -11,7 +11,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class AuthService {
@@ -21,6 +23,9 @@ public class AuthService {
 
     @Autowired
     private NhanVienRepository nhanVienRepository;
+
+    // In-memory token storage (cho dev - production nên dùng Redis hoặc database)
+    private final Map<String, LoginResponse.UserInfo> tokenStore = new ConcurrentHashMap<>();
 
     /**
      * Đăng nhập người dùng
@@ -68,6 +73,9 @@ public class AuthService {
         // TODO: Nên sử dụng JWT trong thực tế
         String token = "Bearer-" + UUID.randomUUID().toString();
 
+        // 8. Lưu token vào tokenStore
+        tokenStore.put(token, userInfo);
+
         return new LoginResponse(token, userInfo);
     }
 
@@ -75,17 +83,22 @@ public class AuthService {
      * Lấy thông tin user hiện tại
      */
     public LoginResponse.UserInfo getCurrentUser(String token) {
-        // TODO: Validate token và lấy thông tin user từ token
-        // Tạm thời trả về null
-        throw new ApiException("Token không hợp lệ", "INVALID_TOKEN");
+        // Validate token và lấy thông tin user từ tokenStore
+        LoginResponse.UserInfo userInfo = tokenStore.get(token);
+        
+        if (userInfo == null) {
+            throw new ApiException("Token không hợp lệ hoặc đã hết hạn", "INVALID_TOKEN");
+        }
+        
+        return userInfo;
     }
 
     /**
      * Đăng xuất
      */
     public void logout(String token) {
-        // TODO: Implement logout logic (invalidate token)
-        // Tạm thời không làm gì
+        // Xóa token khỏi tokenStore để invalidate
+        tokenStore.remove(token);
     }
 }
 
