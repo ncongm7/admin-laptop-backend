@@ -1,6 +1,7 @@
 package com.example.backendlaptop.controller.customer;
 
 import com.example.backendlaptop.dto.sanpham.customer.CTSPResponseCustomer;
+import com.example.backendlaptop.dto.sanpham.customer.CTSPTTKTResponseCustomer;
 import com.example.backendlaptop.model.response.ResponseObject;
 import com.example.backendlaptop.service.sanpham.customer.CTSPCustomerService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,5 +26,14 @@ public class CTSPCustomerController {
     public ResponseEntity<?> findAllBySanPhamId(@PathVariable("sanPhamId") UUID sanPhamId) {
         List<CTSPResponseCustomer> ctspResponseCustomers = ctspCustomerService.findAllBySanPhamId(sanPhamId);
         return ResponseEntity.ok(ctspResponseCustomers);
+    }
+
+    @GetMapping("/thong-so-ky-thuat/{id}")
+    public ResponseEntity<?> findThongSoKyThuatById(@PathVariable("id") UUID id) {
+        CTSPTTKTResponseCustomer ctspttktResponseCustomer = ctspCustomerService.findThongSoKyThuatById(id);
+        if (ctspttktResponseCustomer != null) {
+            return ResponseEntity.ok(ctspttktResponseCustomer);
+        }
+        return ResponseEntity.notFound().build();
     }
 }
