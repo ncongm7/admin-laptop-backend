@@ -2,6 +2,7 @@ package com.example.backendlaptop.controller.auth;
 
 import com.example.backendlaptop.dto.auth.LoginRequest;
 import com.example.backendlaptop.dto.auth.LoginResponse;
+import com.example.backendlaptop.dto.auth.RegisterRequest;
 import com.example.backendlaptop.model.response.ResponseObject;
 import com.example.backendlaptop.service.auth.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -20,6 +21,17 @@ public class AuthController {
 
     @Autowired
     private AuthService authService;
+
+    /**
+     * API Đăng ký tài khoản khách hàng
+     * Endpoint: POST /api/auth/register
+     */
+    @Operation(summary = "Đăng ký khách hàng", description = "Đăng ký tài khoản khách hàng mới")
+    @PostMapping("/register")
+    public ResponseEntity<ResponseObject<LoginResponse>> register(@Valid @RequestBody RegisterRequest request) {
+        LoginResponse response = authService.register(request);
+        return ResponseEntity.ok(new ResponseObject<>(response, "Đăng ký thành công"));
+    }
 
     /**
      * API Đăng nhập
