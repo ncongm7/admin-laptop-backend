@@ -32,6 +32,11 @@ public class KhachHangService {
         return khachHangRepository.findById(id).orElse(null);
     }
 
+    //tìm khách hàng theo mã
+    public KhachHangDto findByMaKhachHang(String maKhachHang) {
+        return khachHangRepository.findByMaKhachHangDto(maKhachHang);
+    }
+
 //    tìm kiếm khách hàng
     public List<KhachHangDto> timKiem(String ten, String sdt){
         return khachHangRepository.searchByMultiField(ten,sdt);

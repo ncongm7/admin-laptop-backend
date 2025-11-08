@@ -60,6 +60,12 @@ public class KhachHangController {
     public ResponseEntity<Object> getOne(@PathVariable("id") UUID id) {
         return ResponseEntity.ok(khachHangService.getOne(id));
     }
+
+    @GetMapping("/by-ma/{maKhachHang}")
+    public ResponseEntity<Object> getByMaKhachHang(@PathVariable("maKhachHang") String maKhachHang) {
+        return ResponseEntity.ok(khachHangService.findByMaKhachHang(maKhachHang));
+    }
+
 //Thêm mã
 @GetMapping("/generate-code")
 public ResponseEntity<String> generateMaKhachHang() {
