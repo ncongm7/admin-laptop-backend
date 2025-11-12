@@ -41,10 +41,18 @@ public class GlobalExceptionHandler {
     // Bắt tất cả lỗi còn lại
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleAll(Exception ex) {
+        // Log chi tiết lỗi
+        System.err.println("❌ [GlobalExceptionHandler] Lỗi không mong đợi:");
+        System.err.println("  - Exception Type: " + ex.getClass().getName());
+        System.err.println("  - Message: " + ex.getMessage());
+        System.err.println("  - Stack Trace:");
+        ex.printStackTrace();
+        
         Map<String, Object> response = new HashMap<>();
         response.put("status", "FAILED");
         response.put("code", "INTERNAL_ERROR");
         response.put("message", ex.getMessage());
+        response.put("exceptionType", ex.getClass().getSimpleName());
 
         return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
     }
