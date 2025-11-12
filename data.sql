@@ -732,8 +732,8 @@ ADD update_at DATETIME2
 
 ALTER TABLE mau_sac
 ADD hex_code varchar(7);
- 
- 
+
+
 go
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='lc_subdistrict' AND xtype='U')
 BEGIN
@@ -4088,7 +4088,7 @@ values
         (3320, 3, '003', 3, '08', N'Xã Thái Hòa', 'TQTH', '02419', null, null, null, null, '2025-09-10 14:16:56.447435'),
         (3321, 3, '003', 3, '08', N'Xã Xuân Vân', 'TQXV', '02449', null, null, null, null, '2025-09-10 14:16:56.447435');
 
-		
+
 		select*from lc_province
 
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='lc_province' AND xtype='U')

@@ -18,6 +18,9 @@ public class CTSPResponseCustomer {
     private String dungLuongOCung;
     private String kichThuocManHinh;
     private BigDecimal giaBan;
+    private BigDecimal giaTruocGiam; // show gạch
+    private BigDecimal giaSauGiam;
+    private Integer soLuongTon;
 
     public CTSPResponseCustomer(ChiTietSanPham ctsp){
         this.idctsp = ctsp.getId();
@@ -27,7 +30,10 @@ public class CTSPResponseCustomer {
         this.tenGpu = ctsp.getGpu().getTenGpu();
         this.tenRam = ctsp.getRam().getTenRam();
         this.giaBan = ctsp.getGiaBan();
+        this.giaTruocGiam = this.giaBan; // mặc định không KM
+        this.giaSauGiam   = this.giaBan;
         this.dungLuongOCung = ctsp.getOCung().getDungLuong();
         this.kichThuocManHinh = ctsp.getLoaiManHinh().getKichThuoc();
+        this.soLuongTon=ctsp.getSoLuongTon();
     }
 }

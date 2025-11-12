@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -70,4 +71,31 @@ public interface ChiTietSanPhamRepository extends JpaRepository<ChiTietSanPham, 
             @Param("dotGiamGiaId") UUID dotGiamGiaId,
             @Param("sanPhamId") UUID sanPhamId
     );
+    //lấy giá
+    interface PriceView {
+        UUID getCtspId();
+        BigDecimal getGiaBan();
+        BigDecimal getGiaTruocGiam();
+        BigDecimal getGiaSauGiam();
+    }
+
+    @Query(value = """
+        SELECT 
+            c.id AS ctspId,
+            c.gia_ban AS giaBan,
+            ISNULL(x.gia_ban_dau, c.gia_ban)      AS giaTruocGiam,
+            ISNULL(x.gia_sau_khi_giam, c.gia_ban) AS giaSauGiam
+        FROM chi_tiet_san_pham c
+        OUTER APPLY (
+            SELECT TOP (1) dct.gia_ban_dau, dct.gia_sau_khi_giam
+            FROM dot_giam_gia_chi_tiet dct
+            JOIN dot_giam_gia km ON km.id = dct.id_km
+            WHERE dct.id_ctsp = c.id
+              AND km.trang_thai = 1
+              AND GETDATE() BETWEEN km.ngayBatDau AND km.ngayKetThuc
+            ORDER BY km.ngayBatDau DESC, dct.id DESC
+        ) x
+        WHERE c.id = :ctspId
+        """, nativeQuery = true)
+    PriceView findPriceForCtsp(@Param("ctspId") UUID ctspId);
 }
