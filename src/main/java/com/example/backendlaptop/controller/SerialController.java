@@ -45,6 +45,12 @@ public class SerialController {
         }
     }
     
+    @GetMapping("/all")
+    public ResponseEntity<List<SerialResponse>> getAllSerial() {
+        List<SerialResponse> responses = serialService.getAllSerial();
+        return ResponseEntity.ok(responses);
+    }
+    
     @GetMapping("/ctsp/{ctspId}")
     public ResponseEntity<List<SerialResponse>> getSerialsByCtspId(@PathVariable UUID ctspId) {
         List<SerialResponse> responses = serialService.getSerialsByCtspId(ctspId);

@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -24,4 +25,15 @@ public interface SerialRepository extends JpaRepository<Serial, UUID> {
     
     @Query("SELECT s FROM Serial s WHERE s.serialNo LIKE %:keyword% OR s.ctsp.maCtsp LIKE %:keyword%")
     List<Serial> findByKeyword(@Param("keyword") String keyword);
+    
+    /**
+     * Tìm serial theo số serial
+     */
+    Optional<Serial> findBySerialNo(String serialNo);
+    
+    /**
+     * Tìm serial theo số serial và ID chi tiết sản phẩm
+     */
+    @Query("SELECT s FROM Serial s WHERE s.serialNo = :serialNo AND s.ctsp.id = :ctspId")
+    Optional<Serial> findBySerialNoAndCtspId(@Param("serialNo") String serialNo, @Param("ctspId") UUID ctspId);
 }

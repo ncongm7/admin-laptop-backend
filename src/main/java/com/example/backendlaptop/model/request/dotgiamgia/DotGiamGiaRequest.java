@@ -29,7 +29,4 @@ public class DotGiamGiaRequest {
     @NotNull(message = "Ngày kết thúc không được để trống")
     @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private Instant ngayKetThuc;
-
-    @NotNull(message = "Trạng thái (bật/tắt) không được để trống")
-    private Integer trangThai; // 0 = Tắt, 1 = Bật
 }

@@ -54,6 +54,12 @@ public class ChiTietSanPhamController {
         return ResponseEntity.ok(responses);
     }
     
+    @GetMapping("/san-pham/{sanPhamId}/with-discount")
+    public ResponseEntity<List<ChiTietSanPhamResponse>> getChiTietSanPhamWithDiscount(@PathVariable UUID sanPhamId) {
+        List<ChiTietSanPhamResponse> responses = chiTietSanPhamService.getChiTietSanPhamWithDiscount(sanPhamId);
+        return ResponseEntity.ok(responses);
+    }
+    
     @GetMapping
     public ResponseEntity<List<ChiTietSanPhamResponse>> getAllChiTietSanPham() {
         List<ChiTietSanPhamResponse> responses = chiTietSanPhamService.getAllChiTietSanPham();
