@@ -13,6 +13,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -81,14 +84,38 @@ public class NhanVienController {
                 directory.mkdirs();
             }
 
-            // Tạo tên file unique
+            // Validate và tạo tên file unique
             String originalFilename = file.getOriginalFilename();
-            String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+            if (originalFilename == null || originalFilename.isEmpty()) {
+                return ResponseEntity.badRequest().body("Tên file không hợp lệ");
+            }
+            
+            // Validate file extension
+            String extension = "";
+            int dotIndex = originalFilename.lastIndexOf(".");
+            if (dotIndex > 0 && dotIndex < originalFilename.length() - 1) {
+                extension = originalFilename.substring(dotIndex).toLowerCase();
+            }
+            
+            // Whitelist allowed extensions
+            List<String> allowedExtensions = Arrays.asList(".jpg", ".jpeg", ".png", ".gif");
+            if (!allowedExtensions.contains(extension)) {
+                return ResponseEntity.badRequest().body("Chỉ chấp nhận file ảnh: jpg, jpeg, png, gif");
+            }
+            
+            // Generate safe filename using UUID
             String filename = UUID.randomUUID().toString() + extension;
             
-            // Lưu file
-            Path filePath = Paths.get(uploadDir + filename);
-            Files.copy(file.getInputStream(), filePath);
+            // Lưu file - use resolve to prevent path traversal
+            Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
+            Path filePath = uploadPath.resolve(filename).normalize();
+            
+            // Security check: ensure the resolved path is still within uploadDir
+            if (!filePath.startsWith(uploadPath)) {
+                return ResponseEntity.badRequest().body("Đường dẫn file không hợp lệ");
+            }
+            
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
             // Trả về URL ảnh
             String imageUrl = "/uploads/avatars/" + filename;
