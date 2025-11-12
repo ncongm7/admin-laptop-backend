@@ -36,6 +36,11 @@ import java.util.UUID;
  */
 @Service
 public class ThanhToanService {
+    
+    // Serial status constants
+    private static final int SERIAL_STATUS_DAMAGED = 0;        // Bị hỏng/không khả dụng
+    private static final int SERIAL_STATUS_AVAILABLE = 1;      // Chưa bán / Trong kho
+    private static final int SERIAL_STATUS_SOLD = 2;           // Đã được bán
 
     @Autowired
     private BanHangHoaDonService hoaDonService;
@@ -95,10 +100,10 @@ public class ThanhToanService {
         Serial serial = serialOpt.get();
         
         // 4. Kiểm tra trạng thái serial (phải là 1 = Chưa bán / Trong kho)
-        if (serial.getTrangThai() == null || serial.getTrangThai() != 1) {
+        if (serial.getTrangThai() == null || serial.getTrangThai() != SERIAL_STATUS_AVAILABLE) {
             String statusMessage = switch (serial.getTrangThai() != null ? serial.getTrangThai() : -1) {
-                case 2 -> "Serial đã được bán";
-                case 0 -> "Serial bị hỏng/không khả dụng";
+                case SERIAL_STATUS_SOLD -> "Serial đã được bán";
+                case SERIAL_STATUS_DAMAGED -> "Serial bị hỏng/không khả dụng";
                 default -> "Serial có trạng thái không hợp lệ";
             };
             

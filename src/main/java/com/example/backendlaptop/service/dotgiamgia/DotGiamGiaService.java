@@ -10,6 +10,7 @@ import com.example.backendlaptop.until.CheckNgayBatDauKetThuc;
 import com.example.backendlaptop.until.MapperUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -42,7 +43,7 @@ public class DotGiamGiaService {
         repository.save(dotGiamGia);
     }
 
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public void update(DotGiamGiaRequest request, UUID id) {
         var dot = repository.findById(id).orElseThrow(() -> new ApiException("Not Found", "NF"));
         MapperUtils.mapToExisting(request, dot);
