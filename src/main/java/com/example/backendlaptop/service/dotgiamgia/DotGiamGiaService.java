@@ -10,6 +10,7 @@ import com.example.backendlaptop.until.CheckNgayBatDauKetThuc;
 import com.example.backendlaptop.until.MapperUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -18,11 +19,14 @@ import java.util.UUID;
 public class DotGiamGiaService {
     @Autowired
     private DotGiamGiaRepository repository;
-    @Autowired
-    private DotGiamGiaChiTietService dggctService;
+
     @Autowired
     private DotGiamGiaChiTietRepository dggctRepository;
 
+    private void validate(DotGiamGiaRequest req) {
+        // 1) Validate ngày (ném lỗi nếu sai)
+        CheckNgayBatDauKetThuc.status(req.getNgayBatDau(), req.getNgayKetThuc()); // chỉ để validate
+    }
 
     public List<DotGiamGiaResponse> getAll() {
         return repository.findAll().stream().map(DotGiamGiaResponse::new).toList();
@@ -36,22 +40,31 @@ public class DotGiamGiaService {
     }
 
     public void add(DotGiamGiaRequest req) {
+        validate(req);
         DotGiamGia dotGiamGia = MapperUtils.map(req, DotGiamGia.class);
-        int status = CheckNgayBatDauKetThuc.status(req.getNgayBatDau(), req.getNgayKetThuc());
-        dotGiamGia.setTrangThai(status);
+
+        // Công tắc quản trị
+        dotGiamGia.setTrangThai(req.getTrangThai() == null ? 1 : req.getTrangThai()); // 1=Bật mặc định
+
         repository.save(dotGiamGia);
     }
 
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public void update(DotGiamGiaRequest request, UUID id) {
-        var dot = repository.findById(id).orElseThrow(() -> new ApiException("Not Found", "NF"));
+        DotGiamGia dot = repository.findById(id).orElseThrow(() -> new ApiException("Not Found", "NF"));
+
+        validate(request);
+
         MapperUtils.mapToExisting(request, dot);
-        dot.setId(id);
-        int status = CheckNgayBatDauKetThuc.status(request.getNgayBatDau(), request.getNgayKetThuc());
-        dot.setTrangThai(status);
+
+        // Công tắc quản trị: nhận từ request (nếu null thì giữ nguyên)
+        if (request.getTrangThai() != null) {
+            dot.setTrangThai(request.getTrangThai());
+        }
+
         repository.save(dot);
 
-        // Reprice toàn bộ chi tiết thuộc đợt + làm đẹp giá xuống 1.000
+        // Reprice toàn bộ chi tiết thuộc đợt
         var newGiaTri = java.math.BigDecimal.valueOf(dot.getGiaTri() == null ? 0 : dot.getGiaTri());
         dggctRepository.bulkRepriceByDot(dot.getId(), newGiaTri);
     }

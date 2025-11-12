@@ -2,13 +2,18 @@ package com.example.backendlaptop.service.auth;
 
 import com.example.backendlaptop.dto.auth.LoginRequest;
 import com.example.backendlaptop.dto.auth.LoginResponse;
+import com.example.backendlaptop.dto.auth.RegisterRequest;
+import com.example.backendlaptop.entity.KhachHang;
 import com.example.backendlaptop.entity.NhanVien;
 import com.example.backendlaptop.entity.TaiKhoan;
 import com.example.backendlaptop.expection.ApiException;
+import com.example.backendlaptop.repository.KhachHangRepository;
 import com.example.backendlaptop.repository.NhanVienRepository;
 import com.example.backendlaptop.repository.TaiKhoanRepository;
+import com.example.backendlaptop.service.PhanQuyenSer.KhachHangService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -21,6 +26,12 @@ public class AuthService {
 
     @Autowired
     private NhanVienRepository nhanVienRepository;
+
+    @Autowired
+    private KhachHangRepository khachHangRepository;
+
+    @Autowired
+    private KhachHangService khachHangService;
 
     /**
      * Đăng nhập người dùng
@@ -86,6 +97,71 @@ public class AuthService {
     public void logout(String token) {
         // TODO: Implement logout logic (invalidate token)
         // Tạm thời không làm gì
+    }
+
+    /**
+     * Đăng ký tài khoản khách hàng mới
+     */
+    @Transactional
+    public LoginResponse register(RegisterRequest request) {
+        // 1. Validate mật khẩu
+        if (!request.getMatKhau().equals(request.getXacNhanMatKhau())) {
+            throw new ApiException("Mật khẩu xác nhận không khớp", "PASSWORD_MISMATCH");
+        }
+
+        // 2. Kiểm tra số điện thoại đã tồn tại chưa (dùng làm username)
+        if (taiKhoanRepository.findByTenDangNhap(request.getSoDienThoai()).isPresent()) {
+            throw new ApiException("Số điện thoại đã được đăng ký", "PHONE_EXISTS");
+        }
+
+        // 3. Kiểm tra email đã tồn tại chưa (nếu có)
+        if (request.getEmail() != null && !request.getEmail().isEmpty()) {
+            // Kiểm tra trong KhachHang
+            if (khachHangRepository.findByEmail(request.getEmail()).isPresent()) {
+                throw new ApiException("Email đã được đăng ký", "EMAIL_EXISTS");
+            }
+        }
+
+        // 4. Tạo tài khoản
+        TaiKhoan taiKhoan = new TaiKhoan();
+        taiKhoan.setId(UUID.randomUUID());
+        taiKhoan.setTenDangNhap(request.getSoDienThoai()); // Dùng SĐT làm username
+        taiKhoan.setMatKhau(request.getMatKhau()); // TODO: Hash password
+        taiKhoan.setEmail(request.getEmail());
+        taiKhoan.setTrangThai(1); // Active
+        taiKhoan.setNgayTao(Instant.now());
+        taiKhoan.setMaVaiTro(null); // Khách hàng không có vai trò
+        taiKhoanRepository.save(taiKhoan);
+
+        // 5. Tạo mã khách hàng
+        String maKhachHang = khachHangService.generateMaKhachHang();
+
+        // 6. Tạo khách hàng
+        KhachHang khachHang = new KhachHang();
+        // Không set ID thủ công, để Hibernate tự generate theo @GeneratedValue
+        khachHang.setMaTaiKhoan(taiKhoan);
+        khachHang.setMaKhachHang(maKhachHang);
+        khachHang.setHoTen(request.getHoTen());
+        khachHang.setSoDienThoai(request.getSoDienThoai());
+        khachHang.setEmail(request.getEmail());
+        khachHang.setGioiTinh(request.getGioiTinh() != null ? request.getGioiTinh() : 0);
+        khachHang.setNgaySinh(request.getNgaySinh());
+        khachHang.setTrangThai(1); // Active
+        khachHang = khachHangRepository.save(khachHang); // Lưu và lấy entity đã được persist với ID
+
+        // 7. Tự động đăng nhập sau khi đăng ký
+        LoginResponse.UserInfo userInfo = new LoginResponse.UserInfo();
+        userInfo.setUserId(khachHang.getId()); // Lưu ID khách hàng
+        userInfo.setTenDangNhap(taiKhoan.getTenDangNhap());
+        userInfo.setEmail(taiKhoan.getEmail());
+        userInfo.setHoTen(khachHang.getHoTen());
+        userInfo.setTrangThai(taiKhoan.getTrangThai());
+        userInfo.setVaiTro("KHACH_HANG");
+
+        // 8. Tạo token
+        String token = "Bearer-" + UUID.randomUUID().toString();
+
+        return new LoginResponse(token, userInfo);
     }
 }
 
