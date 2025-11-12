@@ -17,12 +17,48 @@ public class CTSPCustomerService {
     @Autowired
     private ChiTietSanPhamRepository chiTietSanPhamRepository;
 
-    public CTSPResponseCustomer findById(UUID id){
-        Optional<ChiTietSanPham> chiTietSanPham = chiTietSanPhamRepository.findById(id);
-        if(chiTietSanPham.isPresent()){
-            return new CTSPResponseCustomer(chiTietSanPham.get());
+//    public CTSPResponseCustomer findById(UUID id){
+//        Optional<ChiTietSanPham> chiTietSanPham = chiTietSanPhamRepository.findById(id);
+//        if(chiTietSanPham.isPresent()){
+//            return new CTSPResponseCustomer(chiTietSanPham.get());
+//        }
+//        return null;
+//    }
+//    public List<CTSPResponseCustomer> findAllBySanPhamId(UUID sanPhamId) {
+//        List<ChiTietSanPham> chiTietSanPhams = chiTietSanPhamRepository.findBySanPham_Id(sanPhamId);
+//        return chiTietSanPhams.stream()
+//                .map(CTSPResponseCustomer::new)
+//                .collect(Collectors.toList());
+//    }
+public CTSPResponseCustomer findById(UUID id){
+    var ctspOpt = chiTietSanPhamRepository.findById(id);
+    if (ctspOpt.isEmpty()) return null;
+
+    var dto = new CTSPResponseCustomer(ctspOpt.get()); // mặc định 2 giá = giaBan
+    var pv  = chiTietSanPhamRepository.findPriceForCtsp(id);
+    if (pv != null) {
+        dto.setGiaBan(pv.getGiaBan());
+        dto.setGiaTruocGiam(pv.getGiaTruocGiam());
+        dto.setGiaSauGiam(pv.getGiaSauGiam());
+    }
+    return dto;
+}
+
+    public List<CTSPResponseCustomer> findAllBySanPhamId(UUID sanPhamId) {
+        var list = chiTietSanPhamRepository.findBySanPham_Id(sanPhamId)
+                .stream().map(CTSPResponseCustomer::new)
+                .collect(Collectors.toList());
+
+        // Trang thực tế 4–5 CTSP: loop từng cái cho đơn giản
+        for (var dto : list) {
+            var pv = chiTietSanPhamRepository.findPriceForCtsp(dto.getIdctsp());
+            if (pv != null) {
+                dto.setGiaBan(pv.getGiaBan());
+                dto.setGiaTruocGiam(pv.getGiaTruocGiam());
+                dto.setGiaSauGiam(pv.getGiaSauGiam());
+            }
         }
-        return null;
+        return list;
     }
 
     public CTSPTTKTResponseCustomer findThongSoKyThuatById(UUID id){
@@ -33,11 +69,5 @@ public class CTSPCustomerService {
         return null;
     }
 
-    public List<CTSPResponseCustomer> findAllBySanPhamId(UUID sanPhamId) {
-        List<ChiTietSanPham> chiTietSanPhams = chiTietSanPhamRepository.findBySanPham_Id(sanPhamId);
-        return chiTietSanPhams.stream()
-                .map(CTSPResponseCustomer::new)
-                .collect(Collectors.toList());
-    }
 
 }

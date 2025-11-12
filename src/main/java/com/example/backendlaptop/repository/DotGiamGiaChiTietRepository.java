@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -18,6 +19,7 @@ public interface DotGiamGiaChiTietRepository extends JpaRepository<DotGiamGiaChi
     Set<UUID> findCtspIdsByDotId(@Param("dotId") UUID dotId);
 
     List<DotGiamGiaChiTiet> findByDotGiamGia_Id(UUID dotGiamGiaId);
+
 
 
     // DotGiamGiaChiTietRepository.java
