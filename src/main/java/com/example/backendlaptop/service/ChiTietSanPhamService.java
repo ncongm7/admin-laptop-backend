@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -31,6 +32,7 @@ public class ChiTietSanPhamService {
     private final MauSacRepository mauSacRepository;
     private final LoaiManHinhRepository loaiManHinhRepository;
     private final PinRepository pinRepository;
+    private final DotGiamGiaChiTietRepository dotGiamGiaChiTietRepository;
     
     public ChiTietSanPhamResponse createChiTietSanPham(ChiTietSanPhamRequest request) {
         // Kiểm tra sản phẩm tồn tại
@@ -310,6 +312,14 @@ public class ChiTietSanPhamService {
     }
     
     @Transactional(readOnly = true)
+    public List<ChiTietSanPhamResponse> getChiTietSanPhamWithDiscount(UUID sanPhamId) {
+        List<ChiTietSanPham> chiTietSanPhams = chiTietSanPhamRepository.findBySanPham_Id(sanPhamId);
+        return chiTietSanPhams.stream()
+                .map(this::convertToResponseWithDiscount)
+                .collect(Collectors.toList());
+    }
+    
+    @Transactional(readOnly = true)
     public List<ChiTietSanPhamResponse> getAllChiTietSanPham() {
         List<ChiTietSanPham> chiTietSanPhams = chiTietSanPhamRepository.findAll();
         return chiTietSanPhams.stream()
@@ -435,6 +445,55 @@ public class ChiTietSanPhamService {
         // Set timestamp fields
         response.setCreatedAt(chiTietSanPham.getNgayTao());
         response.setUpdatedAt(chiTietSanPham.getNgaySua());
+        
+        return response;
+    }
+    
+    private ChiTietSanPhamResponse convertToResponseWithDiscount(ChiTietSanPham chiTietSanPham) {
+        // Sử dụng method convertToResponse hiện có
+        ChiTietSanPhamResponse response = convertToResponse(chiTietSanPham);
+        
+        // Tìm thông tin giảm giá cho chi tiết sản phẩm này
+        List<DotGiamGiaChiTiet> discountList = dotGiamGiaChiTietRepository.findAll();
+        Optional<DotGiamGiaChiTiet> dotGiamGiaChiTiet = discountList.stream()
+                .filter(d -> d.getIdCtsp() != null && d.getIdCtsp().getId().equals(chiTietSanPham.getId()))
+                .filter(d -> d.getDotGiamGia() != null && d.getDotGiamGia().getTrangThai() == 1)
+                .filter(d -> {
+                    java.time.Instant now = java.time.Instant.now();
+                    return d.getDotGiamGia().getNgayBatDau() != null 
+                        && d.getDotGiamGia().getNgayKetThuc() != null
+                        && !now.isBefore(d.getDotGiamGia().getNgayBatDau())
+                        && !now.isAfter(d.getDotGiamGia().getNgayKetThuc());
+                })
+                .findFirst();
+        
+        if (dotGiamGiaChiTiet.isPresent()) {
+            DotGiamGiaChiTiet discount = dotGiamGiaChiTiet.get();
+            
+            // Set thông tin giảm giá
+            response.setCoGiamGia(true);
+            response.setGiaGoc(discount.getGiaBanDau());
+            response.setGiaGiam(discount.getGiaSauKhiGiam());
+            response.setTenDotGiamGia(discount.getDotGiamGia().getTenKm());
+            response.setNgayBatDauGiam(discount.getDotGiamGia().getNgayBatDau());
+            response.setNgayKetThucGiam(discount.getDotGiamGia().getNgayKetThuc());
+            
+            // Tính % giảm giá
+            if (discount.getGiaBanDau() != null && discount.getGiaSauKhiGiam() != null 
+                && discount.getGiaBanDau().compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal phanTramGiam = discount.getGiaBanDau()
+                        .subtract(discount.getGiaSauKhiGiam())
+                        .multiply(BigDecimal.valueOf(100))
+                        .divide(discount.getGiaBanDau(), 0, RoundingMode.HALF_UP);
+                response.setPhanTramGiam(phanTramGiam.intValue());
+            }
+        } else {
+            // Không có giảm giá
+            response.setCoGiamGia(false);
+            response.setGiaGoc(chiTietSanPham.getGiaBan());
+            response.setGiaGiam(chiTietSanPham.getGiaBan());
+            response.setPhanTramGiam(0);
+        }
         
         return response;
     }
