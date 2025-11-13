@@ -51,7 +51,8 @@ public class ChiTietSanPhamResponse {
     private UUID idPin;
     private String dungLuongPin;
     private String maPin;
-    
+
+
     // Date fields
     private Instant createdAt;
     private Instant updatedAt;
