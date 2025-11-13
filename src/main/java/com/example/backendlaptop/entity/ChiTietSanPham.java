@@ -33,6 +33,9 @@ public class ChiTietSanPham {
     @Column(name = "gia_ban", precision = 18, scale = 2)
     private BigDecimal giaBan;
 
+    @Column(name = "gia_nhap", precision = 18, scale = 2)
+    private BigDecimal giaNhap;
+
     @Nationalized
     @Lob
     @Column(name = "ghi_chu")

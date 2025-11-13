@@ -55,4 +55,13 @@ public class ChiTietSanPhamResponse {
     // Date fields
     private Instant createdAt;
     private Instant updatedAt;
+    
+    // Thông tin giảm giá
+    private BigDecimal giaGoc;           // Giá gốc (trước giảm giá)
+    private BigDecimal giaGiam;          // Giá sau giảm giá  
+    private Integer phanTramGiam;        // % giảm giá
+    private String tenDotGiamGia;        // Tên đợt giảm giá
+    private Boolean coGiamGia;           // Có đang giảm giá không
+    private Instant ngayBatDauGiam;      // Ngày bắt đầu giảm giá
+    private Instant ngayKetThucGiam;     // Ngày kết thúc giảm giá
 }

@@ -85,7 +85,7 @@ public class HoaDon {
     @Column(name = "trang_thai_thanh_toan")
     private Integer trangThaiThanhToan;
 
-    @Enumerated(EnumType.ORDINAL)
+    @Convert(converter = com.example.backendlaptop.converter.TrangThaiHoaDonConverter.class)
     @Column(name = "trang_thai")
     private TrangThaiHoaDon trangThai;
 

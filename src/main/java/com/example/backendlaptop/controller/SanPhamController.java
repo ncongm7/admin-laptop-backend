@@ -126,6 +126,19 @@ public class SanPhamController {
         return ResponseEntity.ok(responses);
     }
     
+    // Lấy sản phẩm còn hàng (trangThai = 1 và soLuongTon > 0)
+    @GetMapping("/con-hang")
+    public ResponseEntity<List<SanPhamResponse>> getSanPhamConHang() {
+        List<SanPhamResponse> responses = sanPhamService.getSanPhamConHang();
+        return ResponseEntity.ok(responses);
+    }
+    
+    @GetMapping("/con-hang/page")
+    public ResponseEntity<Page<SanPhamResponse>> getSanPhamConHang(Pageable pageable) {
+        Page<SanPhamResponse> responses = sanPhamService.getSanPhamConHang(pageable);
+        return ResponseEntity.ok(responses);
+    }
+    
     // Tìm kiếm nâng cao - Tìm kiếm theo mã/tên, trạng thái, khoảng giá
     @GetMapping("/search/advanced-filter")
     public ResponseEntity<List<SanPhamResponse>> advancedSearch(

@@ -212,6 +212,21 @@ public class SanPhamService {
         return sanPhams.map(this::convertToResponse);
     }
     
+    // Lấy sản phẩm còn hàng (trangThai = 1 và soLuongTon > 0)
+    @Transactional(readOnly = true)
+    public List<SanPhamResponse> getSanPhamConHang() {
+        List<SanPham> sanPhams = sanPhamRepository.findSanPhamConHang();
+        return sanPhams.stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
+    }
+    
+    @Transactional(readOnly = true)
+    public Page<SanPhamResponse> getSanPhamConHang(Pageable pageable) {
+        Page<SanPham> sanPhams = sanPhamRepository.findSanPhamConHang(pageable);
+        return sanPhams.map(this::convertToResponse);
+    }
+    
     // Validate price range
     private void validatePriceRange(Long minPrice, Long maxPrice) {
         if (minPrice != null && minPrice < 0) {
