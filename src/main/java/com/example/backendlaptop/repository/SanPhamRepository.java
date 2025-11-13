@@ -73,4 +73,17 @@ public interface SanPhamRepository extends JpaRepository<SanPham, UUID> {
         @Param("maxPrice") Long maxPrice,
         Pageable pageable
     );
+    
+    // Lấy sản phẩm còn hàng (trạng thái = 1 và tồn kho > 0)
+    @Query("SELECT DISTINCT s FROM SanPham s " +
+           "INNER JOIN ChiTietSanPham ctsp ON ctsp.sanPham.id = s.id " +
+           "WHERE s.trangThai = 1 " +
+           "AND ctsp.soLuongTon > 0")
+    List<SanPham> findSanPhamConHang();
+    
+    @Query("SELECT DISTINCT s FROM SanPham s " +
+           "INNER JOIN ChiTietSanPham ctsp ON ctsp.sanPham.id = s.id " +
+           "WHERE s.trangThai = 1 " +
+           "AND ctsp.soLuongTon > 0")
+    Page<SanPham> findSanPhamConHang(Pageable pageable);
 }
