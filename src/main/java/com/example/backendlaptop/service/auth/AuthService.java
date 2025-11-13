@@ -60,18 +60,29 @@ public class AuthService {
         NhanVien nhanVien = nhanVienRepository.findByTaiKhoanId(taiKhoan.getId())
                 .orElse(null);
 
+        KhachHang khachHang = khachHangRepository.findByMaTaiKhoanId(taiKhoan.getId())
+                .orElse(null);
+
         // 6. Tạo response
         LoginResponse.UserInfo userInfo = new LoginResponse.UserInfo();
-        userInfo.setUserId(nhanVien != null ? nhanVien.getId() : taiKhoan.getId());
+        
+        // Ưu tiên: NhanVien > KhachHang > TaiKhoan
+        if (nhanVien != null) {
+            userInfo.setUserId(nhanVien.getId());
+            userInfo.setHoTen(nhanVien.getHoTen());
+        } else if (khachHang != null) {
+            userInfo.setUserId(khachHang.getId());
+            userInfo.setHoTen(khachHang.getHoTen());
+            userInfo.setVaiTro("KHACH_HANG");
+        } else {
+            userInfo.setUserId(taiKhoan.getId());
+        }
+        
         userInfo.setTenDangNhap(taiKhoan.getTenDangNhap());
         userInfo.setEmail(taiKhoan.getEmail());
         userInfo.setTrangThai(taiKhoan.getTrangThai());
         
-        if (nhanVien != null) {
-            userInfo.setHoTen(nhanVien.getHoTen());
-        }
-        
-        if (taiKhoan.getMaVaiTro() != null) {
+        if (taiKhoan.getMaVaiTro() != null && userInfo.getVaiTro() == null) {
             userInfo.setVaiTro(taiKhoan.getMaVaiTro().getTenVaiTro());
         }
 

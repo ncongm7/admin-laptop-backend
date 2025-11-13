@@ -3,6 +3,7 @@ package com.example.backendlaptop.service.PhanQuyenSer;
 import com.example.backendlaptop.dto.phanQuyenDto.khachHang.KhachHangDto;
 import com.example.backendlaptop.dto.phanQuyenDto.khachHang.KhachHangRequest;
 import com.example.backendlaptop.entity.KhachHang;
+import com.example.backendlaptop.expection.ApiException;
 import com.example.backendlaptop.repository.KhachHangRepository;
 import com.example.backendlaptop.repository.TaiKhoanRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,9 +33,24 @@ public class KhachHangService {
         return khachHangRepository.findById(id).orElse(null);
     }
 
-    //tìm khách hàng theo mã
+    /**
+     * Tìm khách hàng theo mã khách hàng
+     * @param maKhachHang Mã khách hàng cần tìm
+     * @return KhachHangDto nếu tìm thấy
+     * @throws ApiException với code "NOT_FOUND" nếu không tìm thấy khách hàng
+     */
     public KhachHangDto findByMaKhachHang(String maKhachHang) {
-        return khachHangRepository.findByMaKhachHangDto(maKhachHang);
+        // Tìm khách hàng theo mã trong repository
+        KhachHangDto khachHangDto = khachHangRepository.findByMaKhachHangDto(maKhachHang);
+        
+        // Kiểm tra nếu không tìm thấy khách hàng
+        if (khachHangDto == null) {
+            // Throw ApiException với code "NOT_FOUND" để GlobalExceptionHandler xử lý
+            throw new ApiException("Khách hàng không tồn tại", "NOT_FOUND");
+        }
+        
+        // Trả về thông tin khách hàng nếu tìm thấy
+        return khachHangDto;
     }
 
 //    tìm kiếm khách hàng
