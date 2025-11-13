@@ -134,6 +134,16 @@ public class SerialService {
         return createSerialsBatch(requests);
     }
     
+    public List<SerialResponse> getAllSerial() {
+        System.out.println("SerialService: getAllSerial called");
+        List<Serial> serials = serialRepository.findAll();
+        System.out.println("Found " + serials.size() + " total serials");
+        
+        List<SerialResponse> responses = serials.stream().map(this::mapToResponse).toList();
+        System.out.println("Returning " + responses.size() + " serial responses");
+        return responses;
+    }
+    
     public List<SerialResponse> getSerialsByCtspId(UUID ctspId) {
         System.out.println("SerialService: getSerialsByCtspId called for ctspId: " + ctspId);
         List<Serial> serials = serialRepository.findByCtspId(ctspId);
