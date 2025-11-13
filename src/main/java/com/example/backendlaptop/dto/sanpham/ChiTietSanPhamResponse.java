@@ -53,6 +53,8 @@ public class ChiTietSanPhamResponse {
     private String maPin;
 
 
+
+
     // Date fields
     private Instant createdAt;
     private Instant updatedAt;
