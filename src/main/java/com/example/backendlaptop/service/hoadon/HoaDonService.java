@@ -211,5 +211,142 @@ public class HoaDonService {
             throw new ApiException("Lỗi khi cập nhật trạng thái: " + e.getMessage(), "UPDATE_STATUS_ERROR");
         }
     }
+
+    /**
+     * Lấy danh sách đơn hàng của khách hàng (cho customer)
+     */
+    public Page<HoaDonListResponse> getCustomerOrders(UUID khachHangId, String trangThai, Pageable pageable) {
+        try {
+            System.out.println("🔍 [HoaDonService] Lấy đơn hàng khách: " + khachHangId + ", trạng thái: " + trangThai);
+            
+            if (khachHangId == null) {
+                throw new ApiException("Thiếu thông tin khách hàng", "MISSING_CUSTOMER_ID");
+            }
+
+            Specification<HoaDon> spec = (root, query, criteriaBuilder) -> {
+                List<Predicate> predicates = new ArrayList<>();
+                
+                // Filter theo khách hàng
+                predicates.add(criteriaBuilder.equal(root.get("idKhachHang"), khachHangId));
+                
+                // Filter theo trạng thái nếu có
+                if (trangThai != null && !trangThai.trim().isEmpty()) {
+                    try {
+                        TrangThaiHoaDon trangThaiEnum = TrangThaiHoaDon.valueOf(trangThai.trim().toUpperCase());
+                        predicates.add(criteriaBuilder.equal(root.get("trangThai"), trangThaiEnum));
+                    } catch (IllegalArgumentException e) {
+                        System.err.println("⚠️ [HoaDonService] Trạng thái không hợp lệ: " + trangThai);
+                    }
+                }
+                
+                return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
+            };
+
+            Page<HoaDon> hoaDonPage = hoaDonRepository.findAll(spec, pageable);
+            return hoaDonPage.map(HoaDonListResponse::new);
+        } catch (ApiException e) {
+            throw e;
+        } catch (Exception e) {
+            System.err.println("❌ [HoaDonService] Lỗi khi lấy đơn hàng khách: " + e.getMessage());
+            e.printStackTrace();
+            throw new ApiException("Lỗi khi lấy danh sách đơn hàng: " + e.getMessage(), "GET_CUSTOMER_ORDERS_ERROR");
+        }
+    }
+
+    /**
+     * Lấy chi tiết đơn hàng cho customer (có kiểm tra quyền)
+     */
+    public HoaDonDetailResponse getOrderDetailForCustomer(UUID orderId, UUID khachHangId) {
+        try {
+            System.out.println("🔍 [HoaDonService] Lấy chi tiết đơn: " + orderId + ", khách: " + khachHangId);
+            
+            HoaDon hoaDon = hoaDonRepository.findById(orderId)
+                .orElseThrow(() -> new ApiException("Không tìm thấy đơn hàng", "NOT_FOUND"));
+
+            // Kiểm tra quyền: chỉ cho phép xem đơn hàng của mình
+            if (khachHangId != null && !hoaDon.getIdKhachHang().equals(khachHangId)) {
+                throw new SecurityException("Bạn không có quyền xem đơn hàng này");
+            }
+
+            return new HoaDonDetailResponse(hoaDon);
+        } catch (SecurityException e) {
+            throw e;
+        } catch (ApiException e) {
+            throw e;
+        } catch (Exception e) {
+            System.err.println("❌ [HoaDonService] Lỗi khi lấy chi tiết đơn: " + e.getMessage());
+            e.printStackTrace();
+            throw new ApiException("Lỗi khi lấy chi tiết đơn hàng: " + e.getMessage(), "GET_ORDER_DETAIL_ERROR");
+        }
+    }
+
+    /**
+     * Hủy đơn hàng cho customer (chỉ cho phép khi CHO_THANH_TOAN)
+     */
+    public boolean cancelOrderForCustomer(UUID orderId, UUID khachHangId) {
+        try {
+            System.out.println("🚫 [HoaDonService] Hủy đơn: " + orderId + ", khách: " + khachHangId);
+            
+            HoaDon hoaDon = hoaDonRepository.findById(orderId)
+                .orElseThrow(() -> new ApiException("Không tìm thấy đơn hàng", "NOT_FOUND"));
+
+            // Kiểm tra quyền
+            if (khachHangId != null && !hoaDon.getIdKhachHang().equals(khachHangId)) {
+                throw new SecurityException("Bạn không có quyền hủy đơn hàng này");
+            }
+
+            // Chỉ cho phép hủy khi trạng thái = CHO_THANH_TOAN
+            if (hoaDon.getTrangThai() != TrangThaiHoaDon.CHO_THANH_TOAN) {
+                System.out.println("⚠️ [HoaDonService] Không thể hủy đơn ở trạng thái: " + hoaDon.getTrangThai());
+                return false;
+            }
+
+            hoaDon.setTrangThai(TrangThaiHoaDon.DA_HUY);
+            hoaDonRepository.save(hoaDon);
+            
+            System.out.println("✅ [HoaDonService] Đã hủy đơn hàng");
+            return true;
+        } catch (SecurityException e) {
+            throw e;
+        } catch (ApiException e) {
+            throw e;
+        } catch (Exception e) {
+            System.err.println("❌ [HoaDonService] Lỗi khi hủy đơn: " + e.getMessage());
+            e.printStackTrace();
+            throw new ApiException("Lỗi khi hủy đơn hàng: " + e.getMessage(), "CANCEL_ORDER_ERROR");
+        }
+    }
+
+    /**
+     * Mua lại đơn hàng (thêm sản phẩm vào giỏ hàng)
+     * TODO: Cần implement logic thêm vào giỏ hàng
+     */
+    public boolean reorderForCustomer(UUID orderId, UUID khachHangId) {
+        try {
+            System.out.println("🔄 [HoaDonService] Mua lại đơn: " + orderId + ", khách: " + khachHangId);
+            
+            HoaDon hoaDon = hoaDonRepository.findById(orderId)
+                .orElseThrow(() -> new ApiException("Không tìm thấy đơn hàng", "NOT_FOUND"));
+
+            // Kiểm tra quyền
+            if (khachHangId != null && !hoaDon.getIdKhachHang().equals(khachHangId)) {
+                throw new SecurityException("Bạn không có quyền thực hiện thao tác này");
+            }
+
+            // TODO: Implement logic thêm các sản phẩm trong đơn vào giỏ hàng
+            // Cần inject GioHangService và thêm từng chi tiết hóa đơn vào giỏ
+            
+            System.out.println("⚠️ [HoaDonService] Chức năng mua lại chưa được implement đầy đủ");
+            return true;
+        } catch (SecurityException e) {
+            throw e;
+        } catch (ApiException e) {
+            throw e;
+        } catch (Exception e) {
+            System.err.println("❌ [HoaDonService] Lỗi khi mua lại đơn: " + e.getMessage());
+            e.printStackTrace();
+            throw new ApiException("Lỗi khi mua lại đơn hàng: " + e.getMessage(), "REORDER_ERROR");
+        }
+    }
 }
 
