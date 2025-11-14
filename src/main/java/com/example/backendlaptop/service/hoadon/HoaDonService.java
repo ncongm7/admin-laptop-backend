@@ -5,6 +5,7 @@ import com.example.backendlaptop.dto.hoadon.HoaDonListResponse;
 import com.example.backendlaptop.dto.hoadon.HoaDonSearchRequest;
 import com.example.backendlaptop.entity.HoaDon;
 import com.example.backendlaptop.expection.ApiException;
+import com.example.backendlaptop.model.TrangThaiHoaDon;
 import com.example.backendlaptop.repository.banhang.HoaDonRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -173,6 +174,42 @@ public class HoaDonService {
 
             return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
         };
+    }
+
+    /**
+     * Cập nhật trạng thái đơn hàng
+     */
+    public HoaDonDetailResponse capNhatTrangThai(UUID idHoaDon, Integer trangThai) {
+        try {
+            System.out.println("🔄 [HoaDonService] Cập nhật trạng thái hóa đơn: " + idHoaDon + " -> " + trangThai);
+            
+            HoaDon hoaDon = hoaDonRepository.findById(idHoaDon)
+                .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn với ID: " + idHoaDon, "NOT_FOUND"));
+
+            // Convert integer to enum
+            TrangThaiHoaDon newTrangThai = TrangThaiHoaDon.values()[trangThai];
+            hoaDon.setTrangThai(newTrangThai);
+
+            // Nếu trạng thái là "Đã thanh toán", cập nhật ngày thanh toán
+            if (newTrangThai == TrangThaiHoaDon.DA_THANH_TOAN && hoaDon.getNgayThanhToan() == null) {
+                hoaDon.setNgayThanhToan(Instant.now());
+                hoaDon.setTrangThaiThanhToan(1); // Đã thanh toán
+            }
+
+            hoaDon = hoaDonRepository.save(hoaDon);
+            
+            System.out.println("✅ [HoaDonService] Cập nhật trạng thái thành công");
+            
+            return new HoaDonDetailResponse(hoaDon);
+        } catch (ApiException e) {
+            throw e;
+        } catch (Exception e) {
+            System.err.println("❌ [HoaDonService] Lỗi khi cập nhật trạng thái:");
+            System.err.println("  - Error: " + e.getClass().getName());
+            System.err.println("  - Message: " + e.getMessage());
+            e.printStackTrace();
+            throw new ApiException("Lỗi khi cập nhật trạng thái: " + e.getMessage(), "UPDATE_STATUS_ERROR");
+        }
     }
 }
 

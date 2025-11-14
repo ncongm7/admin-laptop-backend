@@ -80,5 +80,19 @@ public class HoaDonController {
         HoaDonDetailResponse result = hoaDonService.getHoaDonDetail(idHoaDon);
         return ResponseEntity.ok(new ResponseObject<>(result, "Lấy chi tiết hóa đơn thành công"));
     }
+
+    /**
+     * API 3: Cập nhật trạng thái đơn hàng
+     * 
+     * PUT /api/v1/hoa-don/{idHoaDon}/status?trangThai=0
+     */
+    @PutMapping("/{idHoaDon}/status")
+    public ResponseEntity<ResponseObject<HoaDonDetailResponse>> capNhatTrangThai(
+            @PathVariable UUID idHoaDon,
+            @RequestParam Integer trangThai
+    ) {
+        HoaDonDetailResponse result = hoaDonService.capNhatTrangThai(idHoaDon, trangThai);
+        return ResponseEntity.ok(new ResponseObject<>(result, "Cập nhật trạng thái đơn hàng thành công"));
+    }
 }
 
