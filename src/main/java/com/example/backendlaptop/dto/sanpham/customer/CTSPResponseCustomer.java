@@ -17,6 +17,7 @@ public class CTSPResponseCustomer {
     private String tenRam;
     private String dungLuongOCung;
     private String kichThuocManHinh;
+    private String tenMauSac;
     private BigDecimal giaBan;
 
     public CTSPResponseCustomer(ChiTietSanPham ctsp){
@@ -29,5 +30,6 @@ public class CTSPResponseCustomer {
         this.giaBan = ctsp.getGiaBan();
         this.dungLuongOCung = ctsp.getOCung().getDungLuong();
         this.kichThuocManHinh = ctsp.getLoaiManHinh().getKichThuoc();
+        this.tenMauSac = ctsp.getMauSac().getTenMau();
     }
 }
