@@ -1,13 +1,17 @@
 package com.example.backendlaptop.service;
 
+import com.example.backendlaptop.dto.sanpham.ChiTietSanPhamResponse;
 import com.example.backendlaptop.dto.sanpham.SanPhamRequest;
 import com.example.backendlaptop.dto.sanpham.SanPhamResponse;
+import com.example.backendlaptop.entity.ChiTietSanPham;
 import com.example.backendlaptop.entity.SanPham;
 import com.example.backendlaptop.expection.ApiException;
+import com.example.backendlaptop.repository.ChiTietSanPhamRepository;
 import com.example.backendlaptop.repository.SanPhamRepository;
 import com.example.backendlaptop.until.MapperUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +27,7 @@ import java.util.stream.Collectors;
 public class SanPhamService {
     
     private final SanPhamRepository sanPhamRepository;
+    private final ChiTietSanPhamRepository chiTietSanPhamRepository;
     
     public SanPhamResponse createSanPham(SanPhamRequest request) {
         // Kiểm tra mã sản phẩm đã tồn tại
@@ -227,6 +232,85 @@ public class SanPhamService {
         return sanPhams.map(this::convertToResponse);
     }
     
+    /**
+     * Lấy danh sách sản phẩm còn hàng KÈM CHI TIẾT BIẾN THỂ (cho module Bán Hàng)
+     * 
+     * API này trả về:
+     * - Danh sách SẢN PHẨM cha (không phải chi tiết)
+     * - Mỗi sản phẩm có kèm danh sách chiTietSanPhams (các biến thể)
+     * - Chỉ lấy sản phẩm có trangThai = 1 (đang bán)
+     * - Chỉ lấy biến thể có soLuongTon > 0
+     * 
+     * @param pageable - Phân trang
+     * @return Page<SanPhamResponse> - Danh sách sản phẩm còn hàng kèm biến thể
+     */
+    @Transactional(readOnly = true)
+    public Page<SanPhamResponse> getSanPhamConHangWithVariants(Pageable pageable) {
+        // Lấy danh sách sản phẩm còn hàng (trangThai = 1)
+        Page<SanPham> sanPhamPage = sanPhamRepository.findSanPhamConHang(pageable);
+        
+        // Convert và thêm chi tiết biến thể vào từng sản phẩm
+        List<SanPhamResponse> sanPhamResponses = sanPhamPage.getContent().stream()
+                .map(this::enrichSanPhamWithVariants)
+                .filter(response -> response.getChiTietSanPhams() != null && !response.getChiTietSanPhams().isEmpty())
+                .collect(Collectors.toList());
+        
+        // Trả về Page với danh sách đã được enrich
+        return new PageImpl<>(sanPhamResponses, pageable, sanPhamPage.getTotalElements());
+    }
+    
+    /**
+     * Tìm kiếm sản phẩm theo keyword KÈM CHI TIẾT BIẾN THỂ (cho module Bán Hàng)
+     * 
+     * @param keyword - Từ khóa tìm kiếm (tên hoặc mã sản phẩm)
+     * @param pageable - Phân trang
+     * @return Page<SanPhamResponse> - Danh sách sản phẩm tìm được kèm biến thể
+     */
+    @Transactional(readOnly = true)
+    public Page<SanPhamResponse> searchSanPhamWithVariants(String keyword, Pageable pageable) {
+        Page<SanPham> sanPhamPage;
+        
+        if (keyword == null || keyword.trim().isEmpty()) {
+            // Nếu không có keyword, trả về sản phẩm còn hàng
+            sanPhamPage = sanPhamRepository.findSanPhamConHang(pageable);
+        } else {
+            // Tìm kiếm theo keyword
+            sanPhamPage = sanPhamRepository.searchByMaOrTen(keyword.trim(), pageable);
+        }
+        
+        // Convert và thêm chi tiết biến thể
+        List<SanPhamResponse> sanPhamResponses = sanPhamPage.getContent().stream()
+                .filter(sp -> sp.getTrangThai() != null && sp.getTrangThai() == 1) // Chỉ lấy sản phẩm đang bán
+                .map(this::enrichSanPhamWithVariants)
+                .filter(response -> response.getChiTietSanPhams() != null && !response.getChiTietSanPhams().isEmpty())
+                .collect(Collectors.toList());
+        
+        return new PageImpl<>(sanPhamResponses, pageable, sanPhamPage.getTotalElements());
+    }
+    
+    /**
+     * Helper method: Enrich SanPham với danh sách ChiTietSanPham (biến thể)
+     * 
+     * @param sanPham - Entity SanPham
+     * @return SanPhamResponse - Response đã được enrich với danh sách biến thể
+     */
+    private SanPhamResponse enrichSanPhamWithVariants(SanPham sanPham) {
+        SanPhamResponse response = convertToResponse(sanPham);
+        
+        // Lấy danh sách chi tiết sản phẩm (biến thể)
+        List<ChiTietSanPham> chiTietSanPhams = chiTietSanPhamRepository.findBySanPham_Id(sanPham.getId());
+        
+        // Chỉ lấy biến thể đang bán (trangThai = 1)
+        List<ChiTietSanPhamResponse> chiTietResponses = chiTietSanPhams.stream()
+                .filter(ctsp -> ctsp.getTrangThai() != null && ctsp.getTrangThai() == 1)
+                .map(this::convertChiTietToResponse)
+                .collect(Collectors.toList());
+        
+        response.setChiTietSanPhams(chiTietResponses);
+        
+        return response;
+    }
+    
     // Validate price range
     private void validatePriceRange(Long minPrice, Long maxPrice) {
         if (minPrice != null && minPrice < 0) {
@@ -244,5 +328,81 @@ public class SanPhamService {
     
     private SanPhamResponse convertToResponse(SanPham sanPham) {
         return MapperUtils.map(sanPham, SanPhamResponse.class);
+    }
+    
+    /**
+     * Convert ChiTietSanPham entity sang ChiTietSanPhamResponse DTO
+     * Helper method cho getSanPhamConHangWithVariants
+     * 
+     * Method này populate đầy đủ thông tin từ các entity liên quan
+     * (CPU, RAM, GPU, Màu sắc, v.v.)
+     */
+    private ChiTietSanPhamResponse convertChiTietToResponse(ChiTietSanPham chiTietSanPham) {
+        ChiTietSanPhamResponse response = MapperUtils.map(chiTietSanPham, ChiTietSanPhamResponse.class);
+        
+        // Set thông tin sản phẩm
+        if (chiTietSanPham.getSanPham() != null) {
+            response.setIdSanPham(chiTietSanPham.getSanPham().getId());
+            response.setTenSanPham(chiTietSanPham.getSanPham().getTenSanPham());
+            response.setMaSanPham(chiTietSanPham.getSanPham().getMaSanPham());
+        }
+        
+        // Set thông tin CPU
+        if (chiTietSanPham.getCpu() != null) {
+            response.setIdCpu(chiTietSanPham.getCpu().getId());
+            response.setTenCpu(chiTietSanPham.getCpu().getTenCpu());
+            response.setMaCpu(chiTietSanPham.getCpu().getMaCpu());
+        }
+        
+        // Set thông tin GPU
+        if (chiTietSanPham.getGpu() != null) {
+            response.setIdGpu(chiTietSanPham.getGpu().getId());
+            response.setTenGpu(chiTietSanPham.getGpu().getTenGpu());
+            response.setMaGpu(chiTietSanPham.getGpu().getMaGpu());
+        }
+        
+        // Set thông tin RAM
+        if (chiTietSanPham.getRam() != null) {
+            response.setIdRam(chiTietSanPham.getRam().getId());
+            response.setTenRam(chiTietSanPham.getRam().getTenRam());
+            response.setMaRam(chiTietSanPham.getRam().getMaRam());
+        }
+        
+        // Set thông tin ổ cứng
+        if (chiTietSanPham.getOCung() != null) {
+            response.setIdOCung(chiTietSanPham.getOCung().getId());
+            response.setDungLuongOCung(chiTietSanPham.getOCung().getDungLuong());
+            response.setMaOCung(chiTietSanPham.getOCung().getMaOCung());
+        }
+        
+        // Set thông tin màu sắc
+        if (chiTietSanPham.getMauSac() != null) {
+            response.setIdMauSac(chiTietSanPham.getMauSac().getId());
+            response.setTenMauSac(chiTietSanPham.getMauSac().getTenMau());
+            response.setMaMauSac(chiTietSanPham.getMauSac().getMaMau());
+            response.setHexCode(chiTietSanPham.getMauSac().getHexCode());
+        }
+        
+        // Set thông tin loại màn hình
+        if (chiTietSanPham.getLoaiManHinh() != null) {
+            response.setIdLoaiManHinh(chiTietSanPham.getLoaiManHinh().getId());
+            response.setKichThuocManHinh(chiTietSanPham.getLoaiManHinh().getKichThuoc());
+            response.setMaLoaiManHinh(chiTietSanPham.getLoaiManHinh().getMaLoaiManHinh());
+        }
+        
+        // Set thông tin pin
+        if (chiTietSanPham.getPin() != null) {
+            response.setIdPin(chiTietSanPham.getPin().getId());
+            response.setDungLuongPin(chiTietSanPham.getPin().getDungLuongPin());
+            response.setMaPin(chiTietSanPham.getPin().getMaPin());
+        }
+        
+        // Set giá mặc định (không tính giảm giá ở đây)
+        response.setCoGiamGia(false);
+        response.setGiaGoc(chiTietSanPham.getGiaBan());
+        response.setGiaGiam(chiTietSanPham.getGiaBan());
+        response.setPhanTramGiam(0);
+        
+        return response;
     }
 }
