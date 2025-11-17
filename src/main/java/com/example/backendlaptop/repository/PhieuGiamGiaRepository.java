@@ -16,4 +16,6 @@ public interface PhieuGiamGiaRepository extends JpaRepository<PhieuGiamGia, UUID
     Collection<Object> findByMa(String ma);
 
     Optional<PhieuGiamGia> findByMaIgnoreCase(String ma);
+
+    Page<PhieuGiamGia> findByTrangThaiAndRiengTu(Integer trangThai, Boolean riengTu, Pageable pageable);
 }
