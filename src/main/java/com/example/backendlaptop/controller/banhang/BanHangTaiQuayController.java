@@ -21,10 +21,6 @@ public class BanHangTaiQuayController {
     @Autowired
     private BanHangTaiQuayFacade banHangTaiQuayFacade;
 
-    /**
-     * API 1: Tạo Hóa Đơn Chờ Mới
-     * Endpoint: POST /api/v1/ban-hang/hoa-don/tao-moi
-     */
     @PostMapping("/hoa-don/tao-moi")
     public ResponseEntity<ResponseObject<HoaDonResponse>> taoHoaDonMoi(@RequestBody TaoHoaDonRequest request) {
         HoaDonResponse response = banHangTaiQuayFacade.taoHoaDonChoiMoi(request);
@@ -32,10 +28,6 @@ public class BanHangTaiQuayController {
                 .body(new ResponseObject<>(response, "Tạo hóa đơn chờ thành công"));
     }
 
-    /**
-     * API 2: Thêm Sản Phẩm Vào Hóa Đơn Chờ
-     * Endpoint: POST /api/v1/ban-hang/hoa-don/{idHoaDon}/them-san-pham
-     */
     @PostMapping("/hoa-don/{idHoaDon}/them-san-pham")
     public ResponseEntity<ResponseObject<HoaDonResponse>> themSanPhamVaoHoaDon(
             @PathVariable UUID idHoaDon,
