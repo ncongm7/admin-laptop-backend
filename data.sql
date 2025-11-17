@@ -611,8 +611,11 @@ ALTER TABLE khach_hang DROP CONSTRAINT UQ__khach_ha__FFC64A2B0AE193BD;  -- hoặ
 CREATE UNIQUE INDEX UQ_khach_hang_ma_tai_khoan_notnull
 ON khach_hang(ma_tai_khoan)
 WHERE ma_tai_khoan IS NOT NULL;
-
-
+GO
+--1 thêm cột baneer url
+ALTER TABLE dot_giam_gia
+    ADD bannerImageUrl VARCHAR(255) NULL;
+GO
             -- 2) Chỉ fill cho những sản phẩm chưa có giá trị (đặt tạm = 12 tháng)
         UPDATE dbo.san_pham
         SET thoi_han_bh_thang = 12

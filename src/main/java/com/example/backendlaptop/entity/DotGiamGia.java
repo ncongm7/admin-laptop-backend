@@ -43,4 +43,6 @@ public class DotGiamGia {
     @Column(name = "trang_thai")
     private Integer trangThai;
 
+    @Column(name = "bannerImageUrl", nullable = true)
+    private String bannerImageUrl;
 }

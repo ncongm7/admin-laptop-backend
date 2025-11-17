@@ -1,6 +1,8 @@
 package com.example.backendlaptop.repository;
 
 import com.example.backendlaptop.entity.DotGiamGiaChiTiet;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -35,5 +37,6 @@ public interface DotGiamGiaChiTietRepository extends JpaRepository<DotGiamGiaChi
     int bulkRepriceByDot(@Param("dotId") UUID dotId,
                          @Param("newGiaTri") java.math.BigDecimal newGiaTri);
 
-
+    @Query("SELECT d.idCtsp.id FROM DotGiamGiaChiTiet d WHERE d.dotGiamGia.id = :idDotGiamGia")
+    Page<UUID> findIdCtspByIdDotGiamGia(@Param("idDotGiamGia") UUID idDotGiamGia, Pageable pageable);
 }
