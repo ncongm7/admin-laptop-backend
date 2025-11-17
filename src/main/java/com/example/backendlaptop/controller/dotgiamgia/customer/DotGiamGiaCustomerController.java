@@ -18,8 +18,8 @@ public class DotGiamGiaCustomerController {
         return new ResponseObject<>(dotGiamGiaCustomerService.getAll(pageNo));
     }
 
-    @GetMapping("/{idDotGiamGia}/products")
-    public ResponseObject<?> getIdCtspByIdDotGiamGia(@PathVariable UUID idDotGiamGia, @RequestParam(value = "pageNo", defaultValue = "0") Integer pageNo) {
-        return new ResponseObject<>(dotGiamGiaCustomerService.getIdCtspByIdDotGiamGia(idDotGiamGia, pageNo));
+    @GetMapping("/{id}")
+    public ResponseObject<?> getIdCtspByIdDotGiamGia(@PathVariable UUID id, @RequestParam(value = "pageNo", defaultValue = "0") Integer pageNo) {
+        return new ResponseObject<>(dotGiamGiaCustomerService.getIdCtspByIdDotGiamGia(id, pageNo));
     }
 }
