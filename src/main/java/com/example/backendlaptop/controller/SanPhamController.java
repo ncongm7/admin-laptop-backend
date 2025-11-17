@@ -173,4 +173,40 @@ public class SanPhamController {
         );
         return ResponseEntity.ok(responses);
     }
+    
+    /**
+     * API cho BÁN HÀNG: Lấy danh sách sản phẩm còn hàng (kèm chi tiết biến thể)
+     * Endpoint: GET /api/san-pham/ban-hang/con-hang
+     * 
+     * Trả về danh sách SẢN PHẨM (cha) còn hàng, mỗi sản phẩm có kèm:
+     * - Danh sách chiTietSanPhams (các biến thể)
+     * - Số lượng biến thể
+     * - Trạng thái còn hàng
+     * 
+     * @param pageable - Phân trang (page, size, sort)
+     * @return Page<SanPhamResponse> - Danh sách sản phẩm còn hàng kèm biến thể
+     */
+    @GetMapping("/ban-hang/con-hang")
+    public ResponseEntity<Page<SanPhamResponse>> getSanPhamConHangForBanHang(Pageable pageable) {
+        Page<SanPhamResponse> responses = sanPhamService.getSanPhamConHangWithVariants(pageable);
+        return ResponseEntity.ok(responses);
+    }
+    
+    /**
+     * API cho BÁN HÀNG: Tìm kiếm sản phẩm (kèm chi tiết biến thể)
+     * Endpoint: GET /api/san-pham/ban-hang/tim-kiem
+     * 
+     * Tìm kiếm SẢN PHẨM theo từ khóa và trả về kèm danh sách biến thể
+     * 
+     * @param keyword - Từ khóa tìm kiếm (tên sản phẩm, mã sản phẩm)
+     * @param pageable - Phân trang (page, size, sort)
+     * @return Page<SanPhamResponse> - Danh sách sản phẩm tìm được kèm biến thể
+     */
+    @GetMapping("/ban-hang/tim-kiem")
+    public ResponseEntity<Page<SanPhamResponse>> searchSanPhamForBanHang(
+            @RequestParam(required = false) String keyword,
+            Pageable pageable) {
+        Page<SanPhamResponse> responses = sanPhamService.searchSanPhamWithVariants(keyword, pageable);
+        return ResponseEntity.ok(responses);
+    }
 }
