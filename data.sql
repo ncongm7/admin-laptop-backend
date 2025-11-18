@@ -4334,3 +4334,39 @@ PRINT '✓ Đã thêm cột gia_nhap và insert dữ liệu mẫu thành công!'
 
 ---thêm thư viện --
 ---cái này nhé  npm install @zxing/library quagga chart.js vue-qrcode-reader
+-- danh muc sản phẩm
+go
+CREATE TABLE danh_muc (
+                          id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+                          ten_danh_muc NVARCHAR(255) NOT NULL,
+                          slug VARCHAR(255) UNIQUE NOT NULL,
+                          icon_url VARCHAR(MAX),
+    mo_ta NVARCHAR(500),
+    trang_thai INT DEFAULT 1
+);
+go
+CREATE TABLE sanpham_danhmuc (
+                                 id_san_pham UNIQUEIDENTIFIER NOT NULL,
+                                 id_danh_muc UNIQUEIDENTIFIER NOT NULL,
+                                 PRIMARY KEY (id_san_pham, id_danh_muc),
+                                 FOREIGN KEY (id_san_pham) REFERENCES san_pham(id),
+                                 FOREIGN KEY (id_danh_muc) REFERENCES danh_muc(id)
+);
+go
+INSERT INTO danh_muc (ten_danh_muc, slug, icon_url, mo_ta)
+VALUES
+(N'Laptop Gaming', 'laptop-gaming', 'https://img/icons/gaming.png', N'Laptops cho game thủ'),
+(N'Laptop Văn Phòng', 'laptop-van-phong', 'https://img/icons/office.png', N'Phù hợp làm việc, học tập'),
+(N'Laptop Đồ Hoạ', 'laptop-do-hoa', 'https://img/icons/design.png', N'Cho dân thiết kế, render'),
+(N'Laptop Mỏng Nhẹ', 'laptop-mong-nhe', 'https://img/icons/thin.png', N'Ultrabook mỏng nhẹ'),
+(N'Laptop Sinh Viên', 'laptop-sinh-vien', 'https://img/icons/student.png', N'Giá tốt – bền – ổn định');
+go
+INSERT INTO sanpham_danhmuc (id_san_pham, id_danh_muc)
+VALUES
+('cb0b7f80-d870-49d8-a2a1-116745260777', (SELECT id FROM danh_muc WHERE slug='laptop-gaming')),
+('ec23a415-9386-4fee-becc-20fd3d6d8b87', (SELECT id FROM danh_muc WHERE slug='laptop-gaming')),
+('a078d723-4279-40fc-b059-26a35a291bed', (SELECT id FROM danh_muc WHERE slug='laptop-van-phong')),
+('1bbba750-de2f-4340-8544-cca996780112', (SELECT id FROM danh_muc WHERE slug='laptop-do-hoa')),
+('ecb90826-f2ad-4424-b57d-d0699d95c7ca', (SELECT id FROM danh_muc WHERE slug='laptop-sinh-vien'));
+
+
