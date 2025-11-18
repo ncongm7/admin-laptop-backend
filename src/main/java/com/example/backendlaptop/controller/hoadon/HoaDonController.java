@@ -94,5 +94,42 @@ public class HoaDonController {
         HoaDonDetailResponse result = hoaDonService.capNhatTrangThai(idHoaDon, trangThai);
         return ResponseEntity.ok(new ResponseObject<>(result, "Cập nhật trạng thái đơn hàng thành công"));
     }
+
+    /**
+     * API 4: Xác nhận đơn hàng online (admin)
+     * 
+     * PUT /api/v1/hoa-don/{idHoaDon}/xac-nhan?nhanVienId={nhanVienId}
+     * 
+     * Chức năng:
+     * - Xác nhận đơn hàng online
+     * - Trừ kho (Serial) khi xác nhận
+     * - Chỉ áp dụng cho đơn hàng online ở trạng thái CHO_THANH_TOAN
+     */
+    @PutMapping("/{idHoaDon}/xac-nhan")
+    public ResponseEntity<ResponseObject<HoaDonDetailResponse>> xacNhanDonHang(
+            @PathVariable UUID idHoaDon,
+            @RequestParam(required = false) UUID nhanVienId
+    ) {
+        HoaDonDetailResponse result = hoaDonService.xacNhanDonHangOnline(idHoaDon, nhanVienId);
+        return ResponseEntity.ok(new ResponseObject<>(result, "Xác nhận đơn hàng thành công"));
+    }
+
+    /**
+     * API 5: Hủy đơn hàng online (admin)
+     * 
+     * PUT /api/v1/hoa-don/{idHoaDon}/huy?nhanVienId={nhanVienId}
+     * 
+     * Chức năng:
+     * - Hủy đơn hàng online
+     * - Chỉ hủy được khi trạng thái = CHO_THANH_TOAN (chưa trừ kho)
+     */
+    @PutMapping("/{idHoaDon}/huy")
+    public ResponseEntity<ResponseObject<HoaDonDetailResponse>> huyDonHang(
+            @PathVariable UUID idHoaDon,
+            @RequestParam(required = false) UUID nhanVienId
+    ) {
+        HoaDonDetailResponse result = hoaDonService.huyDonHangOnline(idHoaDon, nhanVienId);
+        return ResponseEntity.ok(new ResponseObject<>(result, "Hủy đơn hàng thành công"));
+    }
 }
 

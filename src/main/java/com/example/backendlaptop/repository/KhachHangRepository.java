@@ -48,4 +48,7 @@ public interface KhachHangRepository extends JpaRepository<KhachHang, UUID> {
     KhachHangDto findByMaKhachHangDto(@Param("maKhachHang") String maKhachHang);
 
     Optional<KhachHang> findByEmail(String email);
+
+    @Query("SELECT kh FROM KhachHang kh WHERE kh.maTaiKhoan.id = :taiKhoanId")
+    Optional<KhachHang> findByMaTaiKhoanId(@Param("taiKhoanId") UUID taiKhoanId);
 }

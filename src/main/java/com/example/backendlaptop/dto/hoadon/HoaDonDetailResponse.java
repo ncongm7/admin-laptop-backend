@@ -31,6 +31,11 @@ public class HoaDonDetailResponse {
     private Integer soDiemSuDung;
     private BigDecimal soTienQuyDoi;
     
+    // Fields hỗ trợ frontend
+    private String trangThaiDisplay; // Text hiển thị trạng thái
+    private Boolean canCancel; // Có thể hủy không (chỉ khi CHO_THANH_TOAN)
+    private Boolean canTrack; // Có thể theo dõi không (khi đã xác nhận trở đi)
+    
     // Thông tin khách hàng
     private KhachHangInfo khachHang;
     
@@ -57,6 +62,12 @@ public class HoaDonDetailResponse {
         this.ghiChu = hoaDon.getGhiChu();
         this.soDiemSuDung = hoaDon.getSoDiemSuDung();
         this.soTienQuyDoi = hoaDon.getSoTienQuyDoi();
+        
+        // Tính toán các field hỗ trợ frontend
+        this.trangThaiDisplay = getTrangThaiDisplay(hoaDon.getTrangThai());
+        this.canCancel = hoaDon.getTrangThai() == TrangThaiHoaDon.CHO_THANH_TOAN;
+        this.canTrack = hoaDon.getTrangThai() != TrangThaiHoaDon.CHO_THANH_TOAN 
+                && hoaDon.getTrangThai() != TrangThaiHoaDon.DA_HUY;
         
         // Map thông tin khách hàng
         if (hoaDon.getIdKhachHang() != null) {
@@ -85,6 +96,31 @@ public class HoaDonDetailResponse {
         // NOTE: ChiTietThanhToan không có relationship trong HoaDon entity
         // Cần query riêng nếu cần hiển thị thông tin thanh toán
         // TODO: Có thể thêm sau bằng cách inject ChiTietThanhToanRepository vào Service
+    }
+    
+    // ===== HELPER METHODS =====
+    
+    /**
+     * Lấy text hiển thị cho trạng thái
+     */
+    private String getTrangThaiDisplay(TrangThaiHoaDon trangThai) {
+        if (trangThai == null) {
+            return "Không xác định";
+        }
+        switch (trangThai) {
+            case CHO_THANH_TOAN:
+                return "Chờ thanh toán";
+            case DA_THANH_TOAN:
+                return "Đã thanh toán";
+            case DA_HUY:
+                return "Đã hủy";
+            case DANG_GIAO:
+                return "Đang giao hàng";
+            case HOAN_THANH:
+                return "Hoàn thành";
+            default:
+                return trangThai.toString();
+        }
     }
     
     // ===== INNER CLASSES =====

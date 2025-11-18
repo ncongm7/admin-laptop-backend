@@ -11,6 +11,7 @@ import com.example.backendlaptop.repository.banhang.HoaDonChiTietRepository;
 import com.example.backendlaptop.repository.banhang.HoaDonRepository;
 import com.example.backendlaptop.repository.ChiTietSanPhamRepository;
 import com.example.backendlaptop.repository.PhieuGiamGiaRepository;
+import com.example.backendlaptop.repository.SerialRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -37,6 +38,7 @@ public class CustomerOrderService {
     private final KhachHangRepository khachHangRepository;
     private final ChiTietSanPhamRepository chiTietSanPhamRepository;
     private final PhieuGiamGiaRepository phieuGiamGiaRepository;
+    private final SerialRepository serialRepository;
 
     /**
      * Tạo đơn hàng từ customer
@@ -72,10 +74,12 @@ public class CustomerOrderService {
                 ChiTietSanPham ctsp = chiTietSanPhamRepository.findById(sp.getIdCtsp())
                         .orElseThrow(() -> new ApiException("Không tìm thấy sản phẩm: " + sp.getIdCtsp(), "PRODUCT_NOT_FOUND"));
 
-                // Kiểm tra số lượng tồn kho
+                // Kiểm tra số lượng tồn kho dựa trên Serial (trangThai = 1 = có sẵn)
+                // QUAN TRỌNG: Chỉ kiểm tra, KHÔNG trừ kho. Kho sẽ được trừ khi admin xác nhận đơn hàng.
                 String tenSanPham = ctsp.getSanPham() != null ? ctsp.getSanPham().getTenSanPham() : "Sản phẩm";
-                if (ctsp.getSoLuongTon() == null || ctsp.getSoLuongTon() < sp.getSoLuong()) {
-                    throw new ApiException("Sản phẩm " + tenSanPham + " không đủ số lượng", "INSUFFICIENT_STOCK");
+                int soLuongKhaDung = serialRepository.countByCtspIdAndTrangThai(sp.getIdCtsp(), 1);
+                if (soLuongKhaDung < sp.getSoLuong()) {
+                    throw new ApiException("Sản phẩm " + tenSanPham + " không đủ số lượng. Còn lại: " + soLuongKhaDung, "INSUFFICIENT_STOCK");
                 }
 
                 HoaDonChiTiet chiTiet = new HoaDonChiTiet();
@@ -177,6 +181,43 @@ public class CustomerOrderService {
             System.err.println("Lỗi khi lấy chi tiết đơn hàng: " + e.getMessage());
             e.printStackTrace();
             throw new ApiException("Lỗi khi lấy chi tiết đơn hàng: " + e.getMessage(), "GET_ORDER_DETAIL_ERROR");
+        }
+    }
+
+    /**
+     * Hủy đơn hàng của customer
+     * Chỉ cho phép hủy khi trạng thái = CHO_THANH_TOAN (chưa trừ kho)
+     */
+    @Transactional
+    public HoaDonDetailResponse huyDonHang(UUID idHoaDon, UUID khachHangId) {
+        try {
+            // 1. Tìm hóa đơn
+            HoaDon hoaDon = hoaDonRepository.findById(idHoaDon)
+                    .orElseThrow(() -> new ApiException("Không tìm thấy đơn hàng", "ORDER_NOT_FOUND"));
+
+            // 2. Kiểm tra quyền: đơn hàng phải thuộc về khách hàng này
+            if (hoaDon.getIdKhachHang() == null || !hoaDon.getIdKhachHang().getId().equals(khachHangId)) {
+                throw new ApiException("Bạn không có quyền hủy đơn hàng này", "UNAUTHORIZED");
+            }
+
+            // 3. Kiểm tra trạng thái: chỉ hủy được khi CHO_THANH_TOAN (chưa trừ kho)
+            if (hoaDon.getTrangThai() != TrangThaiHoaDon.CHO_THANH_TOAN) {
+                throw new ApiException("Chỉ có thể hủy đơn hàng ở trạng thái 'Chờ thanh toán'. Trạng thái hiện tại: " + hoaDon.getTrangThai(), "INVALID_STATUS");
+            }
+
+            // 4. Cập nhật trạng thái thành DA_HUY
+            hoaDon.setTrangThai(TrangThaiHoaDon.DA_HUY);
+            hoaDon = hoaDonRepository.save(hoaDon);
+
+            System.out.println("✅ [CustomerOrderService] Đã hủy đơn hàng: " + idHoaDon);
+
+            return new HoaDonDetailResponse(hoaDon);
+        } catch (ApiException e) {
+            throw e;
+        } catch (Exception e) {
+            System.err.println("Lỗi khi hủy đơn hàng: " + e.getMessage());
+            e.printStackTrace();
+            throw new ApiException("Lỗi khi hủy đơn hàng: " + e.getMessage(), "CANCEL_ORDER_ERROR");
         }
     }
 }

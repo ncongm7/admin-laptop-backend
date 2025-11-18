@@ -57,5 +57,30 @@ public class CustomerOrderController {
         HoaDonDetailResponse result = customerOrderService.getChiTietDonHang(idHoaDon);
         return ResponseEntity.ok(new ResponseObject<>(result, "Lấy chi tiết đơn hàng thành công"));
     }
+
+    /**
+     * Lấy trạng thái đơn hàng của customer
+     * GET /api/v1/customer/orders/{idHoaDon}/status
+     */
+    @GetMapping("/{idHoaDon}/status")
+    public ResponseEntity<ResponseObject<HoaDonDetailResponse>> getOrderStatus(
+            @PathVariable UUID idHoaDon,
+            @RequestParam UUID khachHangId) {
+        HoaDonDetailResponse result = customerOrderService.getChiTietDonHang(idHoaDon);
+        // TODO: Có thể thêm validation để đảm bảo đơn hàng thuộc về khách hàng này
+        return ResponseEntity.ok(new ResponseObject<>(result, "Lấy trạng thái đơn hàng thành công"));
+    }
+
+    /**
+     * Hủy đơn hàng của customer
+     * POST /api/v1/customer/orders/{idHoaDon}/cancel
+     */
+    @PostMapping("/{idHoaDon}/cancel")
+    public ResponseEntity<ResponseObject<HoaDonDetailResponse>> cancelOrder(
+            @PathVariable UUID idHoaDon,
+            @RequestParam UUID khachHangId) {
+        HoaDonDetailResponse result = customerOrderService.huyDonHang(idHoaDon, khachHangId);
+        return ResponseEntity.ok(new ResponseObject<>(result, "Hủy đơn hàng thành công"));
+    }
 }
 

@@ -65,19 +65,35 @@ public class AuthService {
         NhanVien nhanVien = nhanVienRepository.findByTaiKhoanId(taiKhoan.getId())
                 .orElse(null);
 
-        // 6. Tạo response
+        // 6. Lấy thông tin khách hàng (nếu không phải nhân viên)
+        KhachHang khachHang = null;
+        if (nhanVien == null) {
+            khachHang = khachHangRepository.findByMaTaiKhoanId(taiKhoan.getId())
+                    .orElse(null);
+        }
+
+        // 7. Tạo response
         LoginResponse.UserInfo userInfo = new LoginResponse.UserInfo();
-        userInfo.setUserId(nhanVien != null ? nhanVien.getId() : taiKhoan.getId());
+        // Nếu là nhân viên, dùng nhanVien.getId(), nếu là khách hàng, dùng khachHang.getId()
+        if (nhanVien != null) {
+            userInfo.setUserId(nhanVien.getId());
+            userInfo.setHoTen(nhanVien.getHoTen());
+        } else if (khachHang != null) {
+            userInfo.setUserId(khachHang.getId()); // Dùng ID khách hàng
+            userInfo.setHoTen(khachHang.getHoTen());
+        } else {
+            // Fallback: dùng taiKhoan ID nếu không tìm thấy cả nhân viên và khách hàng
+            userInfo.setUserId(taiKhoan.getId());
+        }
+        
         userInfo.setTenDangNhap(taiKhoan.getTenDangNhap());
         userInfo.setEmail(taiKhoan.getEmail());
         userInfo.setTrangThai(taiKhoan.getTrangThai());
         
-        if (nhanVien != null) {
-            userInfo.setHoTen(nhanVien.getHoTen());
-        }
-        
         if (taiKhoan.getMaVaiTro() != null) {
             userInfo.setVaiTro(taiKhoan.getMaVaiTro().getTenVaiTro());
+        } else if (khachHang != null) {
+            userInfo.setVaiTro("KHACH_HANG");
         }
 
         // 7. Tạo JWT token (tạm thời dùng UUID làm token đơn giản)
