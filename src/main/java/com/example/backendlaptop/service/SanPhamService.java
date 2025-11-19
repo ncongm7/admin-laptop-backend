@@ -4,9 +4,11 @@ import com.example.backendlaptop.dto.sanpham.ChiTietSanPhamResponse;
 import com.example.backendlaptop.dto.sanpham.SanPhamRequest;
 import com.example.backendlaptop.dto.sanpham.SanPhamResponse;
 import com.example.backendlaptop.entity.ChiTietSanPham;
+import com.example.backendlaptop.entity.DotGiamGia;
 import com.example.backendlaptop.entity.SanPham;
 import com.example.backendlaptop.expection.ApiException;
 import com.example.backendlaptop.repository.ChiTietSanPhamRepository;
+import com.example.backendlaptop.repository.DotGiamGiaChiTietRepository;
 import com.example.backendlaptop.repository.SanPhamRepository;
 import com.example.backendlaptop.until.MapperUtils;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -28,6 +31,9 @@ public class SanPhamService {
     
     private final SanPhamRepository sanPhamRepository;
     private final ChiTietSanPhamRepository chiTietSanPhamRepository;
+    
+    // ================================= LOGIC MỚI: INJECT REPOSITORY ĐỂ TÌM GIẢM GIÁ =================================
+    private final DotGiamGiaChiTietRepository dotGiamGiaChiTietRepository;
     
     public SanPhamResponse createSanPham(SanPhamRequest request) {
         // Kiểm tra mã sản phẩm đã tồn tại
@@ -338,6 +344,7 @@ public class SanPhamService {
      * (CPU, RAM, GPU, Màu sắc, v.v.)
      */
     private ChiTietSanPhamResponse convertChiTietToResponse(ChiTietSanPham chiTietSanPham) {
+        // ================================= LOGIC MỚI: TÍNH TOÁN GIÁ GIẢM CHO TỪNG SẢN PHẨM CHI TIẾT =================================
         ChiTietSanPhamResponse response = MapperUtils.map(chiTietSanPham, ChiTietSanPhamResponse.class);
         
         // Set thông tin sản phẩm
@@ -397,12 +404,77 @@ public class SanPhamService {
             response.setMaPin(chiTietSanPham.getPin().getMaPin());
         }
         
-        // Set giá mặc định (không tính giảm giá ở đây)
-        response.setCoGiamGia(false);
-        response.setGiaGoc(chiTietSanPham.getGiaBan());
-        response.setGiaGiam(chiTietSanPham.getGiaBan());
-        response.setPhanTramGiam(0);
+        // BƯỚC 1: THIẾT LẬP GIÁ GỐC VÀ GIÁ BÁN BAN ĐẦU
+        BigDecimal giaGoc = chiTietSanPham.getGiaBan();
+        response.setGiaGoc(giaGoc);
+        response.setGiaBan(giaGoc); // Mặc định giá bán bằng giá gốc
+
+        // BƯỚC 2: TÌM KIẾM ĐỢT GIẢM GIÁ ĐANG HOẠT ĐỘNG
+        List<DotGiamGia> activeDiscounts = dotGiamGiaChiTietRepository.findActiveDiscountsForProduct(chiTietSanPham.getId(), Instant.now());
+
+        if (!activeDiscounts.isEmpty()) {
+            // ================================= LOGIC MỚI: TÌM KHUYẾN MÃI TỐT NHẤT (GIÁ THẤP NHẤT) =================================
+            BigDecimal bestPrice = giaGoc;
+            DotGiamGia bestDiscount = null;
+
+            // Duyệt qua tất cả các khuyến mãi đang hoạt động
+            for (DotGiamGia dgg : activeDiscounts) {
+                Integer giaTriGiam = dgg.getGiaTri();
+                if (giaTriGiam == null || giaTriGiam <= 0) {
+                    continue; // Bỏ qua nếu giá trị giảm không hợp lệ
+                }
+
+                BigDecimal currentFinalPrice;
+                // Nếu giá trị giảm <= 100, tính theo %
+                if (giaTriGiam <= 100) {
+                    BigDecimal phanTram = new BigDecimal(giaTriGiam).divide(new BigDecimal(100));
+                    BigDecimal soTienGiam = giaGoc.multiply(phanTram);
+                    currentFinalPrice = giaGoc.subtract(soTienGiam);
+                } 
+                // Nếu giá trị giảm > 100, tính theo số tiền cố định
+                else {
+                    currentFinalPrice = giaGoc.subtract(new BigDecimal(giaTriGiam));
+                }
+
+                // Nếu giá sau khi giảm của đợt này tốt hơn, cập nhật giá tốt nhất và khuyến mãi tốt nhất
+                if (currentFinalPrice.compareTo(bestPrice) < 0) {
+                    bestPrice = currentFinalPrice;
+                    bestDiscount = dgg;
+                }
+            }
+
+            // BƯỚC 3A: NẾU TÌM THẤY KHUYẾN MÃI TỐT NHẤT, ÁP DỤNG NÓ
+            if (bestDiscount != null) {
+                response.setCoGiamGia(true);
+                response.setTenDotGiamGia(bestDiscount.getTenKm());
+                response.setPhanTramGiam(bestDiscount.getGiaTri()); // Vẫn lưu giá trị gốc của đợt giảm giá
+                response.setNgayBatDauGiam(bestDiscount.getNgayBatDau());
+                response.setNgayKetThucGiam(bestDiscount.getNgayKetThuc());
+
+                // Đảm bảo giá không bị âm
+                if (bestPrice.compareTo(BigDecimal.ZERO) < 0) {
+                    bestPrice = BigDecimal.ZERO;
+                }
+
+                response.setGiaGiam(bestPrice);
+                response.setGiaBan(bestPrice); // Cập nhật lại giá bán cuối cùng
+            } else {
+                // Không có khuyến mãi nào hợp lệ được tìm thấy
+                setNoDiscount(response, giaGoc);
+            }
+        } else {
+            // BƯỚC 3B: NẾU KHÔNG TÌM THẤY, SET GIÁ TRỊ MẶC ĐỊNH
+            setNoDiscount(response, giaGoc);
+        }
         
         return response;
+    }
+
+    // Helper method để gán giá trị khi không có giảm giá
+    private void setNoDiscount(ChiTietSanPhamResponse response, BigDecimal giaGoc) {
+        response.setCoGiamGia(false);
+        response.setGiaGiam(giaGoc);
+        response.setGiaBan(giaGoc);
+        response.setPhanTramGiam(0);
     }
 }
