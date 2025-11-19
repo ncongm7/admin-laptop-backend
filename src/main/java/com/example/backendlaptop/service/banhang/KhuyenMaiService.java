@@ -56,29 +56,37 @@ public class KhuyenMaiService {
         
         // 3. Lấy danh sách PhieuGiamGia hợp lệ
         List<PhieuGiamGia> phieuGiamGias = phieuGiamGiaRepository.findAll();
+        System.out.println("  - Tổng số voucher trong DB: " + phieuGiamGias.size());
         
         List<VoucherSuggestionResponse> suggestions = phieuGiamGias.stream()
                 .filter(pgg -> {
+                    System.out.println("  🔍 Kiểm tra voucher: " + pgg.getMa() + " - " + pgg.getTenPhieuGiamGia());
+                    
                     // Kiểm tra trạng thái (1 = Hoạt động)
                     if (pgg.getTrangThai() == null || pgg.getTrangThai() != 1) {
+                        System.out.println("    ❌ Bị loại: Trạng thái không hoạt động (trangThai=" + pgg.getTrangThai() + ")");
                         return false;
                     }
                     
                     // Kiểm tra ngày hiệu lực
                     if (pgg.getNgayBatDau() != null && pgg.getNgayBatDau().isAfter(now)) {
+                        System.out.println("    ❌ Bị loại: Chưa đến ngày bắt đầu (ngayBatDau=" + pgg.getNgayBatDau() + ")");
                         return false; // Chưa đến ngày bắt đầu
                     }
                     if (pgg.getNgayKetThuc() != null && pgg.getNgayKetThuc().isBefore(now)) {
+                        System.out.println("    ❌ Bị loại: Đã hết hạn (ngayKetThuc=" + pgg.getNgayKetThuc() + ", now=" + now + ")");
                         return false; // Đã hết hạn
                     }
                     
                     // Kiểm tra số lượng còn lại
                     if (pgg.getSoLuongDung() != null && pgg.getSoLuongDung() <= 0) {
+                        System.out.println("    ❌ Bị loại: Hết lượt sử dụng (soLuongDung=" + pgg.getSoLuongDung() + ")");
                         return false; // Hết lượt sử dụng
                     }
                     
                     // Kiểm tra điều kiện hóa đơn tối thiểu
                     if (pgg.getHoaDonToiThieu() != null && tongTien.compareTo(pgg.getHoaDonToiThieu()) < 0) {
+                        System.out.println("    ❌ Bị loại: Tổng tiền chưa đủ (tongTien=" + tongTien + ", hoaDonToiThieu=" + pgg.getHoaDonToiThieu() + ")");
                         return false; // Tổng tiền chưa đủ điều kiện
                     }
                     
@@ -87,10 +95,12 @@ public class KhuyenMaiService {
                         // Voucher riêng tư - chỉ áp dụng cho khách hàng cụ thể
                         // TODO: Nếu có bảng liên kết PhieuGiamGia với KhachHang, kiểm tra ở đây
                         if (idKhachHang == null) {
+                            System.out.println("    ❌ Bị loại: Voucher riêng tư nhưng không có khách hàng");
                             return false; // Khách lẻ không dùng được voucher riêng tư
                         }
                     }
                     
+                    System.out.println("    ✅ Voucher hợp lệ!");
                     return true;
                 })
                 .map(pgg -> VoucherSuggestionResponse.fromPhieuGiamGia(pgg, tongTien))

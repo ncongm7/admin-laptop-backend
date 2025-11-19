@@ -188,7 +188,9 @@ public class SerialService {
         serial.setTrangThai(trangThai);
         serialRepository.save(serial);
         // Update stock count for the variant (subtract hidden serials)
-        updateStockCount(serial.getCtsp().getId());
+        if (serial.getCtsp() != null && serial.getCtsp().getId() != null) {
+            updateStockCount(serial.getCtsp().getId());
+        }
     }
     
     public void deleteSerial(UUID id) {
@@ -206,6 +208,11 @@ public class SerialService {
         int count = serialRepository.countByCtspIdAndTrangThai(ctspId, 1); // Count available serials
         ChiTietSanPham ctsp = chiTietSanPhamRepository.findById(ctspId)
                 .orElseThrow(() -> new RuntimeException("Chi tiết sản phẩm không tồn tại"));
+        
+        // Đảm bảo version không null (Hibernate @Version yêu cầu giá trị không null)
+        if (ctsp.getVersion() == null) {
+            ctsp.setVersion(0L);
+        }
         
         ctsp.setSoLuongTon(count);
         chiTietSanPhamRepository.save(ctsp);

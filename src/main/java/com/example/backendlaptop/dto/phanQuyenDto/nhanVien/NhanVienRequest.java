@@ -30,4 +30,8 @@ public class NhanVienRequest {
     private String danhGia;
 
     private Integer trangThai;
+    
+    private String tenDangNhap; // Tên đăng nhập (username)
+    
+    private String matKhau; // Mật khẩu (chỉ update nếu có giá trị)
 }

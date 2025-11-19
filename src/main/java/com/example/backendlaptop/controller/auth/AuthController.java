@@ -52,15 +52,29 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<ResponseObject<LoginResponse.UserInfo>> getCurrentUser(
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
-        
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new ResponseObject<>(false, null, "Token không hợp lệ"));
+        try {
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ResponseObject<>(false, null, "Token không hợp lệ"));
+            }
+            
+            String token = authHeader.substring(7);
+            if (token == null || token.trim().isEmpty()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ResponseObject<>(false, null, "Token không được để trống"));
+            }
+            
+            LoginResponse.UserInfo userInfo = authService.getCurrentUser(token);
+            if (userInfo == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ResponseObject<>(false, null, "Không thể lấy thông tin user từ token"));
+            }
+            
+            return ResponseEntity.ok(new ResponseObject<>(userInfo, "Lấy thông tin user thành công"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ResponseObject<>(false, null, "Lỗi khi lấy thông tin user: " + e.getMessage()));
         }
-        
-        String token = authHeader.substring(7);
-        LoginResponse.UserInfo userInfo = authService.getCurrentUser(token);
-        return ResponseEntity.ok(new ResponseObject<>(userInfo, "Lấy thông tin user thành công"));
     }
 
     /**

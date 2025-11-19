@@ -666,10 +666,30 @@ GO
 
 
 ---------------------------------
+-- Index: Đảm bảo mỗi nhân viên chỉ có một tài khoản (ma_tai_khoan không được trùng lặp)
+-- Lưu ý: Index này đã được tạo ở trên, không cần tạo lại
+-- Nếu cần xóa constraint cũ, chạy lệnh sau:
+-- ALTER TABLE dbo.nhan_vien DROP CONSTRAINT [UQ__nhan_vie__FFC64A2B26837423];
 
-CREATE UNIQUE INDEX UX_NhanVien_MaTaiKhoan_NotNull
-ON dbo.nhan_vien(ma_tai_khoan)
-WHERE ma_tai_khoan IS NOT NULL;
+---------------------------------
+-- Indexes cho bảng hoa_don: Tối ưu query đơn hàng online
+---------------------------------
+
+-- Index: Tối ưu query đơn hàng online chờ xác nhận (theo kế hoạch quản lý đơn hàng online)
+CREATE NONCLUSTERED INDEX IX_HoaDon_TrangThai_LoaiHoaDon
+ON dbo.hoa_don(trang_thai, loai_hoa_don)
+INCLUDE (id, ma, id_khach_hang, ngay_tao, tong_tien_sau_giam)
+WHERE loai_hoa_don = 1; -- Chỉ index cho đơn hàng online (giao hàng)
+
+-- Index: Tối ưu query đơn hàng theo khách hàng
+CREATE NONCLUSTERED INDEX IX_HoaDon_KhachHang_TrangThai
+ON dbo.hoa_don(id_khach_hang, trang_thai)
+INCLUDE (id, ma, ngay_tao, tong_tien_sau_giam);
+
+-- Index: Tối ưu query đơn hàng theo ngày tạo (để filter đơn mới)
+CREATE NONCLUSTERED INDEX IX_HoaDon_NgayTao_TrangThai
+ON dbo.hoa_don(ngay_tao DESC, trang_thai)
+INCLUDE (id, ma, id_khach_hang, loai_hoa_don);
 
 
 
@@ -4369,4 +4389,67 @@ VALUES
 ('1bbba750-de2f-4340-8544-cca996780112', (SELECT id FROM danh_muc WHERE slug='laptop-do-hoa')),
 ('ecb90826-f2ad-4424-b57d-d0699d95c7ca', (SELECT id FROM danh_muc WHERE slug='laptop-sinh-vien'));
 
+
+-- ===================================================================================
+-- CẬP NHẬT ROLE: Chuẩn hóa về 3 role chính (ADMIN, NHAN_VIEN, KHACH_HANG)
+-- Chạy script này sau khi database đã chạy để update role
+-- Lưu ý: Script này được thêm vào cuối file để không ảnh hưởng đến database đang chạy
+-- ===================================================================================
+
+PRINT 'Bắt đầu cập nhật role...';
+GO
+
+-- Bước 1: Đảm bảo có đủ 3 vai trò chính
+IF NOT EXISTS (SELECT 1 FROM vai_tro WHERE ma_vai_tro = 'NHAN_VIEN')
+BEGIN
+    INSERT INTO vai_tro (ma_vai_tro, ten_vai_tro, mo_ta) 
+    VALUES ('NHAN_VIEN', 'Nhân viên', 'Nhân viên bán hàng và quản lý');
+    PRINT 'Đã tạo vai trò NHAN_VIEN';
+END
+ELSE
+BEGIN
+    PRINT 'Vai trò NHAN_VIEN đã tồn tại';
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM vai_tro WHERE ma_vai_tro = 'KHACH_HANG')
+BEGIN
+    INSERT INTO vai_tro (ma_vai_tro, ten_vai_tro, mo_ta) 
+    VALUES ('KHACH_HANG', 'Khách hàng', 'Người dùng cuối mua sản phẩm');
+    PRINT 'Đã tạo vai trò KHACH_HANG';
+END
+ELSE
+BEGIN
+    PRINT 'Vai trò KHACH_HANG đã tồn tại';
+END
+GO
+
+-- Bước 2: Cập nhật vai trò của các tài khoản hiện có
+-- Chuyển STAFF, MANAGER, CASHIER thành NHAN_VIEN
+UPDATE tai_khoan 
+SET ma_vai_tro = (SELECT id FROM vai_tro WHERE ma_vai_tro = 'NHAN_VIEN')
+WHERE ma_vai_tro IN (
+    SELECT id FROM vai_tro WHERE ma_vai_tro IN ('STAFF', 'MANAGER', 'CASHIER')
+);
+PRINT 'Đã cập nhật các tài khoản STAFF/MANAGER/CASHIER thành NHAN_VIEN';
+GO
+
+-- Chuyển CUSTOMER thành KHACH_HANG
+UPDATE tai_khoan 
+SET ma_vai_tro = (SELECT id FROM vai_tro WHERE ma_vai_tro = 'KHACH_HANG')
+WHERE ma_vai_tro = (SELECT id FROM vai_tro WHERE ma_vai_tro = 'CUSTOMER');
+PRINT 'Đã cập nhật các tài khoản CUSTOMER thành KHACH_HANG';
+GO
+
+-- Bước 3: Xóa các vai trò không dùng (optional - comment lại nếu muốn giữ)
+-- Lưu ý: Chỉ xóa nếu chắc chắn không còn tài khoản nào sử dụng
+/*
+DELETE FROM vai_tro WHERE ma_vai_tro IN ('STAFF', 'MANAGER', 'CASHIER', 'CUSTOMER');
+PRINT 'Đã xóa các vai trò không dùng';
+GO
+*/
+
+PRINT 'Hoàn tất cập nhật role!';
+PRINT 'Hệ thống hiện có 3 vai trò chính: ADMIN, NHAN_VIEN, KHACH_HANG';
+GO
 

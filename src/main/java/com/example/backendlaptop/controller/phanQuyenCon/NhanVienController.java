@@ -48,8 +48,8 @@ public class NhanVienController {
     @PostMapping("/add-nhan-vien")
     public ResponseEntity<Object> add(@RequestBody NhanVienRequest nhanVienRequest) {
         try {
-            nhanVienService.addNV(nhanVienRequest);
-            return ResponseEntity.ok().build();
+            java.util.Map<String, String> loginInfo = nhanVienService.addNV(nhanVienRequest);
+            return ResponseEntity.ok(loginInfo);
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
         }

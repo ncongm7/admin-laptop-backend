@@ -57,10 +57,21 @@ public class BanHangHoaDonService {
         hoaDon.setHoaDonChiTiets(new HashSet<>());
 
         // Gán nhân viên (lấy từ authentication context hoặc request)
+        // Cho phép null nếu không có nhân viên (có thể là khách hàng tự tạo hóa đơn)
         if (request.getNhanVienId() != null) {
-            NhanVien nhanVien = nhanVienRepository.findById(request.getNhanVienId())
-                    .orElseThrow(() -> new ApiException("Không tìm thấy nhân viên với ID: " + request.getNhanVienId(), "NOT_FOUND"));
-            hoaDon.setIdNhanVien(nhanVien);
+            try {
+                NhanVien nhanVien = nhanVienRepository.findById(request.getNhanVienId())
+                        .orElse(null);
+                if (nhanVien != null) {
+                    hoaDon.setIdNhanVien(nhanVien);
+                } else {
+                    // Log warning nhưng không throw exception - cho phép tạo hóa đơn không có nhân viên
+                    System.err.println("Warning: Không tìm thấy nhân viên với ID: " + request.getNhanVienId() + ". Tạo hóa đơn không có nhân viên.");
+                }
+            } catch (Exception e) {
+                System.err.println("Lỗi khi tìm nhân viên: " + e.getMessage());
+                // Tiếp tục tạo hóa đơn không có nhân viên
+            }
         }
 
         // Gán khách hàng (có thể null nếu là khách vãng lai)

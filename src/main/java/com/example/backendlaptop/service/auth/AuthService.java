@@ -91,7 +91,8 @@ public class AuthService {
         userInfo.setTrangThai(taiKhoan.getTrangThai());
         
         if (taiKhoan.getMaVaiTro() != null) {
-            userInfo.setVaiTro(taiKhoan.getMaVaiTro().getTenVaiTro());
+            // Trả về ma_vai_tro (code) thay vì ten_vai_tro để nhất quán với frontend
+            userInfo.setVaiTro(taiKhoan.getMaVaiTro().getMaVaiTro());
         } else if (khachHang != null) {
             userInfo.setVaiTro("KHACH_HANG");
         }
@@ -185,7 +186,7 @@ public class AuthService {
         userInfo.setEmail(taiKhoan.getEmail());
         userInfo.setHoTen(khachHang.getHoTen());
         userInfo.setTrangThai(taiKhoan.getTrangThai());
-        userInfo.setVaiTro("KHACH_HANG");
+        userInfo.setVaiTro("KHACH_HANG"); // ma_vai_tro code
 
         // 8. Tạo token
         String token = "Bearer-" + UUID.randomUUID().toString();
