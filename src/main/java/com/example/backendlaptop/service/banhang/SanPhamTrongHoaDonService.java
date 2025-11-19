@@ -3,16 +3,21 @@ package com.example.backendlaptop.service.banhang;
 import com.example.backendlaptop.dto.banhang.HoaDonResponse;
 import com.example.backendlaptop.dto.banhang.ThemSanPhamRequest;
 import com.example.backendlaptop.entity.ChiTietSanPham;
+import com.example.backendlaptop.entity.DotGiamGiaChiTiet;
 import com.example.backendlaptop.entity.HoaDon;
 import com.example.backendlaptop.entity.HoaDonChiTiet;
 import com.example.backendlaptop.expection.ApiException;
 import com.example.backendlaptop.model.TrangThaiHoaDon;
 import com.example.backendlaptop.repository.ChiTietSanPhamRepository;
+import com.example.backendlaptop.repository.DotGiamGiaChiTietRepository;
 import com.example.backendlaptop.repository.banhang.HoaDonChiTietRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -29,6 +34,9 @@ public class SanPhamTrongHoaDonService {
 
     @Autowired
     private ChiTietSanPhamRepository chiTietSanPhamRepository;
+
+    @Autowired
+    private DotGiamGiaChiTietRepository dotGiamGiaChiTietRepository;
 
     @Autowired
     private BanHangHoaDonService hoaDonService;
@@ -97,7 +105,11 @@ public class SanPhamTrongHoaDonService {
         chiTietSanPhamRepository.save(ctsp);
         System.out.println("✅ [SanPhamTrongHoaDonService] Đã tạm giữ " + request.getSoLuong() + " sản phẩm");
 
-        // 7. Kiểm tra sản phẩm đã có trong hóa đơn chưa
+        // 7. Lấy giá từ dot_giam_gia_chi_tiet (nếu có) hoặc giá gốc
+        BigDecimal donGia = getGiaBanHienTai(ctsp);
+        System.out.println("  - Giá bán hiện tại (đã tính giảm giá): " + donGia);
+
+        // 8. Kiểm tra sản phẩm đã có trong hóa đơn chưa (và cập nhật giá)
         Optional<HoaDonChiTiet> existingHdct = hoaDon.getHoaDonChiTiets().stream()
                 .filter(hdct -> hdct.getChiTietSanPham().getId().equals(ctsp.getId()))
                 .findFirst();
@@ -107,6 +119,8 @@ public class SanPhamTrongHoaDonService {
             System.out.println("✅ [SanPhamTrongHoaDonService] Sản phẩm đã có trong hóa đơn, cập nhật số lượng");
             HoaDonChiTiet hdct = existingHdct.get();
             hdct.setSoLuong(hdct.getSoLuong() + request.getSoLuong());
+            // Cập nhật lại giá (phòng trường hợp giá giảm thay đổi)
+            hdct.setDonGia(donGia);
             hoaDonChiTietRepository.save(hdct);
         } else {
             // Tạo mới
@@ -115,16 +129,50 @@ public class SanPhamTrongHoaDonService {
             hdct.setHoaDon(hoaDon);
             hdct.setChiTietSanPham(ctsp);
             hdct.setSoLuong(request.getSoLuong());
-            hdct.setDonGia(ctsp.getGiaBan());
+            hdct.setDonGia(donGia); // Sử dụng giá từ dot_giam_gia_chi_tiet (nếu có)
             hoaDon.getHoaDonChiTiets().add(hdct);
             hoaDonChiTietRepository.save(hdct);
         }
 
-        // 8. Tính lại tổng tiền
+        // 9. Tính lại tổng tiền
         hoaDonService.capNhatTongTien(hoaDon);
         System.out.println("✅ [SanPhamTrongHoaDonService] Hoàn tất thêm sản phẩm vào hóa đơn!");
         
         return new HoaDonResponse(hoaDonService.findById(idHoaDon));
+    }
+    
+    /**
+     * Lấy giá bán hiện tại của sản phẩm
+     * Ưu tiên lấy giá từ dot_giam_gia_chi_tiet (nếu có và đang hiệu lực)
+     * Nếu không có, lấy giá gốc từ chi_tiet_san_pham
+     */
+    private BigDecimal getGiaBanHienTai(ChiTietSanPham ctsp) {
+        // Tìm thông tin giảm giá cho chi tiết sản phẩm này
+        List<DotGiamGiaChiTiet> discountList = dotGiamGiaChiTietRepository.findAll();
+        Optional<DotGiamGiaChiTiet> dotGiamGiaChiTiet = discountList.stream()
+                .filter(d -> d.getIdCtsp() != null && d.getIdCtsp().getId().equals(ctsp.getId()))
+                .filter(d -> d.getDotGiamGia() != null && d.getDotGiamGia().getTrangThai() == 1)
+                .filter(d -> {
+                    Instant now = Instant.now();
+                    return d.getDotGiamGia().getNgayBatDau() != null 
+                        && d.getDotGiamGia().getNgayKetThuc() != null
+                        && !now.isBefore(d.getDotGiamGia().getNgayBatDau())
+                        && !now.isAfter(d.getDotGiamGia().getNgayKetThuc());
+                })
+                .findFirst();
+        
+        if (dotGiamGiaChiTiet.isPresent()) {
+            DotGiamGiaChiTiet discount = dotGiamGiaChiTiet.get();
+            BigDecimal giaSauKhiGiam = discount.getGiaSauKhiGiam();
+            if (giaSauKhiGiam != null && giaSauKhiGiam.compareTo(BigDecimal.ZERO) > 0) {
+                System.out.println("  ✅ [SanPhamTrongHoaDonService] Tìm thấy giá giảm từ dot_giam_gia_chi_tiet: " + giaSauKhiGiam);
+                return giaSauKhiGiam;
+            }
+        }
+        
+        // Nếu không có giảm giá hoặc giá giảm không hợp lệ, trả về giá gốc
+        System.out.println("  ℹ️ [SanPhamTrongHoaDonService] Sử dụng giá gốc: " + ctsp.getGiaBan());
+        return ctsp.getGiaBan();
     }
 
     /**
