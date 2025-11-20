@@ -1,0 +1,104 @@
+### Test CRUD Đợt Giảm Giá
+### Sử dụng REST Client extension trong VS Code hoặc IntelliJ
+
+@baseUrl = http://localhost:8080/api/dot-giam-gia-quan-ly
+
+### 1. GET - Lấy danh sách tất cả đợt giảm giá
+GET {{baseUrl}}/danh-sach
+Content-Type: application/json
+
+### 2. POST - Thêm mới đợt giảm giá (Loại % - 10%)
+POST {{baseUrl}}/add
+Content-Type: application/json
+
+{
+  "tenKm": "Test Giảm giá 10%",
+  "loaiDotGiamGia": 1,
+  "giaTri": 10.00,
+  "soTienGiamToiDa": 2000000.00,
+  "moTa": "Test giảm giá 10% tối đa 2 triệu",
+  "ngayBatDau": "2025-01-20T00:00:00Z",
+  "ngayKetThuc": "2025-12-31T23:59:59Z",
+  "trangThai": 1
+}
+
+### 3. POST - Thêm mới đợt giảm giá (Loại VND - 500k)
+POST {{baseUrl}}/add
+Content-Type: application/json
+
+{
+  "tenKm": "Test Giảm giá 500k",
+  "loaiDotGiamGia": 2,
+  "giaTri": 500000.00,
+  "soTienGiamToiDa": 500000.00,
+  "moTa": "Test giảm giá cố định 500k",
+  "ngayBatDau": "2025-01-20T00:00:00Z",
+  "ngayKetThuc": "2025-12-31T23:59:59Z",
+  "trangThai": 1
+}
+
+### 4. GET - Lấy chi tiết đợt giảm giá (thay {id} bằng ID thực tế)
+GET {{baseUrl}}/detail/{{id}}
+Content-Type: application/json
+
+### 5. PUT - Cập nhật đợt giảm giá (thay {id} bằng ID thực tế)
+PUT {{baseUrl}}/update/{{id}}
+Content-Type: application/json
+
+{
+  "tenKm": "Test Giảm giá 15% (Updated)",
+  "loaiDotGiamGia": 1,
+  "giaTri": 15.00,
+  "soTienGiamToiDa": 3000000.00,
+  "moTa": "Test giảm giá 15% tối đa 3 triệu (Updated)",
+  "ngayBatDau": "2025-01-20T00:00:00Z",
+  "ngayKetThuc": "2025-12-31T23:59:59Z",
+  "trangThai": 1
+}
+
+### 6. DELETE - Xóa đợt giảm giá (thay {id} bằng ID thực tế)
+DELETE {{baseUrl}}/delete/{{id}}
+
+### 7. POST - Test Validation: Giá trị % > 100 (sẽ lỗi)
+POST {{baseUrl}}/add
+Content-Type: application/json
+
+{
+  "tenKm": "Test Validation - % > 100",
+  "loaiDotGiamGia": 1,
+  "giaTri": 150.00,
+  "soTienGiamToiDa": 5000000.00,
+  "moTa": "Test validation",
+  "ngayBatDau": "2025-01-20T00:00:00Z",
+  "ngayKetThuc": "2025-12-31T23:59:59Z",
+  "trangThai": 1
+}
+
+### 8. POST - Test Validation: Giá trị % < 0 (sẽ lỗi)
+POST {{baseUrl}}/add
+Content-Type: application/json
+
+{
+  "tenKm": "Test Validation - % < 0",
+  "loaiDotGiamGia": 1,
+  "giaTri": -10.00,
+  "soTienGiamToiDa": 2000000.00,
+  "moTa": "Test validation",
+  "ngayBatDau": "2025-01-20T00:00:00Z",
+  "ngayKetThuc": "2025-12-31T23:59:59Z",
+  "trangThai": 1
+}
+
+### 9. POST - Test Validation: Thiếu loại giảm giá (sẽ lỗi)
+POST {{baseUrl}}/add
+Content-Type: application/json
+
+{
+  "tenKm": "Test Validation - Thiếu loại",
+  "giaTri": 10.00,
+  "moTa": "Test validation",
+  "ngayBatDau": "2025-01-20T00:00:00Z",
+  "ngayKetThuc": "2025-12-31T23:59:59Z",
+  "trangThai": 1
+}
+

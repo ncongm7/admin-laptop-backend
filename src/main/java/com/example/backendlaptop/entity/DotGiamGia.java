@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.Nationalized;
 import org.hibernate.annotations.UuidGenerator;
 
@@ -26,8 +25,14 @@ public class DotGiamGia {
     @Column(name = "ten_km")
     private String tenKm;
 
-    @Column(name = "gia_tri")
-    private Integer giaTri;
+    @Column(name = "loai_dot_giam_gia")
+    private Integer loaiDotGiamGia; // 1: Giảm theo %, 2: Giảm theo số tiền (VND)
+
+    @Column(name = "gia_tri", precision = 18, scale = 2)
+    private java.math.BigDecimal giaTri; // Giá trị giảm: % (0-100) hoặc số tiền VND
+
+    @Column(name = "so_tien_giam_toi_da", precision = 18, scale = 2)
+    private java.math.BigDecimal soTienGiamToiDa; // Giới hạn số tiền giảm tối đa (chỉ dùng khi loai = 1 - %)
 
     @Nationalized
     @Lob

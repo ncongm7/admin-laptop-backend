@@ -66,12 +66,25 @@ public class VoucherSuggestionResponse {
         response.setId(dgg.getId());
         response.setMa("DGG-" + dgg.getId().toString().substring(0, 8));
         response.setTenPhieuGiamGia(dgg.getTenKm());
-        response.setGiaTriGiamGia(new BigDecimal(dgg.getGiaTri()));
+        
+        // Map loaiDotGiamGia (1: %, 2: VND) sang loaiPhieuGiamGia (0: %, 1: VND)
+        // DotGiamGia: 1 = %, 2 = VND
+        // PhieuGiamGia: 0 = %, 1 = VND
+        if (dgg.getLoaiDotGiamGia() != null) {
+            response.setLoaiPhieuGiamGia(dgg.getLoaiDotGiamGia() == 1 ? 0 : 1); // 1->0 (%), 2->1 (VND)
+        } else {
+            response.setLoaiPhieuGiamGia(1); // Mặc định VND nếu null
+        }
+        
+        // giaTri đã là BigDecimal, không cần new BigDecimal()
+        response.setGiaTriGiamGia(dgg.getGiaTri() != null ? dgg.getGiaTri() : BigDecimal.ZERO);
+        response.setSoTienGiamToiDa(dgg.getSoTienGiamToiDa());
         response.setNgayKetThuc(dgg.getNgayKetThuc());
         response.setMoTa(dgg.getMoTa());
         response.setLoaiVoucher("DOT_GIAM_GIA");
         // DotGiamGia thường áp dụng trên sản phẩm, không có điều kiện hóa đơn tối thiểu
         response.setHoaDonToiThieu(BigDecimal.ZERO);
+        response.setSoLuongDung(null); // DotGiamGia không có giới hạn số lượng dùng
         
         return response;
     }

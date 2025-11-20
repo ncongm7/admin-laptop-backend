@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -26,6 +27,33 @@ public class DotGiamGiaService {
     private void validate(DotGiamGiaRequest req) {
         // 1) Validate ngày (ném lỗi nếu sai)
         CheckNgayBatDauKetThuc.status(req.getNgayBatDau(), req.getNgayKetThuc()); // chỉ để validate
+
+        // 2) Validate loại giảm giá và giá trị
+        if (req.getLoaiDotGiamGia() == null) {
+            throw new IllegalArgumentException("Loại đợt giảm giá không được để trống");
+        }
+
+        // 3) Nếu là giảm theo % (loai = 1), validate giá trị 0-100
+        if (Integer.valueOf(1).equals(req.getLoaiDotGiamGia())) {
+            if (req.getGiaTri() == null) {
+                throw new IllegalArgumentException("Giá trị giảm (%) không được để trống");
+            }
+            BigDecimal v = req.getGiaTri();
+            if (v.compareTo(BigDecimal.ZERO) < 0 || v.compareTo(new BigDecimal("100")) > 0) {
+                throw new IllegalArgumentException("Giá trị giảm (%) phải trong khoảng 0 đến 100");
+            }
+        }
+        // Nếu là giảm theo VND (loai = 2), chỉ cần >= 0
+        else if (Integer.valueOf(2).equals(req.getLoaiDotGiamGia())) {
+            if (req.getGiaTri() == null) {
+                throw new IllegalArgumentException("Giá trị giảm (VND) không được để trống");
+            }
+            if (req.getGiaTri().compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("Giá trị giảm (VND) phải >= 0");
+            }
+        } else {
+            throw new IllegalArgumentException("Loại đợt giảm giá không hợp lệ (chỉ chấp nhận 1: % hoặc 2: VND)");
+        }
     }
 
     public List<DotGiamGiaResponse> getAll() {
@@ -46,6 +74,11 @@ public class DotGiamGiaService {
         // Công tắc quản trị
         dotGiamGia.setTrangThai(req.getTrangThai() == null ? 1 : req.getTrangThai()); // 1=Bật mặc định
 
+        // Nếu là giảm theo VND (loai = 2), set soTienGiamToiDa = giaTri (giống PhieuGiamGia)
+        if (Integer.valueOf(2).equals(dotGiamGia.getLoaiDotGiamGia())) {
+            dotGiamGia.setSoTienGiamToiDa(dotGiamGia.getGiaTri());
+        }
+
         repository.save(dotGiamGia);
     }
 
@@ -62,11 +95,15 @@ public class DotGiamGiaService {
             dot.setTrangThai(request.getTrangThai());
         }
 
+        // Nếu là giảm theo VND (loai = 2), set soTienGiamToiDa = giaTri
+        if (Integer.valueOf(2).equals(dot.getLoaiDotGiamGia())) {
+            dot.setSoTienGiamToiDa(dot.getGiaTri());
+        }
+
         repository.save(dot);
 
-        // Reprice toàn bộ chi tiết thuộc đợt
-        var newGiaTri = java.math.BigDecimal.valueOf(dot.getGiaTri() == null ? 0 : dot.getGiaTri());
-        dggctRepository.bulkRepriceByDot(dot.getId(), newGiaTri);
+        // Reprice toàn bộ chi tiết thuộc đợt (sử dụng loại giảm giá mới)
+        dggctRepository.bulkRepriceByDot(dot.getId(), dot.getGiaTri(), dot.getLoaiDotGiamGia(), dot.getSoTienGiamToiDa());
     }
 
     public DotGiamGiaResponse detail(UUID id) {
