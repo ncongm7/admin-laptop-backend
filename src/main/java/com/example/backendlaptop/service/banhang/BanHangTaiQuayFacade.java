@@ -33,6 +33,9 @@ public class BanHangTaiQuayFacade {
     @Autowired
     private ThanhToanService thanhToanService;
 
+    @Autowired
+    private InHoaDonService inHoaDonService;
+
     // ==================== QUẢN LÝ HÓA ĐƠN ====================
 
     /**
@@ -93,6 +96,14 @@ public class BanHangTaiQuayFacade {
         return sanPhamTrongHoaDonService.xoaSanPhamKhoiHoaDon(idHoaDonChiTiet);
     }
 
+    /**
+     * API: Cập nhật số lượng sản phẩm trong hóa đơn
+     * Endpoint: PUT /api/v1/ban-hang/hoa-don/cap-nhat-so-luong/{idHoaDonChiTiet}
+     */
+    public HoaDonResponse capNhatSoLuongSanPham(UUID idHoaDonChiTiet, Integer soLuong) {
+        return sanPhamTrongHoaDonService.capNhatSoLuongSanPham(idHoaDonChiTiet, soLuong);
+    }
+
     // ==================== QUẢN LÝ KHUYẾN MÃI/VOUCHER ====================
 
     /**
@@ -135,6 +146,16 @@ public class BanHangTaiQuayFacade {
      */
     public XacThucSerialResponse xacThucSerial(XacThucSerialRequest request) {
         return thanhToanService.xacThucSerial(request);
+    }
+
+    // ==================== IN HÓA ĐƠN ====================
+
+    /**
+     * API: In hóa đơn
+     * Endpoint: GET /api/v1/ban-hang/hoa-don/{idHoaDon}/in
+     */
+    public String inHoaDon(UUID idHoaDon) {
+        return inHoaDonService.generateInvoiceHTML(idHoaDon);
     }
 }
 

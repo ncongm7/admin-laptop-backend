@@ -268,6 +268,8 @@ CREATE TABLE chi_tiet_thanh_toan (
     id_hoa_don UNIQUEIDENTIFIER,
     phuong_thuc_thanh_toan_id UNIQUEIDENTIFIER,
     so_tien_thanh_toan DECIMAL(18, 2),
+    tien_khach_dua DECIMAL(18, 2) NULL, -- Số tiền khách đưa (cho thanh toán tiền mặt)
+    tien_tra_lai DECIMAL(18, 2) NULL, -- Số tiền trả lại khách (cho thanh toán tiền mặt)
     ma_giao_dich VARCHAR(100),
     ghi_chu NVARCHAR(MAX)
 );

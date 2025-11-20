@@ -215,6 +215,73 @@ public class SanPhamTrongHoaDonService {
     }
 
     /**
+     * Cập nhật số lượng sản phẩm trong hóa đơn
+     * Bao gồm:
+     * - Kiểm tra tồn kho
+     * - Điều chỉnh tồn kho tạm giữ
+     * - Cập nhật chi tiết hóa đơn
+     * - Tính lại tổng tiền
+     */
+    @Transactional
+    public HoaDonResponse capNhatSoLuongSanPham(UUID idHoaDonChiTiet, Integer soLuongMoi) {
+        // 1. Tìm hóa đơn chi tiết
+        HoaDonChiTiet hdct = hoaDonChiTietRepository.findById(idHoaDonChiTiet)
+                .orElseThrow(() -> new ApiException("Không tìm thấy chi tiết hóa đơn với ID: " + idHoaDonChiTiet, "NOT_FOUND"));
+
+        // 2. Lấy thông tin
+        HoaDon hoaDon = hdct.getHoaDon();
+        ChiTietSanPham ctsp = hdct.getChiTietSanPham();
+        int soLuongCu = hdct.getSoLuong();
+
+        // 3. Kiểm tra trạng thái hóa đơn
+        if (hoaDon.getTrangThai() != TrangThaiHoaDon.CHO_THANH_TOAN) {
+            throw new ApiException("Chỉ có thể cập nhật số lượng sản phẩm trong hóa đơn đang chờ thanh toán", "BAD_REQUEST");
+        }
+
+        // 4. Kiểm tra số lượng mới
+        if (soLuongMoi <= 0) {
+            throw new ApiException("Số lượng phải lớn hơn 0", "BAD_REQUEST");
+        }
+
+        // 5. Tính số lượng thay đổi
+        int soLuongThayDoi = soLuongMoi - soLuongCu;
+
+        if (soLuongThayDoi == 0) {
+            // Không có thay đổi, trả về hóa đơn hiện tại
+            return new HoaDonResponse(hoaDonService.findById(hoaDon.getId()));
+        }
+
+        // 6. Kiểm tra tồn kho nếu tăng số lượng
+        if (soLuongThayDoi > 0) {
+            int soLuongTon = ctsp.getSoLuongTon() != null ? ctsp.getSoLuongTon() : 0;
+            int soLuongTamGiu = ctsp.getSoLuongTamGiu() != null ? ctsp.getSoLuongTamGiu() : 0;
+            int soLuongKhaDung = soLuongTon - soLuongTamGiu;
+
+            if (soLuongThayDoi > soLuongKhaDung) {
+                throw new ApiException("Không đủ hàng. Số lượng khả dụng: " + soLuongKhaDung, "INSUFFICIENT_STOCK");
+            }
+
+            // Tăng số lượng tạm giữ
+            ctsp.setSoLuongTamGiu(soLuongTamGiu + soLuongThayDoi);
+        } else {
+            // Giảm số lượng, giải phóng tồn kho tạm giữ
+            int soLuongTamGiu = ctsp.getSoLuongTamGiu() != null ? ctsp.getSoLuongTamGiu() : 0;
+            ctsp.setSoLuongTamGiu(Math.max(0, soLuongTamGiu + soLuongThayDoi)); // soLuongThayDoi là số âm
+        }
+
+        // 7. Cập nhật số lượng trong hóa đơn chi tiết
+        hdct.setSoLuong(soLuongMoi);
+        ensureVersionNotNull(ctsp);
+        chiTietSanPhamRepository.save(ctsp);
+        hoaDonChiTietRepository.save(hdct);
+
+        // 8. Tính lại tổng tiền
+        hoaDonService.capNhatTongTien(hoaDon);
+
+        return new HoaDonResponse(hoaDonService.findById(hoaDon.getId()));
+    }
+
+    /**
      * Giải phóng tồn kho tạm giữ cho tất cả sản phẩm trong hóa đơn
      * Được gọi khi xóa hóa đơn chờ
      */
