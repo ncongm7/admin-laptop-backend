@@ -143,4 +143,30 @@ public class BanHangTaiQuayController {
         HoaDonResponse response = banHangTaiQuayFacade.xoaVoucher(idHoaDon);
         return ResponseEntity.ok(new ResponseObject<>(response, "Xóa voucher thành công"));
     }
+
+    /**
+     * API: Cập nhật số lượng sản phẩm trong hóa đơn
+     * Endpoint: PUT /api/v1/ban-hang/hoa-don/cap-nhat-so-luong/{idHoaDonChiTiet}
+     */
+    @PutMapping("/hoa-don/cap-nhat-so-luong/{idHoaDonChiTiet}")
+    public ResponseEntity<ResponseObject<HoaDonResponse>> capNhatSoLuongSanPham(
+            @PathVariable UUID idHoaDonChiTiet,
+            @Valid @RequestBody CapNhatSoLuongRequest request) {
+        HoaDonResponse response = banHangTaiQuayFacade.capNhatSoLuongSanPham(idHoaDonChiTiet, request.getSoLuong());
+        return ResponseEntity.ok(new ResponseObject<>(response, "Cập nhật số lượng sản phẩm thành công"));
+    }
+
+    /**
+     * API: In hóa đơn
+     * Endpoint: GET /api/v1/ban-hang/hoa-don/{idHoaDon}/in
+     * 
+     * Trả về HTML invoice để in hoặc xuất PDF
+     */
+    @GetMapping("/hoa-don/{idHoaDon}/in")
+    public ResponseEntity<String> inHoaDon(@PathVariable UUID idHoaDon) {
+        String html = banHangTaiQuayFacade.inHoaDon(idHoaDon);
+        return ResponseEntity.ok()
+                .header("Content-Type", "text/html; charset=UTF-8")
+                .body(html);
+    }
 }

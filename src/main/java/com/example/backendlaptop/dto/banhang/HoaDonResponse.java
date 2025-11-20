@@ -33,8 +33,16 @@ public class HoaDonResponse {
     private Integer soDiemSuDung;
     private BigDecimal soTienQuyDoi;
     private List<HoaDonChiTietResponse> chiTietList;
+    private KhachHangResponse khachHang; // Thêm object khách hàng với điểm tích lũy
 
     public HoaDonResponse(HoaDon hoaDon) {
+        this(hoaDon, null);
+    }
+
+    /**
+     * Constructor với điểm tích lũy (để map từ service)
+     */
+    public HoaDonResponse(HoaDon hoaDon, Integer diemTichLuy) {
         this.id = hoaDon.getId();
         this.ma = hoaDon.getMa();
         this.idKhachHang = hoaDon.getIdKhachHang() != null ? hoaDon.getIdKhachHang().getId() : null;
@@ -55,6 +63,11 @@ public class HoaDonResponse {
         this.trangThai = hoaDon.getTrangThai();
         this.soDiemSuDung = hoaDon.getSoDiemSuDung();
         this.soTienQuyDoi = hoaDon.getSoTienQuyDoi();
+        
+        // Map khách hàng với điểm tích lũy
+        if (hoaDon.getIdKhachHang() != null) {
+            this.khachHang = new KhachHangResponse(hoaDon.getIdKhachHang(), diemTichLuy);
+        }
         
         // Map chi tiết hóa đơn
         if (hoaDon.getHoaDonChiTiets() != null) {

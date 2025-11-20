@@ -16,6 +16,10 @@ public class ThanhToanRequest {
     @NotNull(message = "Số tiền thanh toán không được để trống")
     private BigDecimal soTienThanhToan;
     
+    private BigDecimal tienKhachDua; // Số tiền khách đưa (cho thanh toán tiền mặt)
+    
+    private BigDecimal tienTraLai; // Số tiền trả lại khách (cho thanh toán tiền mặt)
+    
     private String ghiChu;
     
     private String maGiaoDich;

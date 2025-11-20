@@ -265,6 +265,8 @@ public class ThanhToanService {
         cttt.setIdHoaDon(hoaDon);
         cttt.setPhuongThucThanhToan(pttt);
         cttt.setSoTienThanhToan(request.getSoTienThanhToan());
+        cttt.setTienKhachDua(request.getTienKhachDua()); // Số tiền khách đưa (cho thanh toán tiền mặt)
+        cttt.setTienTraLai(request.getTienTraLai()); // Số tiền trả lại khách (cho thanh toán tiền mặt)
         cttt.setMaGiaoDich(request.getMaGiaoDich());
         cttt.setGhiChu(request.getGhiChu());
         chiTietThanhToanRepository.save(cttt);
