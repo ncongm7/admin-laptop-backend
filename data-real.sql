@@ -296,7 +296,9 @@ CREATE TABLE phieu_giam_gia (
 CREATE TABLE dot_giam_gia (
     id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
     ten_km NVARCHAR(255),
-    gia_tri INT,
+    loai_dot_giam_gia INT, -- 1: Giảm theo %, 2: Giảm theo số tiền (VND)
+    gia_tri DECIMAL(18, 2), -- Giá trị giảm: % (0-100) hoặc số tiền VND
+    so_tien_giam_toi_da DECIMAL(18, 2) NULL, -- Giới hạn số tiền giảm tối đa (chỉ dùng khi loai = 1 - %)
     mo_ta NVARCHAR(MAX),
     ngayBatDau DATETIME2,
     ngayKetThuc DATETIME2,
@@ -751,12 +753,12 @@ INSERT INTO phieu_giam_gia (ma, ten_phieu_giam_gia, loai_phieu_giam_gia, gia_tri
 ('PGG004', 'Giảm 1 triệu cho laptop gaming', 2, 1000000, 1000000, 15000000, 30, '2024-01-01', '2024-12-31', 0, 'Giảm cố định 1 triệu cho laptop gaming', 1),
 ('PGG005', 'Giảm 15% cuối tuần', 1, 15.00, 3000000, 8000000, 200, '2024-01-01', '2024-12-31', 0, 'Giảm giá 15% tối đa 3 triệu cho đơn hàng cuối tuần', 1);
 
-INSERT INTO dot_giam_gia (ten_km, gia_tri, mo_ta, ngayBatDau, ngayKetThuc, trang_thai, bannerImageUrl) VALUES
-('Khuyến mãi Black Friday 2024', 30, 'Giảm giá 30% cho tất cả sản phẩm trong ngày Black Friday', '2024-11-29', '2024-11-29', 1, NULL),
-('Khuyến mãi mùa hè', 20, 'Giảm giá 20% cho laptop gaming trong mùa hè', '2024-06-01', '2024-08-31', 1, NULL),
-('Khuyến mãi sinh nhật', 15, 'Giảm giá 15% cho khách hàng trong tháng sinh nhật', '2024-01-01', '2024-12-31', 1, NULL),
-('Khuyến mãi laptop văn phòng', 25, 'Giảm giá 25% cho laptop văn phòng', '2024-03-01', '2024-03-31', 1, NULL),
-('Khuyến mãi cuối năm', 35, 'Giảm giá 35% cho đơn hàng cuối năm', '2024-12-15', '2024-12-31', 1, NULL);
+INSERT INTO dot_giam_gia (ten_km, loai_dot_giam_gia, gia_tri, so_tien_giam_toi_da, mo_ta, ngayBatDau, ngayKetThuc, trang_thai, bannerImageUrl) VALUES
+('Khuyến mãi Black Friday 2024', 1, 30.00, 5000000.00, 'Giảm giá 30% cho tất cả sản phẩm trong ngày Black Friday (tối đa 5 triệu)', '2024-11-29', '2024-11-29', 1, NULL),
+('Khuyến mãi mùa hè', 1, 20.00, 3000000.00, 'Giảm giá 20% cho laptop gaming trong mùa hè (tối đa 3 triệu)', '2024-06-01', '2024-08-31', 1, NULL),
+('Khuyến mãi sinh nhật', 1, 15.00, 2000000.00, 'Giảm giá 15% cho khách hàng trong tháng sinh nhật (tối đa 2 triệu)', '2024-01-01', '2024-12-31', 1, NULL),
+('Khuyến mãi laptop văn phòng', 1, 25.00, 4000000.00, 'Giảm giá 25% cho laptop văn phòng (tối đa 4 triệu)', '2024-03-01', '2024-03-31', 1, NULL),
+('Khuyến mãi cuối năm', 1, 35.00, 6000000.00, 'Giảm giá 35% cho đơn hàng cuối năm (tối đa 6 triệu)', '2024-12-15', '2024-12-31', 1, NULL);
 
 -- 2. Tài khoản
 INSERT INTO tai_khoan (ma_vai_tro, ten_dang_nhap, mat_khau, email, trang_thai, ngay_tao, lan_dang_nhap_cuoi) VALUES
@@ -922,5 +924,98 @@ GO
 
 PRINT 'Hoàn tất cập nhật role!';
 PRINT 'Hệ thống hiện có 3 vai trò chính: ADMIN, NHAN_VIEN, KHACH_HANG';
+GO
+
+-- ===================================================================================
+-- ALTER TABLE dot_giam_gia - Thêm loại giảm giá % và số tiền giảm tối đa
+-- Ngày tạo: 2025-01-XX
+-- Mô tả: Thêm cột loai_dot_giam_gia và so_tien_giam_toi_da để hỗ trợ giảm giá theo %
+-- LƯU Ý: Nếu chạy lại từ đầu (DROP DATABASE), các cột này đã có trong CREATE TABLE
+--        Các ALTER này chỉ cần thiết nếu database đã tồn tại từ trước
+-- ===================================================================================
+
+-- Kiểm tra và thêm cột loai_dot_giam_gia nếu chưa có
+IF NOT EXISTS (
+    SELECT 1 FROM sys.columns 
+    WHERE object_id = OBJECT_ID('dot_giam_gia') 
+    AND name = 'loai_dot_giam_gia'
+)
+BEGIN
+    ALTER TABLE dot_giam_gia
+    ADD loai_dot_giam_gia INT NULL;
+    PRINT 'Đã thêm cột loai_dot_giam_gia';
+END
+ELSE
+BEGIN
+    PRINT 'Cột loai_dot_giam_gia đã tồn tại, bỏ qua';
+END
+GO
+
+-- Kiểm tra và thêm cột so_tien_giam_toi_da nếu chưa có
+IF NOT EXISTS (
+    SELECT 1 FROM sys.columns 
+    WHERE object_id = OBJECT_ID('dot_giam_gia') 
+    AND name = 'so_tien_giam_toi_da'
+)
+BEGIN
+    ALTER TABLE dot_giam_gia
+    ADD so_tien_giam_toi_da DECIMAL(18, 2) NULL;
+    PRINT 'Đã thêm cột so_tien_giam_toi_da';
+END
+ELSE
+BEGIN
+    PRINT 'Cột so_tien_giam_toi_da đã tồn tại, bỏ qua';
+END
+GO
+
+-- Kiểm tra và thay đổi kiểu dữ liệu của cột gia_tri nếu cần (từ INT sang DECIMAL)
+IF EXISTS (
+    SELECT 1 FROM sys.columns 
+    WHERE object_id = OBJECT_ID('dot_giam_gia') 
+    AND name = 'gia_tri'
+    AND system_type_id = 56 -- INT
+)
+BEGIN
+    ALTER TABLE dot_giam_gia
+    ALTER COLUMN gia_tri DECIMAL(18, 2);
+    PRINT 'Đã thay đổi kiểu dữ liệu của cột gia_tri từ INT sang DECIMAL(18, 2)';
+END
+ELSE
+BEGIN
+    PRINT 'Cột gia_tri đã là DECIMAL hoặc không tồn tại, bỏ qua';
+END
+GO
+
+-- Cập nhật dữ liệu cũ: Mặc định loại = 2 (VND) cho các đợt giảm giá hiện có (nếu có dữ liệu cũ)
+UPDATE dot_giam_gia
+SET loai_dot_giam_gia = 2
+WHERE loai_dot_giam_gia IS NULL;
+GO
+
+-- Set NOT NULL cho loai_dot_giam_gia sau khi đã cập nhật dữ liệu (nếu cột cho phép NULL)
+IF EXISTS (
+    SELECT 1 FROM sys.columns 
+    WHERE object_id = OBJECT_ID('dot_giam_gia') 
+    AND name = 'loai_dot_giam_gia'
+    AND is_nullable = 1
+)
+BEGIN
+    ALTER TABLE dot_giam_gia
+    ALTER COLUMN loai_dot_giam_gia INT NOT NULL;
+    PRINT 'Đã set NOT NULL cho cột loai_dot_giam_gia';
+END
+ELSE
+BEGIN
+    PRINT 'Cột loai_dot_giam_gia đã là NOT NULL, bỏ qua';
+END
+GO
+
+-- Cập nhật so_tien_giam_toi_da = gia_tri cho các đợt giảm giá loại VND (loai = 2)
+UPDATE dot_giam_gia
+SET so_tien_giam_toi_da = gia_tri
+WHERE loai_dot_giam_gia = 2 AND so_tien_giam_toi_da IS NULL;
+GO
+
+PRINT 'Hoàn tất cập nhật bảng dot_giam_gia với loại giảm giá % và số tiền giảm tối đa!';
 GO
 

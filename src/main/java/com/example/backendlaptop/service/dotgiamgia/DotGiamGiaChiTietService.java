@@ -70,10 +70,13 @@ public class DotGiamGiaChiTietService {
 //    }
     @Transactional
     public void addSelectedProducts(DotGiamGiaChiTietRequest req) {
-        // 1) Lấy đợt + mức giảm VND
+        // 1) Lấy đợt giảm giá
         DotGiamGia dot = dotGiamGiaRepository.findById(req.getDotGiamGiaId())
                 .orElseThrow(() -> new ApiException("Đợt giảm giá không tồn tại.", "NOT_FOUND"));
-        final BigDecimal giamVND = BigDecimal.valueOf(dot.getGiaTri() == null ? 0 : dot.getGiaTri());
+        
+        final BigDecimal giaTri = dot.getGiaTri() == null ? BigDecimal.ZERO : dot.getGiaTri();
+        final Integer loaiDotGiamGia = dot.getLoaiDotGiamGia() == null ? 2 : dot.getLoaiDotGiamGia(); // Mặc định là VND nếu null
+        final BigDecimal soTienGiamToiDa = dot.getSoTienGiamToiDa();
 
         // 2) Lấy CTSP hợp lệ
         List<ChiTietSanPham> ctsps = chiTietSanPhamRepository.findAllById(req.getCtspIds());
@@ -85,15 +88,11 @@ public class DotGiamGiaChiTietService {
                 .filter(ct -> !existed.contains(ct.getId()))
                 .map(ct -> {
                     BigDecimal giaBan = ct.getGiaBan();
-                    BigDecimal giaSau = giaBan.subtract(giamVND);
-                    if (giaSau.signum() < 0) giaSau = BigDecimal.ZERO;        // chặn âm
+                    BigDecimal giaSau = calculateGiaSauKhiGiam(giaBan, giaTri, loaiDotGiamGia, soTienGiamToiDa);
 
                     DotGiamGiaChiTiet d = new DotGiamGiaChiTiet();
                     d.setId(UUID.randomUUID());                               // đảm bảo có id phía BE
                     d.setDotGiamGia(dot);                                     // id_km
-                    // Tùy tên field trong entity của bạn:
-                    // d.setIdCtsp(ct);   // nếu field là idCtsp
-                    // d.setChiTietSanPham(ct); // nếu field là chiTietSanPham
                     d.setIdCtsp(ct);
 
                     d.setGiaBanDau(giaBan);
@@ -106,6 +105,46 @@ public class DotGiamGiaChiTietService {
             throw new ApiException("Tất cả CTSP đã thuộc đợt hoặc không hợp lệ.", "BAD_REQUEST");
 
         repository.saveAll(toInsert);
+    }
+
+    /**
+     * Tính giá sau khi giảm dựa trên loại giảm giá
+     * @param giaBan Giá ban đầu
+     * @param giaTri Giá trị giảm (% hoặc VND)
+     * @param loaiDotGiamGia 1: Giảm theo %, 2: Giảm theo VND
+     * @param soTienGiamToiDa Giới hạn số tiền giảm tối đa (chỉ dùng khi loai = 1)
+     * @return Giá sau khi giảm
+     */
+    private BigDecimal calculateGiaSauKhiGiam(BigDecimal giaBan, BigDecimal giaTri, Integer loaiDotGiamGia, BigDecimal soTienGiamToiDa) {
+        BigDecimal giaSau;
+        
+        if (Integer.valueOf(1).equals(loaiDotGiamGia)) {
+            // Giảm theo %
+            BigDecimal soTienGiam = giaBan.multiply(giaTri).divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
+            
+            // Áp dụng giới hạn số tiền giảm tối đa (nếu có)
+            if (soTienGiamToiDa != null && soTienGiamToiDa.compareTo(BigDecimal.ZERO) > 0) {
+                soTienGiam = soTienGiam.min(soTienGiamToiDa);
+            }
+            
+            giaSau = giaBan.subtract(soTienGiam);
+        } else {
+            // Giảm theo VND (mặc định)
+            giaSau = giaBan.subtract(giaTri);
+        }
+        
+        // Chặn giá âm
+        if (giaSau.signum() < 0) {
+            giaSau = BigDecimal.ZERO;
+        }
+        
+        // Làm tròn xuống bội số của 1000 (giữ nguyên logic cũ)
+        if (giaSau.compareTo(BigDecimal.ZERO) > 0) {
+            long giaSauLong = giaSau.longValue();
+            giaSau = BigDecimal.valueOf((giaSauLong / 1000) * 1000);
+        }
+        
+        return giaSau;
     }
 
 }
