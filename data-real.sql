@@ -1019,3 +1019,53 @@ GO
 PRINT 'Hoàn tất cập nhật bảng dot_giam_gia với loại giảm giá % và số tiền giảm tối đa!';
 GO
 
+
+-- =======HIỀN THÊM 21-11-2025============================================================================
+-- Bảng yêu cầu trả hàng
+CREATE TABLE yeu_cau_tra_hang (
+   id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+   id_hoa_don UNIQUEIDENTIFIER NOT NULL, -- FK đến hoa_don
+   id_khach_hang UNIQUEIDENTIFIER, -- FK đến khach_hang
+   id_nhan_vien_xu_ly UNIQUEIDENTIFIER, -- FK đến nhan_vien (người xử lý)
+   ma_yeu_cau VARCHAR(50) UNIQUE, -- Mã yêu cầu: YCTR-20250101-001
+   ly_do_tra_hang NVARCHAR(MAX), -- Lý do trả hàng
+   ngay_mua DATETIME2, -- Ngày mua (từ hóa đơn)
+   ngay_yeu_cau DATETIME2 DEFAULT GETDATE(), -- Ngày tạo yêu cầu
+   ngay_duyet DATETIME2, -- Ngày duyệt
+   ngay_hoan_tat DATETIME2, -- Ngày hoàn tất
+   trang_thai INT, -- 0: Chờ duyệt, 1: Đã duyệt, 2: Từ chối, 3: Hoàn tất
+   so_ngay_sau_mua INT, -- Số ngày sau khi mua (tính tự động)
+   loai_yeu_cau INT, -- 0: Đổi trả (hoàn tiền), 1: Bảo hành (chuyển sang bảo hành)
+   hinh_thuc_hoan_tien INT, -- 0: Theo phương thức gốc, 1: Tiền mặt, 2: Chuyển khoản
+   so_tien_hoan DECIMAL(18, 2), -- Số tiền hoàn lại
+   ly_do_tu_choi NVARCHAR(MAX), -- Lý do từ chối (nếu có)
+   ghi_chu NVARCHAR(MAX), -- Ghi chú nội bộ
+   ngay_tao DATETIME2 DEFAULT GETDATE(),
+   ngay_sua DATETIME2
+);
+
+-- Bảng chi tiết trả hàng (sản phẩm trả)
+CREATE TABLE chi_tiet_tra_hang (
+   id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+   id_yeu_cau_tra_hang UNIQUEIDENTIFIER NOT NULL, -- FK đến yeu_cau_tra_hang
+   id_hoa_don_chi_tiet UNIQUEIDENTIFIER NOT NULL, -- FK đến hoa_don_chi_tiet
+   id_serial_da_ban UNIQUEIDENTIFIER, -- FK đến serial_da_ban (serial trả lại)
+   so_luong INT, -- Số lượng trả
+   don_gia DECIMAL(18, 2), -- Đơn giá lúc mua
+   thanh_tien DECIMAL(18, 2), -- Thành tiền
+   tinh_trang_luc_tra NVARCHAR(100), -- Tình trạng: Tốt, Hỏng, Trầy xước, Khác
+   mo_ta_tinh_trang NVARCHAR(MAX), -- Mô tả chi tiết tình trạng
+   hinh_anh NVARCHAR(MAX), -- URL ảnh minh chứng (JSON array)
+   ngay_tao DATETIME2 DEFAULT GETDATE()
+);
+
+-- Bảng lịch sử xử lý trả hàng
+CREATE TABLE lich_su_tra_hang (
+   id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+   id_yeu_cau_tra_hang UNIQUEIDENTIFIER NOT NULL, -- FK đến yeu_cau_tra_hang
+   id_nhan_vien UNIQUEIDENTIFIER, -- FK đến nhan_vien (người xử lý)
+   hanh_dong NVARCHAR(100), -- CREATE, APPROVE, REJECT, COMPLETE
+   mo_ta NVARCHAR(MAX), -- Mô tả hành động
+   thoi_gian DATETIME2 DEFAULT GETDATE()
+);
+
