@@ -922,3 +922,129 @@ PRINT 'Hoàn tất cập nhật role!';
 PRINT 'Hệ thống hiện có 3 vai trò chính: ADMIN, NHAN_VIEN, KHACH_HANG';
 GO
 
+ALTER TABLE phieu_bao_hanh
+ADD mo_ta NVARCHAR(MAX),
+   chi_phi DECIMAL(18, 2) DEFAULT 0,
+   so_lan_sua_chua INT DEFAULT 0;
+   
+
+ALTER TABLE lich_su_bao_hanh
+ADD chi_phi DECIMAL(18, 2) DEFAULT 0,
+   phuong_thuc_sua_chua NVARCHAR(255),
+   ghi_chu_nhan_vien NVARCHAR(MAX);
+
+
+-- Bảng yêu cầu trả hàng
+CREATE TABLE yeu_cau_tra_hang (
+   id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+   id_hoa_don UNIQUEIDENTIFIER NOT NULL, -- FK đến hoa_don
+   id_khach_hang UNIQUEIDENTIFIER, -- FK đến khach_hang
+   id_nhan_vien_xu_ly UNIQUEIDENTIFIER, -- FK đến nhan_vien (người xử lý)
+   ma_yeu_cau VARCHAR(50) UNIQUE, -- Mã yêu cầu: YCTR-20250101-001
+   ly_do_tra_hang NVARCHAR(MAX), -- Lý do trả hàng
+   ngay_mua DATETIME2, -- Ngày mua (từ hóa đơn)
+   ngay_yeu_cau DATETIME2 DEFAULT GETDATE(), -- Ngày tạo yêu cầu
+   ngay_duyet DATETIME2, -- Ngày duyệt
+   ngay_hoan_tat DATETIME2, -- Ngày hoàn tất
+   trang_thai INT, -- 0: Chờ duyệt, 1: Đã duyệt, 2: Từ chối, 3: Hoàn tất
+   so_ngay_sau_mua INT, -- Số ngày sau khi mua (tính tự động)
+   loai_yeu_cau INT, -- 0: Đổi trả (hoàn tiền), 1: Bảo hành (chuyển sang bảo hành)
+   hinh_thuc_hoan_tien INT, -- 0: Theo phương thức gốc, 1: Tiền mặt, 2: Chuyển khoản
+   so_tien_hoan DECIMAL(18, 2), -- Số tiền hoàn lại
+   ly_do_tu_choi NVARCHAR(MAX), -- Lý do từ chối (nếu có)
+   ghi_chu NVARCHAR(MAX), -- Ghi chú nội bộ
+   ngay_tao DATETIME2 DEFAULT GETDATE(),
+   ngay_sua DATETIME2
+);
+
+-- Bảng chi tiết trả hàng (sản phẩm trả)
+CREATE TABLE chi_tiet_tra_hang (
+   id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+   id_yeu_cau_tra_hang UNIQUEIDENTIFIER NOT NULL, -- FK đến yeu_cau_tra_hang
+   id_hoa_don_chi_tiet UNIQUEIDENTIFIER NOT NULL, -- FK đến hoa_don_chi_tiet
+   id_serial_da_ban UNIQUEIDENTIFIER, -- FK đến serial_da_ban (serial trả lại)
+   so_luong INT, -- Số lượng trả
+   don_gia DECIMAL(18, 2), -- Đơn giá lúc mua
+   thanh_tien DECIMAL(18, 2), -- Thành tiền
+   tinh_trang_luc_tra NVARCHAR(100), -- Tình trạng: Tốt, Hỏng, Trầy xước, Khác
+   mo_ta_tinh_trang NVARCHAR(MAX), -- Mô tả chi tiết tình trạng
+   hinh_anh NVARCHAR(MAX), -- URL ảnh minh chứng (JSON array)
+   ngay_tao DATETIME2 DEFAULT GETDATE()
+);
+
+-- Bảng lịch sử xử lý trả hàng
+CREATE TABLE lich_su_tra_hang (
+   id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+   id_yeu_cau_tra_hang UNIQUEIDENTIFIER NOT NULL, -- FK đến yeu_cau_tra_hang
+   id_nhan_vien UNIQUEIDENTIFIER, -- FK đến nhan_vien (người xử lý)
+   hanh_dong NVARCHAR(100), -- CREATE, APPROVE, REJECT, COMPLETE
+   mo_ta NVARCHAR(MAX), -- Mô tả hành động
+   thoi_gian DATETIME2 DEFAULT GETDATE()
+);
+
+select * from phieu_bao_hanh
+INSERT INTO phieu_bao_hanh (
+    id, 
+    id_khach_hang, 
+    id_serial_da_ban, 
+    ngay_bat_dau, 
+    ngay_ket_thuc, 
+    trang_thai_bao_hanh, 
+    mo_ta, 
+    chi_phi, 
+    so_lan_sua_chua
+) VALUES
+-- Phiếu bảo hành 1: Laptop ASUS - Bảo hành mới, chưa sửa chữa
+(
+    NEWID(),
+    (SELECT TOP 1 user_id FROM khach_hang WHERE ma_khach_hang = 'KH001' ORDER BY user_id),
+    (SELECT TOP 1 id FROM serial_da_ban WHERE id_serial = (SELECT TOP 1 id FROM serial WHERE serial_no = 'ASUS001234567890')),
+    GETDATE(),
+    DATEADD(YEAR, 2, GETDATE()),
+    1, -- Trạng thái: Đang bảo hành
+    N'Bảo hành chính hãng 24 tháng cho laptop gaming ASUS. Bao gồm bảo hành phần cứng và phần mềm.',
+    0.00, -- Chưa có chi phí
+    0 -- Chưa sửa chữa lần nào
+),
+
+-- Phiếu bảo hành 2: Laptop DELL - Đã sửa chữa 1 lần
+(
+    NEWID(),
+    (SELECT TOP 1 user_id FROM khach_hang WHERE ma_khach_hang = 'KH002' ORDER BY user_id),
+    (SELECT TOP 1 id FROM serial_da_ban WHERE id_serial = (SELECT TOP 1 id FROM serial WHERE serial_no = 'DELL001234567890')),
+    DATEADD(MONTH, -6, GETDATE()), -- Bắt đầu 6 tháng trước
+    DATEADD(MONTH, 18, GETDATE()), -- Còn 18 tháng
+    1, -- Trạng thái: Đang bảo hành
+    N'Bảo hành laptop DELL cao cấp. Đã thay thế bàn phím do lỗi phím bị kẹt.',
+    500000.00, -- Chi phí sửa chữa: 500,000 VNĐ
+    1 -- Đã sửa chữa 1 lần
+),
+
+-- Phiếu bảo hành 3: Laptop MAC - Đã sửa chữa nhiều lần
+(
+    NEWID(),
+    (SELECT TOP 1 user_id FROM khach_hang WHERE ma_khach_hang = 'KH003' ORDER BY user_id),
+    (SELECT TOP 1 id FROM serial_da_ban WHERE id_serial = (SELECT TOP 1 id FROM serial WHERE serial_no = 'MAC001234567890')),
+    DATEADD(MONTH, -12, GETDATE()), -- Bắt đầu 12 tháng trước
+    DATEADD(MONTH, 12, GETDATE()), -- Còn 12 tháng
+    1, -- Trạng thái: Đang bảo hành
+    N'Bảo hành laptop Apple MacBook. Đã thay pin và sửa màn hình. Sản phẩm hoạt động tốt sau khi sửa chữa.',
+    2500000.00, -- Chi phí sửa chữa: 2,500,000 VNĐ
+    2 -- Đã sửa chữa 2 lần
+),
+
+-- Phiếu bảo hành 4: Laptop ASUS - Bảo hành sắp hết hạn
+(
+    NEWID(),
+    (SELECT TOP 1 user_id FROM khach_hang WHERE ma_khach_hang = 'KH001' ORDER BY user_id),
+    (SELECT TOP 1 id FROM serial_da_ban WHERE id_serial = (SELECT TOP 1 id FROM serial WHERE serial_no = 'ASUS001234567891')),
+    DATEADD(MONTH, -22, GETDATE()), -- Bắt đầu 22 tháng trước
+    DATEADD(MONTH, 2, GETDATE()), -- Còn 2 tháng
+    1, -- Trạng thái: Đang bảo hành
+    N'Bảo hành laptop ASUS. Sản phẩm hoạt động bình thường, chưa cần sửa chữa.',
+    0.00, -- Chưa có chi phí
+    0 -- Chưa sửa chữa lần nào
+)
+
+ALTER TABLE phieu_bao_hanh
+ADD hinh_anh NVARCHAR(MAX) NULL;

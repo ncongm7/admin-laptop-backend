@@ -2,9 +2,7 @@ package com.example.backendlaptop.controller.baohanh;
 
 import com.example.backendlaptop.model.response.ResponseObject;
 import com.example.backendlaptop.service.baohanh.PhieuBaoHanhService;
-import com.example.backendlaptop.service.phieugiamgia.PhieuGiamGiaService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -29,6 +27,13 @@ public class PhieuBaoHanhController {
     @GetMapping("/detail/{id1}")
     public ResponseObject<?> detail(@PathVariable("id1") UUID id1) {
         return new ResponseObject<>(service.detail(id1));
+    }
+    
+    @PutMapping("/update-trang-thai/{id}")
+    public ResponseObject<?> updateTrangThai(
+            @PathVariable("id") UUID id,
+            @RequestParam("trangThai") Integer trangThai) {
+        return new ResponseObject<>(service.updateTrangThai(id, trangThai), "Cập nhật trạng thái thành công");
     }
 }
 
