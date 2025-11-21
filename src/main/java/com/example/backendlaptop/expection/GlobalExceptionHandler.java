@@ -44,6 +44,9 @@ public class GlobalExceptionHandler {
         } else if ("INVALID_CREDENTIALS".equals(ex.getCode()) || 
                    "INVALID_TOKEN".equals(ex.getCode())) {
             status = HttpStatus.UNAUTHORIZED; // 401 Unauthorized cho sai thông tin đăng nhập
+        } else if ("EMAIL_AUTH_FAILED".equals(ex.getCode()) || 
+                   "EMAIL_SEND_FAILED".equals(ex.getCode())) {
+            status = HttpStatus.INTERNAL_SERVER_ERROR; // 500 cho lỗi email
         }
 
         return new ResponseEntity<>(response, status);

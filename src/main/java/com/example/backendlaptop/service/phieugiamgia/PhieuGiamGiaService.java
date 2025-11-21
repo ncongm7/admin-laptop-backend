@@ -51,6 +51,11 @@ public class PhieuGiamGiaService {
         // Công tắc quản trị
         e.setTrangThai(req.getTrangThai() == null ? 1 : req.getTrangThai()); // 1=Bật mặc định
 
+        // RiengTu: mặc định false nếu null
+        if (req.getRiengTu() == null) {
+            e.setRiengTu(false);
+        }
+
         // VND: cap = value (giữ đúng với FE hiện tại)
         if (Integer.valueOf(1).equals(e.getLoaiPhieuGiamGia())) {
             e.setSoTienGiamToiDa(e.getGiaTriGiamGia());
@@ -70,6 +75,11 @@ public class PhieuGiamGiaService {
         // Công tắc quản trị: nhận từ request (nếu null thì giữ nguyên)
         if (req.getTrangThai() != null) {
             existed.setTrangThai(req.getTrangThai());
+        }
+
+        // RiengTu: cập nhật nếu có trong request
+        if (req.getRiengTu() != null) {
+            existed.setRiengTu(req.getRiengTu());
         }
 
         if (Integer.valueOf(1).equals(existed.getLoaiPhieuGiamGia())) {

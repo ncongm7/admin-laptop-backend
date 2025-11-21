@@ -1787,3 +1787,27 @@ GO
 
 PRINT 'Hoàn tất insert dữ liệu mẫu cho homepage components!';
 GO
+
+-- ===== START: PHIEU_GIAM_GIA_KHACH_HANG =====
+-- Bảng liên kết giữa phiếu giảm giá và khách hàng (cho phiếu cá nhân)
+CREATE TABLE phieu_giam_gia_khach_hang (
+    id BIGINT IDENTITY(1,1) PRIMARY KEY,
+    phieu_giam_gia_id UNIQUEIDENTIFIER NOT NULL,
+    khach_hang_id UNIQUEIDENTIFIER NOT NULL,
+    CONSTRAINT FK_PhieuGiamGiaKhachHang_PhieuGiamGia 
+        FOREIGN KEY (phieu_giam_gia_id) REFERENCES phieu_giam_gia(id) ON DELETE CASCADE,
+    CONSTRAINT FK_PhieuGiamGiaKhachHang_KhachHang 
+        FOREIGN KEY (khach_hang_id) REFERENCES khach_hang(user_id) ON DELETE CASCADE,
+    CONSTRAINT UQ_PhieuGiamGiaKhachHang 
+        UNIQUE (phieu_giam_gia_id, khach_hang_id)
+);
+
+-- Index để tối ưu truy vấn theo khách hàng
+CREATE INDEX IX_PhieuGiamGiaKhachHang_KhachHangId 
+    ON phieu_giam_gia_khach_hang(khach_hang_id);
+
+-- Index để tối ưu truy vấn theo phiếu giảm giá
+CREATE INDEX IX_PhieuGiamGiaKhachHang_PhieuGiamGiaId 
+    ON phieu_giam_gia_khach_hang(phieu_giam_gia_id);
+GO
+-- ===== END: PHIEU_GIAM_GIA_KHACH_HANG =====

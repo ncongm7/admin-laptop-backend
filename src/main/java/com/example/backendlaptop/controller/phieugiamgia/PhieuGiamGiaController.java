@@ -44,4 +44,18 @@ public class PhieuGiamGiaController {
         service.update(request,id1);
         return new ResponseObject<>(null, "Update thanh cong");
     }
+    
+    @Autowired
+    private com.example.backendlaptop.service.phieugiamgia.PhieuGiamGiaEmailService emailService;
+    
+    @PostMapping("/{phieuGiamGiaId}/send-email-to-customer/{customerId}")
+    public ResponseObject<?> sendEmailToCustomer(@PathVariable UUID phieuGiamGiaId, @PathVariable UUID customerId) {
+        try {
+            emailService.guiPhieuGiamGiaChoKhachHang(phieuGiamGiaId, customerId);
+            return new ResponseObject<>(null, "Gửi email thành công");
+        } catch (Exception e) {
+            // Exception sẽ được GlobalExceptionHandler xử lý
+            throw e;
+        }
+    }
 }
