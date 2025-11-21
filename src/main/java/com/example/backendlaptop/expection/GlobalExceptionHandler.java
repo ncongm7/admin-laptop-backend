@@ -35,14 +35,25 @@ public class GlobalExceptionHandler {
         response.put("code", ex.getCode());
         response.put("message", ex.getMessage());
 
-        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+        // Xác định HTTP status code dựa trên error code
+        HttpStatus status = HttpStatus.BAD_REQUEST; // Mặc định
+        if ("ACCOUNT_LOCKED".equals(ex.getCode()) || 
+            "ACCOUNT_NOT_ACTIVATED".equals(ex.getCode()) || 
+            "ACCOUNT_DISABLED".equals(ex.getCode())) {
+            status = HttpStatus.FORBIDDEN; // 403 Forbidden cho tài khoản bị khóa
+        } else if ("INVALID_CREDENTIALS".equals(ex.getCode()) || 
+                   "INVALID_TOKEN".equals(ex.getCode())) {
+            status = HttpStatus.UNAUTHORIZED; // 401 Unauthorized cho sai thông tin đăng nhập
+        }
+
+        return new ResponseEntity<>(response, status);
     }
 
     // Bắt tất cả lỗi còn lại
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleAll(Exception ex) {
         // Log chi tiết lỗi
-        System.err.println("❌ [GlobalExceptionHandler] Lỗi không mong đợi:");
+        System.err.println("[GlobalExceptionHandler] Lỗi không mong đợi:");
         System.err.println("  - Exception Type: " + ex.getClass().getName());
         System.err.println("  - Message: " + ex.getMessage());
         System.err.println("  - Stack Trace:");

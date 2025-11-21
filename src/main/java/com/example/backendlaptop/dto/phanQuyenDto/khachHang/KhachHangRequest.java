@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -32,5 +33,11 @@ public class KhachHangRequest {
     private LocalDate ngaySinh;
 
     private Integer trangThai;
+
+    // Các field cho tạo tài khoản
+    private Boolean createTaiKhoan; // Flag để xác định có tạo tài khoản không
+    private String tenDangNhap; // Tên đăng nhập (username)
+    private String matKhau; // Mật khẩu
+    private UUID maVaiTro; // Vai trò (mặc định KHACH_HANG)
 
 }

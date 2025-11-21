@@ -47,36 +47,75 @@ public class NhanVienService {
 
     @Transactional
     public Map<String, String> addNV(NhanVienRequest nhanVienRequest) {
-        // 1. Kiểm tra SĐT đã được dùng làm username chưa
-        String soDienThoai = nhanVienRequest.getSoDienThoai();
-        if (taiKhoanRepository.findByTenDangNhap(soDienThoai).isPresent()) {
-            throw new IllegalArgumentException("Số điện thoại đã được sử dụng làm tên đăng nhập");
+        TaiKhoan taiKhoan = null;
+        String tenDangNhap = null;
+        String matKhau = null;
+        
+        // 1. Tạo tài khoản nếu có flag createTaiKhoan = true
+        if (Boolean.TRUE.equals(nhanVienRequest.getCreateTaiKhoan())) {
+            // Xác định tên đăng nhập
+            if (nhanVienRequest.getTenDangNhap() != null && !nhanVienRequest.getTenDangNhap().trim().isEmpty()) {
+                tenDangNhap = nhanVienRequest.getTenDangNhap().trim();
+            } else {
+                // Mặc định dùng SĐT làm username
+                tenDangNhap = nhanVienRequest.getSoDienThoai();
+            }
+            
+            // Kiểm tra tên đăng nhập đã tồn tại chưa
+            if (taiKhoanRepository.findByTenDangNhap(tenDangNhap).isPresent()) {
+                throw new IllegalArgumentException("Tên đăng nhập đã được sử dụng");
+            }
+            
+            // Xác định mật khẩu
+            if (nhanVienRequest.getMatKhau() != null && !nhanVienRequest.getMatKhau().trim().isEmpty()) {
+                matKhau = nhanVienRequest.getMatKhau().trim();
+            } else {
+                matKhau = "123456"; // Mật khẩu mặc định
+            }
+            
+            // Xác định email - luôn dùng email nhân viên để tránh vi phạm UNIQUE constraint với NULL
+            // Email nhân viên đã được set trong nhanVienRequest.getEmail()
+            String email = nhanVienRequest.getEmail();
+            if (email == null || email.trim().isEmpty()) {
+                // Nếu không có email, tạo email tạm từ SĐT để tránh NULL
+                email = tenDangNhap + "@temp.local"; // Dùng username + domain tạm
+            } else {
+                email = email.trim();
+            }
+            
+            // Tạo tài khoản
+            taiKhoan = new TaiKhoan();
+            taiKhoan.setId(UUID.randomUUID());
+            taiKhoan.setTenDangNhap(tenDangNhap);
+            taiKhoan.setMatKhau(matKhau);
+            taiKhoan.setEmail(email); // Luôn có giá trị để tránh UNIQUE constraint với NULL
+            taiKhoan.setTrangThai(1); // Active
+            taiKhoan.setNgayTao(Instant.now());
+            
+            // Gán vai trò
+            VaiTro vaiTro = null;
+            if (nhanVienRequest.getMaVaiTro() != null) {
+                // Sử dụng vai trò từ request
+                vaiTro = vaiTroRepository.findById(nhanVienRequest.getMaVaiTro())
+                        .orElseThrow(() -> new RuntimeException("Không tìm thấy vai trò với ID: " + nhanVienRequest.getMaVaiTro()));
+            } else {
+                // Mặc định là NHAN_VIEN
+                vaiTro = vaiTroRepository.findByMaVaiTro("NHAN_VIEN")
+                        .orElseThrow(() -> new RuntimeException("Không tìm thấy vai trò NHAN_VIEN trong database"));
+            }
+            taiKhoan.setMaVaiTro(vaiTro);
+            
+            taiKhoan = taiKhoanRepository.save(taiKhoan);
         }
         
-        // 2. Tạo tài khoản tự động
-        TaiKhoan taiKhoan = new TaiKhoan();
-        taiKhoan.setId(UUID.randomUUID());
-        taiKhoan.setTenDangNhap(soDienThoai); // Username = SĐT
-        // Mật khẩu mặc định: "123456" (có thể thay đổi)
-        String defaultPassword = "123456";
-        taiKhoan.setMatKhau(defaultPassword);
-        taiKhoan.setEmail(nhanVienRequest.getEmail());
-        taiKhoan.setTrangThai(1); // Active
-        taiKhoan.setNgayTao(Instant.now());
-        
-        // 3. Gán role NHAN_VIEN
-        VaiTro vaiTro = vaiTroRepository.findByMaVaiTro("NHAN_VIEN")
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy vai trò NHAN_VIEN trong database"));
-        taiKhoan.setMaVaiTro(vaiTro);
-        
-        taiKhoan = taiKhoanRepository.save(taiKhoan);
-        
-        // 4. Tạo nhân viên và liên kết với tài khoản
+        // 2. Tạo nhân viên
         NhanVien nhanVien = new NhanVien();
-        nhanVien.setMaTaiKhoan(taiKhoan);
+        if (taiKhoan != null) {
+            nhanVien.setMaTaiKhoan(taiKhoan);
+        }
         nhanVien.setMaNhanVien(nhanVienRequest.getMaNhanVien());
         nhanVien.setHoTen(nhanVienRequest.getHoTen());
-        nhanVien.setSoDienThoai(soDienThoai);
+        nhanVien.setSoDienThoai(nhanVienRequest.getSoDienThoai());
         nhanVien.setEmail(nhanVienRequest.getEmail());
         nhanVien.setGioiTinh(nhanVienRequest.getGioiTinh());
         nhanVien.setAnhNhanVien(nhanVienRequest.getAnhNhanVien());
@@ -86,10 +125,12 @@ public class NhanVienService {
         nhanVien.setTrangThai(nhanVienRequest.getTrangThai());
         nhanVienRepository.save(nhanVien);
         
-        // 5. Trả về thông tin đăng nhập
+        // 3. Trả về thông tin đăng nhập nếu có tạo tài khoản
         Map<String, String> loginInfo = new HashMap<>();
-        loginInfo.put("tenDangNhap", soDienThoai);
-        loginInfo.put("matKhau", defaultPassword);
+        if (taiKhoan != null && tenDangNhap != null && matKhau != null) {
+            loginInfo.put("tenDangNhap", tenDangNhap);
+            loginInfo.put("matKhau", matKhau);
+        }
         return loginInfo;
     }
 
