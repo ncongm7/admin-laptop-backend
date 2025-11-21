@@ -40,8 +40,23 @@ public class AuthController {
     @Operation(summary = "Đăng nhập", description = "Đăng nhập bằng tên đăng nhập và mật khẩu")
     @PostMapping("/login")
     public ResponseEntity<ResponseObject<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
-        LoginResponse response = authService.login(request);
-        return ResponseEntity.ok(new ResponseObject<>(response, "Đăng nhập thành công"));
+        try {
+            LoginResponse response = authService.login(request);
+            return ResponseEntity.ok(new ResponseObject<>(response, "Đăng nhập thành công"));
+        } catch (com.example.backendlaptop.expection.ApiException e) {
+            // Xử lý các lỗi từ ApiException
+            HttpStatus status = HttpStatus.BAD_REQUEST;
+            if ("ACCOUNT_LOCKED".equals(e.getCode()) || "ACCOUNT_NOT_ACTIVATED".equals(e.getCode()) || "ACCOUNT_DISABLED".equals(e.getCode())) {
+                status = HttpStatus.FORBIDDEN; // 403 Forbidden cho tài khoản bị khóa
+            } else if ("INVALID_CREDENTIALS".equals(e.getCode())) {
+                status = HttpStatus.UNAUTHORIZED; // 401 Unauthorized cho sai thông tin đăng nhập
+            }
+            return ResponseEntity.status(status)
+                    .body(new ResponseObject<>(false, null, e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ResponseObject<>(false, null, "Lỗi khi đăng nhập: " + e.getMessage()));
+        }
     }
 
     /**

@@ -47,8 +47,14 @@ public class AuthService {
                 .orElseThrow(() -> new ApiException("Tên đăng nhập hoặc mật khẩu không đúng", "INVALID_CREDENTIALS"));
 
         // 2. Kiểm tra trạng thái tài khoản
-        if (taiKhoan.getTrangThai() == null || taiKhoan.getTrangThai() != 1) {
-            throw new ApiException("Tài khoản đã bị khóa hoặc chưa được kích hoạt", "ACCOUNT_DISABLED");
+        if (taiKhoan.getTrangThai() == null) {
+            throw new ApiException("Tài khoản chưa được kích hoạt", "ACCOUNT_NOT_ACTIVATED");
+        }
+        if (taiKhoan.getTrangThai() == 0) {
+            throw new ApiException("Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên để mở khóa", "ACCOUNT_LOCKED");
+        }
+        if (taiKhoan.getTrangThai() != 1) {
+            throw new ApiException("Tài khoản không hoạt động", "ACCOUNT_DISABLED");
         }
 
         // 3. Kiểm tra mật khẩu (đơn giản - chưa mã hóa)

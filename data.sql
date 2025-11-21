@@ -781,6 +781,8 @@ GO
 
 --SELECT name FROM lc_province WHERE id = 1;
 --select*from lc_province
+
+
 insert into lc_subdistrict (id, district_id, district_code, province_id, province_code, name, shortname, code, description, created_by, created_date, modified_by, modified_date)
 values  (1, 1, '001', 1, '01', N'Phường Giảng Võ', 'HNGV', '00025', null, null, null, null, '2025-09-10 14:16:56.447435'),
         (2, 20, '020', 20, '46', N'Phường Vỹ Dạ', 'HVD', '19777', null, null, null, null, '2025-09-10 14:16:56.447435'),

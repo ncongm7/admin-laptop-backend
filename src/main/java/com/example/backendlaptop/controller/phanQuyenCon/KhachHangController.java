@@ -4,9 +4,12 @@ import com.example.backendlaptop.dto.phanQuyenDto.khachHang.KhachHangRequest;
 import com.example.backendlaptop.service.PhanQuyenSer.KhachHangService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -45,15 +48,26 @@ public class KhachHangController {
 
     @PostMapping("/add-khach-hang")
     public ResponseEntity<Object> add(@Valid @RequestBody KhachHangRequest khachHangRequest) {
-        khachHangService.addKH(khachHangRequest);
-        return ResponseEntity.ok().build();
+        try {
+            Map<String, String> loginInfo = khachHangService.addKH(khachHangRequest);
+            return ResponseEntity.ok(loginInfo);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.BAD_REQUEST).body(ex.getMessage());
+        }
     }
 
     @GetMapping("/phan-trang/{pageOne}/{pageSize}")
     public ResponseEntity<Object> phanTrangKhachHang(@PathVariable("pageOne") Integer pageOne, @PathVariable("pageSize") Integer pageSize) {
-        return ResponseEntity.ok(khachHangService.phanTrangKH(pageOne, pageSize).getContent());
-
-
+        Page<?> page = khachHangService.phanTrangKH(pageOne, pageSize);
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("data", page.getContent());
+        response.put("total", page.getTotalElements());
+        response.put("totalPages", page.getTotalPages());
+        response.put("currentPage", page.getNumber());
+        response.put("pageSize", page.getSize());
+        
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/getOne/{id}")
@@ -72,5 +86,11 @@ public ResponseEntity<String> generateMaKhachHang() {
     String newCode = khachHangService.generateMaKhachHang();
     return ResponseEntity.ok(newCode);
 }
+
+//tính tổng tiền
+    @GetMapping("/tong-tien/{id}")
+    public ResponseEntity<Object> tongTien(@PathVariable("id") UUID id) {
+        return ResponseEntity.ok(khachHangService.tongTienMua(id));
+    }
 
 }

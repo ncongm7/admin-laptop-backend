@@ -3,9 +3,11 @@ package com.example.backendlaptop.controller;
 import com.example.backendlaptop.entity.TaiKhoan;
 import com.example.backendlaptop.entity.NhanVien;
 import com.example.backendlaptop.entity.KhachHang;
+import com.example.backendlaptop.entity.VaiTro;
 import com.example.backendlaptop.repository.TaiKhoanRepository;
 import com.example.backendlaptop.repository.NhanVienRepository;
 import com.example.backendlaptop.repository.KhachHangRepository;
+import com.example.backendlaptop.repository.VaiTroRepository;
 import com.example.backendlaptop.model.response.ResponseObject;
 import com.example.backendlaptop.service.auth.AuthService;
 import com.example.backendlaptop.dto.auth.LoginResponse;
@@ -14,8 +16,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RestController
@@ -31,6 +35,9 @@ public class UserController {
     
     @Autowired
     private KhachHangRepository khachHangRepository;
+    
+    @Autowired
+    private VaiTroRepository vaiTroRepository;
     
     @Autowired
     private AuthService authService;
@@ -122,6 +129,127 @@ public class UserController {
         }
     }
     
+    /**
+     * Tạo tài khoản mới (chỉ admin)
+     * Endpoint: POST /api/users
+     */
+    @PostMapping
+    public ResponseEntity<ResponseObject<UserDTO>> createUser(
+            @RequestBody CreateUserRequest request,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        try {
+            // Kiểm tra quyền admin
+            LoginResponse.UserInfo currentUser = getCurrentUserFromToken(authHeader);
+            if (!isAdmin(currentUser)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(new ResponseObject<>(false, null, "Chỉ admin mới có quyền tạo tài khoản"));
+            }
+
+            // Validate
+            if (request.getTenDangNhap() == null || request.getTenDangNhap().trim().isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(new ResponseObject<>(false, null, "Tên đăng nhập không được để trống"));
+            }
+
+            // Kiểm tra tên đăng nhập đã tồn tại chưa
+            Optional<TaiKhoan> existingTaiKhoan = taiKhoanRepository.findByTenDangNhap(request.getTenDangNhap());
+            if (existingTaiKhoan.isPresent()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(new ResponseObject<>(false, null, "Tên đăng nhập đã tồn tại"));
+            }
+
+            // Tạo tài khoản mới
+            TaiKhoan taiKhoan = new TaiKhoan();
+            taiKhoan.setId(UUID.randomUUID());
+            taiKhoan.setTenDangNhap(request.getTenDangNhap());
+            taiKhoan.setMatKhau(request.getMatKhau() != null ? request.getMatKhau() : "123456"); // Mật khẩu mặc định
+            taiKhoan.setEmail(request.getEmail());
+            taiKhoan.setTrangThai(request.getTrangThai() != null ? request.getTrangThai() : 1);
+            taiKhoan.setNgayTao(Instant.now());
+
+            // Set vai trò nếu có
+            if (request.getMaVaiTro() != null) {
+                Optional<VaiTro> vaiTro = vaiTroRepository.findById(request.getMaVaiTro());
+                if (vaiTro.isPresent()) {
+                    taiKhoan.setMaVaiTro(vaiTro.get());
+                }
+            }
+
+            taiKhoan = taiKhoanRepository.save(taiKhoan);
+
+            // Map to DTO
+            UserDTO userDTO = mapToUserDTO(taiKhoan, true);
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(new ResponseObject<>(userDTO, "Tạo tài khoản thành công"));
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body(new ResponseObject<>(false, null, "Lỗi khi tạo tài khoản: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Cập nhật tài khoản (chỉ admin)
+     * Endpoint: PUT /api/users/{id}
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<ResponseObject<UserDTO>> updateUser(
+            @PathVariable String id,
+            @RequestBody CreateUserRequest request,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        try {
+            // Kiểm tra quyền admin
+            LoginResponse.UserInfo currentUser = getCurrentUserFromToken(authHeader);
+            if (!isAdmin(currentUser)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(new ResponseObject<>(false, null, "Chỉ admin mới có quyền cập nhật tài khoản"));
+            }
+
+            UUID userId = UUID.fromString(id);
+            TaiKhoan taiKhoan = taiKhoanRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("Tài khoản không tồn tại"));
+
+            // Cập nhật thông tin
+            if (request.getTenDangNhap() != null) {
+                // Kiểm tra tên đăng nhập đã tồn tại chưa (trừ chính nó)
+                Optional<TaiKhoan> existingTaiKhoan = taiKhoanRepository.findByTenDangNhap(request.getTenDangNhap());
+                if (existingTaiKhoan.isPresent() && !existingTaiKhoan.get().getId().equals(userId)) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body(new ResponseObject<>(false, null, "Tên đăng nhập đã tồn tại"));
+                }
+                taiKhoan.setTenDangNhap(request.getTenDangNhap());
+            }
+
+            if (request.getMatKhau() != null && !request.getMatKhau().trim().isEmpty()) {
+                taiKhoan.setMatKhau(request.getMatKhau());
+            }
+
+            if (request.getEmail() != null) {
+                taiKhoan.setEmail(request.getEmail());
+            }
+
+            if (request.getTrangThai() != null) {
+                taiKhoan.setTrangThai(request.getTrangThai());
+            }
+
+            // Cập nhật vai trò nếu có
+            if (request.getMaVaiTro() != null) {
+                Optional<VaiTro> vaiTro = vaiTroRepository.findById(request.getMaVaiTro());
+                if (vaiTro.isPresent()) {
+                    taiKhoan.setMaVaiTro(vaiTro.get());
+                }
+            }
+
+            taiKhoan = taiKhoanRepository.save(taiKhoan);
+
+            // Map to DTO
+            UserDTO userDTO = mapToUserDTO(taiKhoan, true);
+            return ResponseEntity.ok(new ResponseObject<>(userDTO, "Cập nhật tài khoản thành công"));
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body(new ResponseObject<>(false, null, "Lỗi khi cập nhật tài khoản: " + e.getMessage()));
+        }
+    }
+
     /**
      * Helper: Lấy current user từ token
      */
@@ -265,6 +393,37 @@ public class UserController {
         
         public Boolean getIsStaff() { return isStaff; }
         public void setIsStaff(Boolean isStaff) { this.isStaff = isStaff; }
+    }
+
+    /**
+     * CreateUserRequest class
+     */
+    public static class CreateUserRequest {
+        private UUID id;
+        private UUID maVaiTro;
+        private String tenDangNhap;
+        private String matKhau;
+        private String email;
+        private Integer trangThai;
+
+        // Getters and Setters
+        public UUID getId() { return id; }
+        public void setId(UUID id) { this.id = id; }
+
+        public UUID getMaVaiTro() { return maVaiTro; }
+        public void setMaVaiTro(UUID maVaiTro) { this.maVaiTro = maVaiTro; }
+
+        public String getTenDangNhap() { return tenDangNhap; }
+        public void setTenDangNhap(String tenDangNhap) { this.tenDangNhap = tenDangNhap; }
+
+        public String getMatKhau() { return matKhau; }
+        public void setMatKhau(String matKhau) { this.matKhau = matKhau; }
+
+        public String getEmail() { return email; }
+        public void setEmail(String email) { this.email = email; }
+
+        public Integer getTrangThai() { return trangThai; }
+        public void setTrangThai(Integer trangThai) { this.trangThai = trangThai; }
     }
 }
 
