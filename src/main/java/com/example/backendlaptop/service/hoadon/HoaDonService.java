@@ -3,6 +3,8 @@ package com.example.backendlaptop.service.hoadon;
 import com.example.backendlaptop.dto.hoadon.HoaDonDetailResponse;
 import com.example.backendlaptop.dto.hoadon.HoaDonListResponse;
 import com.example.backendlaptop.dto.hoadon.HoaDonSearchRequest;
+import com.example.backendlaptop.dto.hoadon.PendingOrderResponse;
+import com.example.backendlaptop.dto.hoadon.StatusCountResponse;
 import com.example.backendlaptop.entity.*;
 import com.example.backendlaptop.expection.ApiException;
 import com.example.backendlaptop.model.TrangThaiHoaDon;
@@ -11,6 +13,7 @@ import com.example.backendlaptop.repository.banhang.HoaDonChiTietRepository;
 import com.example.backendlaptop.repository.ChiTietSanPhamRepository;
 import com.example.backendlaptop.repository.SerialRepository;
 import com.example.backendlaptop.repository.SerialDaBanRepository;
+import com.example.backendlaptop.service.WebSocketNotificationService;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -26,6 +29,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Service xử lý logic quản lý hóa đơn
@@ -39,6 +43,7 @@ public class HoaDonService {
     private final ChiTietSanPhamRepository chiTietSanPhamRepository;
     private final SerialRepository serialRepository;
     private final SerialDaBanRepository serialDaBanRepository;
+    private final WebSocketNotificationService webSocketNotificationService;
 
     /**
      * Tìm kiếm và lọc hóa đơn với phân trang
@@ -195,6 +200,9 @@ public class HoaDonService {
             HoaDon hoaDon = hoaDonRepository.findById(idHoaDon)
                 .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn với ID: " + idHoaDon, "NOT_FOUND"));
 
+            // Lưu trạng thái cũ trước khi thay đổi
+            Integer oldStatus = hoaDon.getTrangThai() != null ? hoaDon.getTrangThai().ordinal() : null;
+            
             // Convert integer to enum
             TrangThaiHoaDon newTrangThai = TrangThaiHoaDon.values()[trangThai];
             hoaDon.setTrangThai(newTrangThai);
@@ -208,6 +216,19 @@ public class HoaDonService {
             hoaDon = hoaDonRepository.save(hoaDon);
             
             System.out.println("✅ [HoaDonService] Cập nhật trạng thái thành công");
+            
+            // Gửi WebSocket notification về thay đổi trạng thái (nếu có thay đổi)
+            if (oldStatus != null && !oldStatus.equals(trangThai)) {
+                try {
+                    webSocketNotificationService.notifyOrderStatusChanged(
+                        hoaDon.getId(),
+                        oldStatus,
+                        trangThai
+                    );
+                } catch (Exception e) {
+                    System.err.println("⚠️ [HoaDonService] Lỗi khi gửi WebSocket notification (không ảnh hưởng đến cập nhật): " + e.getMessage());
+                }
+            }
             
             return new HoaDonDetailResponse(hoaDon);
         } catch (ApiException e) {
@@ -457,6 +478,17 @@ public class HoaDonService {
 
             System.out.println("✅ [HoaDonService] Xác nhận đơn hàng thành công, đã trừ kho");
             
+            // Gửi WebSocket notification về thay đổi trạng thái
+            try {
+                webSocketNotificationService.notifyOrderStatusChanged(
+                    hoaDon.getId(),
+                    0, // CHO_THANH_TOAN
+                    1  // DA_THANH_TOAN
+                );
+            } catch (Exception e) {
+                System.err.println("⚠️ [HoaDonService] Lỗi khi gửi WebSocket notification (không ảnh hưởng đến xác nhận đơn): " + e.getMessage());
+            }
+            
             return new HoaDonDetailResponse(hoaDon);
         } catch (ApiException e) {
             throw e;
@@ -491,11 +523,25 @@ public class HoaDonService {
                 throw new ApiException("Chỉ có thể hủy đơn hàng ở trạng thái 'Chờ thanh toán'", "INVALID_STATUS");
             }
 
+            // Lưu trạng thái cũ trước khi thay đổi
+            Integer oldStatus = hoaDon.getTrangThai() != null ? hoaDon.getTrangThai().ordinal() : 0;
+            
             // Cập nhật trạng thái thành DA_HUY
             hoaDon.setTrangThai(TrangThaiHoaDon.DA_HUY);
             hoaDon = hoaDonRepository.save(hoaDon);
 
             System.out.println("✅ [HoaDonService] Đã hủy đơn hàng online");
+            
+            // Gửi WebSocket notification về thay đổi trạng thái
+            try {
+                webSocketNotificationService.notifyOrderStatusChanged(
+                    hoaDon.getId(),
+                    oldStatus,
+                    4  // DA_HUY
+                );
+            } catch (Exception e) {
+                System.err.println("⚠️ [HoaDonService] Lỗi khi gửi WebSocket notification (không ảnh hưởng đến hủy đơn): " + e.getMessage());
+            }
             
             return new HoaDonDetailResponse(hoaDon);
         } catch (ApiException e) {
@@ -506,6 +552,105 @@ public class HoaDonService {
             System.err.println("  - Message: " + e.getMessage());
             e.printStackTrace();
             throw new ApiException("Lỗi khi hủy đơn hàng: " + e.getMessage(), "CANCEL_ORDER_ERROR");
+        }
+    }
+
+    /**
+     * Lấy danh sách đơn hàng online chờ xác nhận
+     * Dùng cho Pending Order Ticker component
+     * 
+     * @return List<PendingOrderResponse> Danh sách đơn hàng chờ xác nhận
+     */
+    public List<PendingOrderResponse> getPendingOnlineOrders() {
+        try {
+            System.out.println("📋 [HoaDonService] Lấy danh sách đơn hàng online chờ xác nhận");
+            
+            // Query: loai_hoa_don = 1 (Online) AND trang_thai = 0 (CHO_THANH_TOAN) AND trang_thai_thanh_toan = 0 (Chưa thanh toán)
+            Specification<HoaDon> spec = (root, query, criteriaBuilder) -> {
+                List<Predicate> predicates = new ArrayList<>();
+                
+                // Lọc theo loại hóa đơn = 1 (Online)
+                predicates.add(criteriaBuilder.equal(root.get("loaiHoaDon"), 1));
+                
+                // Lọc theo trạng thái = CHO_THANH_TOAN (0) - Chờ thanh toán
+                predicates.add(criteriaBuilder.equal(root.get("trangThai"), TrangThaiHoaDon.CHO_THANH_TOAN));
+                
+                // Lọc theo trạng thái thanh toán = 0 (Chưa thanh toán)
+                predicates.add(criteriaBuilder.equal(root.get("trangThaiThanhToan"), 0));
+                
+                return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
+            };
+            
+            // Sắp xếp theo ngày tạo mới nhất, giới hạn 50 đơn
+            Pageable pageable = PageRequest.of(0, 50, Sort.by(Sort.Direction.DESC, "ngayTao"));
+            Page<HoaDon> hoaDonPage = hoaDonRepository.findAll(spec, pageable);
+            
+            // Map sang PendingOrderResponse
+            List<PendingOrderResponse> result = hoaDonPage.getContent().stream()
+                .map(hoaDon -> {
+                    PendingOrderResponse response = new PendingOrderResponse();
+                    response.setId(hoaDon.getId());
+                    response.setMa(hoaDon.getMa());
+                    response.setTenKhachHang(hoaDon.getTenKhachHang());
+                    response.setNgayTao(hoaDon.getNgayTao());
+                    response.setTongTienSauGiam(hoaDon.getTongTienSauGiam());
+                    return response;
+                })
+                .collect(Collectors.toList());
+            
+            System.out.println("✅ [HoaDonService] Tìm thấy " + result.size() + " đơn hàng chờ xác nhận");
+            return result;
+        } catch (Exception e) {
+            System.err.println("❌ [HoaDonService] Lỗi khi lấy danh sách đơn hàng chờ xác nhận:");
+            System.err.println("  - Error: " + e.getClass().getName());
+            System.err.println("  - Message: " + e.getMessage());
+            e.printStackTrace();
+            throw new ApiException("Lỗi khi lấy danh sách đơn hàng chờ xác nhận: " + e.getMessage(), "GET_PENDING_ORDERS_ERROR");
+        }
+    }
+
+    /**
+     * Lấy số lượng hóa đơn theo từng trạng thái
+     * Dùng cho hiển thị badge counts trên UI
+     * 
+     * @return StatusCountResponse Số lượng hóa đơn theo từng trạng thái
+     */
+    public StatusCountResponse getStatusCounts() {
+        try {
+            System.out.println("📊 [HoaDonService] Lấy số lượng hóa đơn theo trạng thái");
+            
+            // Đếm tổng số hóa đơn
+            Long total = hoaDonRepository.count();
+            
+            // Đếm theo từng trạng thái
+            Long choThanhToan = hoaDonRepository.countByTrangThai(TrangThaiHoaDon.CHO_THANH_TOAN);
+            Long daThanhToan = hoaDonRepository.countByTrangThai(TrangThaiHoaDon.DA_THANH_TOAN);
+            Long dangGiao = hoaDonRepository.countByTrangThai(TrangThaiHoaDon.DANG_GIAO);
+            Long hoanThanh = hoaDonRepository.countByTrangThai(TrangThaiHoaDon.HOAN_THANH);
+            Long daHuy = hoaDonRepository.countByTrangThai(TrangThaiHoaDon.DA_HUY);
+            
+            StatusCountResponse response = new StatusCountResponse();
+            response.setTotal(total);
+            response.setCHO_THANH_TOAN(choThanhToan);
+            response.setDA_THANH_TOAN(daThanhToan);
+            response.setDANG_GIAO(dangGiao);
+            response.setHOAN_THANH(hoanThanh);
+            response.setDA_HUY(daHuy);
+            
+            System.out.println("✅ [HoaDonService] Status counts - Total: " + total + 
+                ", CHO_THANH_TOAN: " + choThanhToan + 
+                ", DA_THANH_TOAN: " + daThanhToan +
+                ", DANG_GIAO: " + dangGiao +
+                ", HOAN_THANH: " + hoanThanh +
+                ", DA_HUY: " + daHuy);
+            
+            return response;
+        } catch (Exception e) {
+            System.err.println("❌ [HoaDonService] Lỗi khi lấy số lượng hóa đơn theo trạng thái:");
+            System.err.println("  - Error: " + e.getClass().getName());
+            System.err.println("  - Message: " + e.getMessage());
+            e.printStackTrace();
+            throw new ApiException("Lỗi khi lấy số lượng hóa đơn theo trạng thái: " + e.getMessage(), "GET_STATUS_COUNTS_ERROR");
         }
     }
 }

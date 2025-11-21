@@ -12,6 +12,7 @@ import com.example.backendlaptop.repository.banhang.HoaDonRepository;
 import com.example.backendlaptop.repository.ChiTietSanPhamRepository;
 import com.example.backendlaptop.repository.PhieuGiamGiaRepository;
 import com.example.backendlaptop.repository.SerialRepository;
+import com.example.backendlaptop.service.WebSocketNotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -39,6 +40,7 @@ public class CustomerOrderService {
     private final ChiTietSanPhamRepository chiTietSanPhamRepository;
     private final PhieuGiamGiaRepository phieuGiamGiaRepository;
     private final SerialRepository serialRepository;
+    private final WebSocketNotificationService webSocketNotificationService;
 
     /**
      * Tạo đơn hàng từ customer
@@ -135,6 +137,17 @@ public class CustomerOrderService {
             hoaDon = hoaDonRepository.save(hoaDon);
             for (HoaDonChiTiet chiTiet : chiTietList) {
                 hoaDonChiTietRepository.save(chiTiet);
+            }
+
+            // 8. Gửi WebSocket notification cho đơn hàng mới
+            try {
+                webSocketNotificationService.notifyNewOnlineOrder(
+                    hoaDon.getId(),
+                    hoaDon.getMa(),
+                    hoaDon.getTenKhachHang()
+                );
+            } catch (Exception e) {
+                System.err.println("⚠️ [CustomerOrderService] Lỗi khi gửi WebSocket notification (không ảnh hưởng đến tạo đơn): " + e.getMessage());
             }
 
             return new HoaDonDetailResponse(hoaDon);

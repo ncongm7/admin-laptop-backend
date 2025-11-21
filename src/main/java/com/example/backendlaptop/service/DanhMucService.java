@@ -22,13 +22,24 @@ public class DanhMucService {
                 .collect(Collectors.toList());
     }
 
+    public List<CategoryResponse> getFeaturedCategories() {
+        List<Object[]> results = danhMucRepository.findFeaturedCategoriesWithProductCount();
+        // Nếu không có featured categories, lấy top 6
+        if (results.isEmpty()) {
+            results = danhMucRepository.findTopCategoriesWithProductCount();
+        }
+        return results.stream()
+                .map(this::mapToCategoryResponse)
+                .collect(Collectors.toList());
+    }
+
     private CategoryResponse mapToCategoryResponse(Object[] row) {
         return CategoryResponse.builder()
                 .id(UUID.fromString(row[0].toString()))
                 .name((String) row[1])
-                .slug((String) row[2])
-                .iconUrl((String) row[3])
-                .productCount(((Number) row[4]).longValue())
+                .slug(row[2] != null ? (String) row[2] : "")
+                .iconUrl(row[3] != null ? (String) row[3] : "")
+                .productCount(row[4] != null ? ((Number) row[4]).longValue() : 0L)
                 .build();
     }
 }

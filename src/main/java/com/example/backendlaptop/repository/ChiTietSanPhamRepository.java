@@ -70,4 +70,16 @@ public interface ChiTietSanPhamRepository extends JpaRepository<ChiTietSanPham, 
             @Param("dotGiamGiaId") UUID dotGiamGiaId,
             @Param("sanPhamId") UUID sanPhamId
     );
+
+    // Tìm sản phẩm bán chạy nhất dựa trên số lượng bán từ hoa_don_chi_tiet
+    @Query(value = """
+        SELECT TOP (:limit) ctsp.sp_id, SUM(hdct.so_luong) as total_sold
+        FROM chi_tiet_san_pham ctsp
+        INNER JOIN hoa_don_chi_tiet hdct ON ctsp.id = hdct.id_ctsp
+        INNER JOIN hoa_don hd ON hdct.id_don_hang = hd.id
+        WHERE hd.trang_thai = 2 AND hd.trang_thai_thanh_toan = 1
+        GROUP BY ctsp.sp_id
+        ORDER BY total_sold DESC
+        """, nativeQuery = true)
+    List<Object[]> findBestSellingProducts(@Param("limit") Integer limit);
 }

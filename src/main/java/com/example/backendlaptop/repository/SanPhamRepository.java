@@ -86,4 +86,8 @@ public interface SanPhamRepository extends JpaRepository<SanPham, UUID> {
            "WHERE s.trangThai = 1 " +
            "AND ctsp.soLuongTon > 0")
     Page<SanPham> findSanPhamConHang(Pageable pageable);
+
+    // Lấy sản phẩm mới nhất
+    @Query("SELECT s FROM SanPham s WHERE s.trangThai = :trangThai ORDER BY s.ngayTao DESC")
+    List<SanPham> findTopByTrangThaiOrderByNgayTaoDesc(@Param("trangThai") Integer trangThai, Pageable pageable);
 }

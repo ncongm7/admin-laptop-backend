@@ -17,11 +17,11 @@ import java.util.UUID;
 public class SanphamDanhmucId implements Serializable {
     private static final long serialVersionUID = -1088668502215643701L;
     @NotNull
-    @Column(name = "id_san_pham", nullable = false)
+    @Column(name = "san_pham_id", nullable = false)
     private UUID idSanPham;
 
     @NotNull
-    @Column(name = "id_danh_muc", nullable = false)
+    @Column(name = "danh_muc_id", nullable = false)
     private UUID idDanhMuc;
 
     @Override

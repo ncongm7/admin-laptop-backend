@@ -1156,3 +1156,634 @@ GO
 
 PRINT 'Hoàn tất tạo các bảng trả hàng và cập nhật bảng bảo hành!';
 GO
+
+-- ===================================================================================
+-- XII. CẬP NHẬT SCHEMA CHO HOMEPAGE COMPONENTS
+-- ===================================================================================
+
+-- 1. Thêm cột slug cho san_pham (nếu chưa có)
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('san_pham') AND name = 'slug')
+BEGIN
+    ALTER TABLE san_pham ADD slug VARCHAR(255) NULL;
+    PRINT 'Đã thêm cột slug cho san_pham';
+END
+ELSE
+BEGIN
+    PRINT 'Cột slug đã tồn tại trong san_pham';
+END
+GO
+
+-- Tạo index cho slug để tối ưu tìm kiếm
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_san_pham_slug' AND object_id = OBJECT_ID('san_pham'))
+BEGIN
+    CREATE INDEX IX_san_pham_slug ON san_pham(slug);
+    PRINT 'Đã tạo index IX_san_pham_slug';
+END
+ELSE
+BEGIN
+    PRINT 'Index IX_san_pham_slug đã tồn tại';
+END
+GO
+
+-- 2. Thêm cột cho danh_muc (nếu chưa có)
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('danh_muc') AND name = 'slug')
+BEGIN
+    ALTER TABLE danh_muc ADD slug VARCHAR(255) NULL;
+    PRINT 'Đã thêm cột slug cho danh_muc';
+END
+ELSE
+BEGIN
+    PRINT 'Cột slug đã tồn tại trong danh_muc';
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('danh_muc') AND name = 'icon_url')
+BEGIN
+    ALTER TABLE danh_muc ADD icon_url VARCHAR(MAX) NULL;
+    PRINT 'Đã thêm cột icon_url cho danh_muc';
+END
+ELSE
+BEGIN
+    PRINT 'Cột icon_url đã tồn tại trong danh_muc';
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('danh_muc') AND name = 'featured')
+BEGIN
+    ALTER TABLE danh_muc ADD featured BIT DEFAULT 0;
+    PRINT 'Đã thêm cột featured cho danh_muc';
+END
+ELSE
+BEGIN
+    PRINT 'Cột featured đã tồn tại trong danh_muc';
+END
+GO
+
+-- ===================================================================================
+-- XIII. INSERT DỮ LIỆU MẪU CHO HOMEPAGE COMPONENTS
+-- ===================================================================================
+
+-- 1. Cập nhật danh_muc: Thêm slug, icon_url, featured
+UPDATE danh_muc SET slug = 'laptop-gaming', icon_url = '🎮', featured = 1 WHERE ma_danh_muc = 'DM001';
+UPDATE danh_muc SET slug = 'laptop-van-phong', icon_url = '💼', featured = 1 WHERE ma_danh_muc = 'DM002';
+UPDATE danh_muc SET slug = 'laptop-cao-cap', icon_url = '⭐', featured = 1 WHERE ma_danh_muc = 'DM003';
+UPDATE danh_muc SET slug = 'laptop-do-hoa', icon_url = '🎨', featured = 1 WHERE ma_danh_muc = 'DM004';
+UPDATE danh_muc SET slug = 'laptop-sinh-vien', icon_url = '📚', featured = 1 WHERE ma_danh_muc = 'DM005';
+GO
+
+-- 2. Thêm sản phẩm mới (15-20 sản phẩm laptop đa dạng)
+INSERT INTO san_pham (ma_san_pham, ten_san_pham, mo_ta, trang_thai, ngay_tao, ngay_sua, nguoi_tao, nguoi_sua) VALUES
+('SP006', 'Laptop Gaming MSI Katana GF66', 'Laptop gaming MSI với RTX 3050, hiệu năng mạnh mẽ cho game thủ', 1, DATEADD(DAY, -5, GETDATE()), DATEADD(DAY, -5, GETDATE()), 'admin', 'admin'),
+('SP007', 'Laptop ASUS TUF Gaming F15', 'Laptop gaming ASUS TUF bền bỉ, thiết kế quân đội, RTX 3060', 1, DATEADD(DAY, -4, GETDATE()), DATEADD(DAY, -4, GETDATE()), 'admin', 'admin'),
+('SP008', 'Laptop Acer Nitro 5', 'Laptop gaming Acer giá tốt, RTX 3050, phù hợp game thủ budget', 1, DATEADD(DAY, -3, GETDATE()), DATEADD(DAY, -3, GETDATE()), 'admin', 'admin'),
+('SP009', 'Laptop HP Victus 16', 'Laptop gaming HP Victus màn hình lớn 16 inch, RTX 3050', 1, DATEADD(DAY, -2, GETDATE()), DATEADD(DAY, -2, GETDATE()), 'admin', 'admin'),
+('SP010', 'Laptop Lenovo Legion 5', 'Laptop gaming Lenovo Legion hiệu năng cao, RTX 3060', 1, DATEADD(DAY, -1, GETDATE()), DATEADD(DAY, -1, GETDATE()), 'admin', 'admin'),
+('SP011', 'Laptop Dell Inspiron 15', 'Laptop văn phòng Dell Inspiron giá rẻ, phù hợp sinh viên', 1, DATEADD(DAY, -10, GETDATE()), DATEADD(DAY, -10, GETDATE()), 'admin', 'admin'),
+('SP012', 'Laptop ASUS VivoBook 15', 'Laptop văn phòng ASUS VivoBook mỏng nhẹ, pin trâu', 1, DATEADD(DAY, -9, GETDATE()), DATEADD(DAY, -9, GETDATE()), 'admin', 'admin'),
+('SP013', 'Laptop Acer Aspire 5', 'Laptop văn phòng Acer Aspire giá tốt, hiệu năng ổn định', 1, DATEADD(DAY, -8, GETDATE()), DATEADD(DAY, -8, GETDATE()), 'admin', 'admin'),
+('SP014', 'Laptop HP 15s', 'Laptop văn phòng HP 15s thiết kế đơn giản, bền bỉ', 1, DATEADD(DAY, -7, GETDATE()), DATEADD(DAY, -7, GETDATE()), 'admin', 'admin'),
+('SP015', 'Laptop Lenovo IdeaPad 3', 'Laptop văn phòng Lenovo IdeaPad giá rẻ, phù hợp học tập', 1, DATEADD(DAY, -6, GETDATE()), DATEADD(DAY, -6, GETDATE()), 'admin', 'admin'),
+('SP016', 'Laptop MacBook Air M3', 'Laptop Apple MacBook Air chip M3, siêu mỏng nhẹ, pin 18 giờ', 1, DATEADD(DAY, -15, GETDATE()), DATEADD(DAY, -15, GETDATE()), 'admin', 'admin'),
+('SP017', 'Laptop MacBook Pro 14 M3', 'Laptop Apple MacBook Pro 14 inch chip M3, màn hình Liquid Retina XDR', 1, DATEADD(DAY, -14, GETDATE()), DATEADD(DAY, -14, GETDATE()), 'admin', 'admin'),
+('SP018', 'Laptop Dell XPS 15', 'Laptop cao cấp Dell XPS 15 màn hình OLED, hiệu năng mạnh', 1, DATEADD(DAY, -13, GETDATE()), DATEADD(DAY, -13, GETDATE()), 'admin', 'admin'),
+('SP019', 'Laptop ASUS ZenBook 14', 'Laptop cao cấp ASUS ZenBook màn hình OLED, thiết kế sang trọng', 1, DATEADD(DAY, -12, GETDATE()), DATEADD(DAY, -12, GETDATE()), 'admin', 'admin'),
+('SP020', 'Laptop Lenovo ThinkPad X1 Carbon', 'Laptop doanh nhân Lenovo ThinkPad X1 Carbon siêu mỏng, bàn phím tốt', 1, DATEADD(DAY, -11, GETDATE()), DATEADD(DAY, -11, GETDATE()), 'admin', 'admin'),
+('SP021', 'Laptop ASUS ProArt StudioBook', 'Laptop đồ họa ASUS ProArt chuyên dụng cho designer, RTX 4060', 1, DATEADD(DAY, -20, GETDATE()), DATEADD(DAY, -20, GETDATE()), 'admin', 'admin'),
+('SP022', 'Laptop MSI Creator Z16', 'Laptop đồ họa MSI Creator màn hình 4K, RTX 4070', 1, DATEADD(DAY, -19, GETDATE()), DATEADD(DAY, -19, GETDATE()), 'admin', 'admin'),
+('SP023', 'Laptop Dell Precision 5570', 'Laptop workstation Dell Precision cho công việc chuyên nghiệp', 1, DATEADD(DAY, -18, GETDATE()), DATEADD(DAY, -18, GETDATE()), 'admin', 'admin'),
+('SP024', 'Laptop HP Envy 13', 'Laptop cao cấp HP Envy 13 mỏng nhẹ, thiết kế đẹp', 1, DATEADD(DAY, -17, GETDATE()), DATEADD(DAY, -17, GETDATE()), 'admin', 'admin'),
+('SP025', 'Laptop Acer Swift 3', 'Laptop văn phòng Acer Swift mỏng nhẹ, pin lâu', 1, DATEADD(DAY, -16, GETDATE()), DATEADD(DAY, -16, GETDATE()), 'admin', 'admin');
+GO
+
+-- 3. Thêm chi tiết sản phẩm (variants) cho các sản phẩm mới
+-- Gaming laptops
+INSERT INTO chi_tiet_san_pham (sp_id, cpu_id, ram_id, o_cung_id, gpu_id, loai_man_hinh_id, pin_id, mau_sac_id, ma_ctsp, gia_ban, gia_nhap, ghi_chu, trang_thai, so_luong_ton, so_luong_tam_giu, version, ngay_tao, ngay_sua) VALUES
+-- SP006 - MSI Katana GF66
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP006'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU001'), (SELECT id FROM ram WHERE ma_ram = 'RAM002'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD002'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU001'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH001'), (SELECT id FROM pin WHERE ma_pin = 'PIN002'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS001'), 'CTSP004', 22990000, 17242500, 'MSI Katana GF66 RTX 3050', 1, 35, 0, 0, GETDATE(), GETDATE()),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP006'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU003'), (SELECT id FROM ram WHERE ma_ram = 'RAM002'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD003'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU001'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH001'), (SELECT id FROM pin WHERE ma_pin = 'PIN003'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS001'), 'CTSP005', 27990000, 20992500, 'MSI Katana GF66 RTX 3060', 1, 25, 0, 0, GETDATE(), GETDATE()),
+
+-- SP007 - ASUS TUF Gaming F15
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP007'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU004'), (SELECT id FROM ram WHERE ma_ram = 'RAM002'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD002'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU001'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH001'), (SELECT id FROM pin WHERE ma_pin = 'PIN003'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS001'), 'CTSP006', 24990000, 18742500, 'ASUS TUF Gaming F15 RTX 3060', 1, 40, 0, 0, GETDATE(), GETDATE()),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP007'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU004'), (SELECT id FROM ram WHERE ma_ram = 'RAM003'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD003'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU003'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH001'), (SELECT id FROM pin WHERE ma_pin = 'PIN003'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS001'), 'CTSP007', 32990000, 24742500, 'ASUS TUF Gaming F15 RTX 4060', 1, 20, 0, 0, GETDATE(), GETDATE()),
+
+-- SP008 - Acer Nitro 5
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP008'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU001'), (SELECT id FROM ram WHERE ma_ram = 'RAM001'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD002'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU001'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH001'), (SELECT id FROM pin WHERE ma_pin = 'PIN002'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS001'), 'CTSP008', 19990000, 14992500, 'Acer Nitro 5 RTX 3050', 1, 50, 0, 0, GETDATE(), GETDATE()),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP008'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU002'), (SELECT id FROM ram WHERE ma_ram = 'RAM002'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD002'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU001'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH001'), (SELECT id FROM pin WHERE ma_pin = 'PIN002'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS001'), 'CTSP009', 21990000, 16492500, 'Acer Nitro 5 RTX 3060', 1, 30, 0, 0, GETDATE(), GETDATE()),
+
+-- SP009 - HP Victus 16
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP009'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU001'), (SELECT id FROM ram WHERE ma_ram = 'RAM002'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD002'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU001'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH002'), (SELECT id FROM pin WHERE ma_pin = 'PIN003'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS001'), 'CTSP010', 23990000, 17992500, 'HP Victus 16 RTX 3050', 1, 28, 0, 0, GETDATE(), GETDATE()),
+
+-- SP010 - Lenovo Legion 5
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP010'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU004'), (SELECT id FROM ram WHERE ma_ram = 'RAM002'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD003'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU001'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH001'), (SELECT id FROM pin WHERE ma_pin = 'PIN003'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS001'), 'CTSP011', 26990000, 20242500, 'Lenovo Legion 5 RTX 3060', 1, 22, 0, 0, GETDATE(), GETDATE()),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP010'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU004'), (SELECT id FROM ram WHERE ma_ram = 'RAM003'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD003'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU003'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH001'), (SELECT id FROM pin WHERE ma_pin = 'PIN003'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS001'), 'CTSP012', 34990000, 26242500, 'Lenovo Legion 5 RTX 4060', 1, 15, 0, 0, GETDATE(), GETDATE()),
+
+-- Văn phòng laptops
+-- SP011 - Dell Inspiron 15
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP011'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU001'), (SELECT id FROM ram WHERE ma_ram = 'RAM001'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD001'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU002'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH001'), (SELECT id FROM pin WHERE ma_pin = 'PIN001'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS002'), 'CTSP013', 12990000, 9742500, 'Dell Inspiron 15 cơ bản', 1, 60, 0, 0, GETDATE(), GETDATE()),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP011'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU001'), (SELECT id FROM ram WHERE ma_ram = 'RAM002'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD002'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU002'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH001'), (SELECT id FROM pin WHERE ma_pin = 'PIN001'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS002'), 'CTSP014', 14990000, 11242500, 'Dell Inspiron 15 nâng cấp', 1, 45, 0, 0, GETDATE(), GETDATE()),
+
+-- SP012 - ASUS VivoBook 15
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP012'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU001'), (SELECT id FROM ram WHERE ma_ram = 'RAM001'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD002'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU002'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH001'), (SELECT id FROM pin WHERE ma_pin = 'PIN002'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS002'), 'CTSP015', 13990000, 10492500, 'ASUS VivoBook 15', 1, 55, 0, 0, GETDATE(), GETDATE()),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP012'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU002'), (SELECT id FROM ram WHERE ma_ram = 'RAM002'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD002'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU002'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH001'), (SELECT id FROM pin WHERE ma_pin = 'PIN002'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS002'), 'CTSP016', 16990000, 12742500, 'ASUS VivoBook 15 nâng cấp', 1, 38, 0, 0, GETDATE(), GETDATE()),
+
+-- SP013 - Acer Aspire 5
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP013'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU001'), (SELECT id FROM ram WHERE ma_ram = 'RAM001'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD001'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU002'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH001'), (SELECT id FROM pin WHERE ma_pin = 'PIN001'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS001'), 'CTSP017', 11990000, 8992500, 'Acer Aspire 5', 1, 65, 0, 0, GETDATE(), GETDATE()),
+
+-- SP014 - HP 15s
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP014'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU001'), (SELECT id FROM ram WHERE ma_ram = 'RAM001'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD001'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU002'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH001'), (SELECT id FROM pin WHERE ma_pin = 'PIN001'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS002'), 'CTSP018', 10990000, 8242500, 'HP 15s', 1, 70, 0, 0, GETDATE(), GETDATE()),
+
+-- SP015 - Lenovo IdeaPad 3
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP015'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU001'), (SELECT id FROM ram WHERE ma_ram = 'RAM001'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD001'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU002'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH001'), (SELECT id FROM pin WHERE ma_pin = 'PIN001'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS001'), 'CTSP019', 11490000, 8617500, 'Lenovo IdeaPad 3', 1, 58, 0, 0, GETDATE(), GETDATE()),
+
+-- Cao cấp laptops
+-- SP016 - MacBook Air M3
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP016'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU005'), (SELECT id FROM ram WHERE ma_ram = 'RAM003'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD002'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU004'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH003'), (SELECT id FROM pin WHERE ma_pin = 'PIN002'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS002'), 'CTSP020', 28990000, 21742500, 'MacBook Air M3 256GB', 1, 18, 0, 0, GETDATE(), GETDATE()),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP016'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU005'), (SELECT id FROM ram WHERE ma_ram = 'RAM003'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD003'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU004'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH003'), (SELECT id FROM pin WHERE ma_pin = 'PIN002'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS002'), 'CTSP021', 32990000, 24742500, 'MacBook Air M3 512GB', 1, 12, 0, 0, GETDATE(), GETDATE()),
+
+-- SP017 - MacBook Pro 14 M3
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP017'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU005'), (SELECT id FROM ram WHERE ma_ram = 'RAM003'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD003'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU005'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH004'), (SELECT id FROM pin WHERE ma_pin = 'PIN003'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS002'), 'CTSP022', 49990000, 37492500, 'MacBook Pro 14 M3', 1, 10, 0, 0, GETDATE(), GETDATE()),
+
+-- SP018 - Dell XPS 15
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP018'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU003'), (SELECT id FROM ram WHERE ma_ram = 'RAM003'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD003'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU003'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH004'), (SELECT id FROM pin WHERE ma_pin = 'PIN003'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS002'), 'CTSP023', 42990000, 32242500, 'Dell XPS 15 OLED', 1, 8, 0, 0, GETDATE(), GETDATE()),
+
+-- SP019 - ASUS ZenBook 14
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP019'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU003'), (SELECT id FROM ram WHERE ma_ram = 'RAM002'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD003'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU002'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH003'), (SELECT id FROM pin WHERE ma_pin = 'PIN002'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS002'), 'CTSP024', 32990000, 24742500, 'ASUS ZenBook 14 OLED', 1, 15, 0, 0, GETDATE(), GETDATE()),
+
+-- SP020 - Lenovo ThinkPad X1 Carbon
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP020'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU003'), (SELECT id FROM ram WHERE ma_ram = 'RAM002'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD002'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU002'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH003'), (SELECT id FROM pin WHERE ma_pin = 'PIN002'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS001'), 'CTSP025', 39990000, 29992500, 'Lenovo ThinkPad X1 Carbon', 1, 12, 0, 0, GETDATE(), GETDATE()),
+
+-- Đồ họa laptops
+-- SP021 - ASUS ProArt StudioBook
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP021'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU003'), (SELECT id FROM ram WHERE ma_ram = 'RAM003'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD003'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU003'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH004'), (SELECT id FROM pin WHERE ma_pin = 'PIN003'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS001'), 'CTSP026', 54990000, 41242500, 'ASUS ProArt StudioBook RTX 4060', 1, 6, 0, 0, GETDATE(), GETDATE()),
+
+-- SP022 - MSI Creator Z16
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP022'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU005'), (SELECT id FROM ram WHERE ma_ram = 'RAM003'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD004'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU005'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH005'), (SELECT id FROM pin WHERE ma_pin = 'PIN005'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS002'), 'CTSP027', 69990000, 52492500, 'MSI Creator Z16 RTX 4070', 1, 4, 0, 0, GETDATE(), GETDATE()),
+
+-- SP023 - Dell Precision 5570
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP023'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU003'), (SELECT id FROM ram WHERE ma_ram = 'RAM004'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD003'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU003'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH004'), (SELECT id FROM pin WHERE ma_pin = 'PIN003'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS001'), 'CTSP028', 59990000, 44992500, 'Dell Precision 5570', 1, 5, 0, 0, GETDATE(), GETDATE()),
+
+-- SP024 - HP Envy 13
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP024'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU003'), (SELECT id FROM ram WHERE ma_ram = 'RAM002'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD002'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU002'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH003'), (SELECT id FROM pin WHERE ma_pin = 'PIN002'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS002'), 'CTSP029', 27990000, 20992500, 'HP Envy 13', 1, 20, 0, 0, GETDATE(), GETDATE()),
+
+-- SP025 - Acer Swift 3
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP025'), (SELECT id FROM cpu WHERE ma_cpu = 'CPU001'), (SELECT id FROM ram WHERE ma_ram = 'RAM002'), (SELECT id FROM o_cung WHERE ma_o_cung = 'SSD002'), (SELECT id FROM gpu WHERE ma_gpu = 'GPU002'), (SELECT id FROM loai_man_hinh WHERE ma_loai_man_hinh = 'MH003'), (SELECT id FROM pin WHERE ma_pin = 'PIN002'), (SELECT id FROM mau_sac WHERE ma_mau = 'MS002'), 'CTSP030', 15990000, 11992500, 'Acer Swift 3', 1, 32, 0, 0, GETDATE(), GETDATE());
+GO
+
+-- 4. Thêm hình ảnh cho chi tiết sản phẩm (sử dụng data URI placeholder để tránh ad blocker)
+-- Data URI cho placeholder image (SVG base64)
+DECLARE @placeholderImage VARCHAR(MAX) = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjFmNWY5Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzY0NzQ4YiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkxhcHRvcDwvdGV4dD48L3N2Zz4=';
+
+INSERT INTO hinh_anh (id_spct, url, anh_chinh_dai_dien, ngay_tao, ngay_sua) VALUES
+-- CTSP004 - MSI Katana GF66
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP004'), @placeholderImage, 1, GETDATE(), GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP004'), @placeholderImage, 0, GETDATE(), GETDATE()),
+-- CTSP005 - MSI Katana GF66
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP005'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP006 - ASUS TUF Gaming F15
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP006'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP007 - ASUS TUF Gaming F15
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP007'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP008 - Acer Nitro 5
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP008'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP009 - Acer Nitro 5
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP009'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP010 - HP Victus 16
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP010'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP011 - Lenovo Legion 5
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP011'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP012 - Lenovo Legion 5
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP012'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP013 - Dell Inspiron 15
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP013'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP014 - Dell Inspiron 15
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP014'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP015 - ASUS VivoBook 15
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP015'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP016 - ASUS VivoBook 15
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP016'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP017 - Acer Aspire 5
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP017'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP018 - HP 15s
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP018'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP019 - Lenovo IdeaPad 3
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP019'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP020 - MacBook Air M3
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP020'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP021 - MacBook Air M3
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP021'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP022 - MacBook Pro 14 M3
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP022'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP023 - Dell XPS 15
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP023'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP024 - ASUS ZenBook 14
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP024'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP025 - Lenovo ThinkPad X1 Carbon
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP025'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP026 - ASUS ProArt StudioBook
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP026'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP027 - MSI Creator Z16
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP027'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP028 - Dell Precision 5570
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP028'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP029 - HP Envy 13
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP029'), @placeholderImage, 1, GETDATE(), GETDATE()),
+-- CTSP030 - Acer Swift 3
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP030'), @placeholderImage, 1, GETDATE(), GETDATE());
+GO
+
+-- 5. Liên kết sản phẩm với danh mục
+INSERT INTO sanpham_danhmuc (san_pham_id, danh_muc_id) VALUES
+-- Gaming
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP006'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM001')),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP007'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM001')),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP008'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM001')),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP009'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM001')),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP010'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM001')),
+-- Văn phòng
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP011'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM002')),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP012'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM002')),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP013'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM002')),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP014'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM002')),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP015'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM002')),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP025'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM002')),
+-- Cao cấp
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP016'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM003')),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP017'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM003')),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP018'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM003')),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP019'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM003')),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP020'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM003')),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP024'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM003')),
+-- Đồ họa
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP021'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM004')),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP022'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM004')),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP023'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM004')),
+-- Sinh viên (một số laptop văn phòng giá rẻ)
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP011'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM005')),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP013'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM005')),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP014'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM005')),
+((SELECT id FROM san_pham WHERE ma_san_pham = 'SP015'), (SELECT id FROM danh_muc WHERE ma_danh_muc = 'DM005'));
+GO
+
+-- 6. Thêm serial cho các chi tiết sản phẩm mới
+INSERT INTO serial (ctsp_id, serial_no, trang_thai, ngay_nhap) VALUES
+-- CTSP004
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP004'), 'SN007', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP004'), 'SN008', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP004'), 'SN009', 0, GETDATE()),
+-- CTSP005
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP005'), 'SN010', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP005'), 'SN011', 0, GETDATE()),
+-- CTSP006
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP006'), 'SN012', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP006'), 'SN013', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP006'), 'SN014', 0, GETDATE()),
+-- CTSP007
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP007'), 'SN015', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP007'), 'SN016', 0, GETDATE()),
+-- CTSP008
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP008'), 'SN017', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP008'), 'SN018', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP008'), 'SN019', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP008'), 'SN020', 0, GETDATE()),
+-- CTSP009
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP009'), 'SN021', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP009'), 'SN022', 0, GETDATE()),
+-- CTSP010
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP010'), 'SN023', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP010'), 'SN024', 0, GETDATE()),
+-- CTSP011
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP011'), 'SN025', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP011'), 'SN026', 0, GETDATE()),
+-- CTSP012
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP012'), 'SN027', 0, GETDATE()),
+-- CTSP013
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP013'), 'SN028', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP013'), 'SN029', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP013'), 'SN030', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP013'), 'SN031', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP013'), 'SN032', 0, GETDATE()),
+-- CTSP014
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP014'), 'SN033', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP014'), 'SN034', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP014'), 'SN035', 0, GETDATE()),
+-- CTSP015
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP015'), 'SN036', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP015'), 'SN037', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP015'), 'SN038', 0, GETDATE()),
+-- CTSP016
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP016'), 'SN039', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP016'), 'SN040', 0, GETDATE()),
+-- CTSP017
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP017'), 'SN041', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP017'), 'SN042', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP017'), 'SN043', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP017'), 'SN044', 0, GETDATE()),
+-- CTSP018
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP018'), 'SN045', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP018'), 'SN046', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP018'), 'SN047', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP018'), 'SN048', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP018'), 'SN049', 0, GETDATE()),
+-- CTSP019
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP019'), 'SN050', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP019'), 'SN051', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP019'), 'SN052', 0, GETDATE()),
+-- CTSP020
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP020'), 'SN053', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP020'), 'SN054', 0, GETDATE()),
+-- CTSP021
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP021'), 'SN055', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP021'), 'SN056', 0, GETDATE()),
+-- CTSP022
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP022'), 'SN057', 0, GETDATE()),
+-- CTSP023
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP023'), 'SN058', 0, GETDATE()),
+-- CTSP024
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP024'), 'SN059', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP024'), 'SN060', 0, GETDATE()),
+-- CTSP025
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP025'), 'SN061', 0, GETDATE()),
+-- CTSP026
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP026'), 'SN062', 0, GETDATE()),
+-- CTSP027
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP027'), 'SN063', 0, GETDATE()),
+-- CTSP028
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP028'), 'SN064', 0, GETDATE()),
+-- CTSP029
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP029'), 'SN065', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP029'), 'SN066', 0, GETDATE()),
+-- CTSP030
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP030'), 'SN067', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP030'), 'SN068', 0, GETDATE()),
+((SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP030'), 'SN069', 0, GETDATE());
+GO
+
+-- 7. Cập nhật dot_giam_gia với bannerImageUrl và đảm bảo có đợt đang active
+-- Rút ngắn banner image URL để tránh truncate (VARCHAR(255))
+DECLARE @bannerImage VARCHAR(255) = 'https://example.com/banners/flash-sale.jpg';
+
+-- Tạo đợt giảm giá mới đang active (từ hôm nay đến 7 ngày sau)
+INSERT INTO dot_giam_gia (ten_km, loai_dot_giam_gia, gia_tri, so_tien_giam_toi_da, mo_ta, ngayBatDau, ngayKetThuc, trang_thai, bannerImageUrl) VALUES
+('Flash Sale Cuối Tuần', 1, 25.00, 3000000.00, 'Giảm giá 25% cho tất cả sản phẩm trong flash sale cuối tuần (tối đa 3 triệu)', GETDATE(), DATEADD(DAY, 7, GETDATE()), 1, @bannerImage),
+('Khuyến mãi Mùa Hè 2024', 1, 20.00, 2500000.00, 'Giảm giá 20% cho laptop gaming và văn phòng (tối đa 2.5 triệu)', GETDATE(), DATEADD(DAY, 30, GETDATE()), 1, @bannerImage),
+('Khuyến mãi Sinh viên', 1, 15.00, 2000000.00, 'Giảm giá 15% cho laptop sinh viên (tối đa 2 triệu)', GETDATE(), DATEADD(DAY, 60, GETDATE()), 1, @bannerImage);
+
+-- Cập nhật bannerImageUrl cho các đợt giảm giá hiện có
+UPDATE dot_giam_gia SET bannerImageUrl = @bannerImage WHERE bannerImageUrl IS NULL AND ngayBatDau <= GETDATE() AND ngayKetThuc >= GETDATE();
+GO
+
+-- 8. Thêm dot_giam_gia_chi_tiet (flash sale products) - ít nhất 10-15 sản phẩm
+DECLARE @flashSaleId UNIQUEIDENTIFIER;
+SELECT TOP 1 @flashSaleId = id FROM dot_giam_gia WHERE ten_km = 'Flash Sale Cuối Tuần' ORDER BY ngayBatDau DESC;
+
+INSERT INTO dot_giam_gia_chi_tiet (id_km, id_ctsp, gia_ban_dau, gia_sau_khi_giam) VALUES
+-- Flash Sale products
+(@flashSaleId, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP004'), 22990000, 17242500),
+(@flashSaleId, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP005'), 27990000, 20992500),
+(@flashSaleId, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP006'), 24990000, 18742500),
+(@flashSaleId, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP008'), 19990000, 14992500),
+(@flashSaleId, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP009'), 21990000, 16492500),
+(@flashSaleId, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP010'), 23990000, 17992500),
+(@flashSaleId, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP011'), 26990000, 20242500),
+(@flashSaleId, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP013'), 12990000, 9742500),
+(@flashSaleId, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP014'), 14990000, 11242500),
+(@flashSaleId, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP015'), 13990000, 10492500),
+(@flashSaleId, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP016'), 16990000, 12742500),
+(@flashSaleId, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP017'), 11990000, 8992500),
+(@flashSaleId, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP018'), 10990000, 8242500),
+(@flashSaleId, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP019'), 11490000, 8617500),
+(@flashSaleId, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP030'), 15990000, 11992500);
+GO
+
+-- 9. Thêm hóa đơn và chi tiết hóa đơn (để tính best-selling) - ít nhất 10-15 hóa đơn đã thanh toán
+DECLARE @khachHang1 UNIQUEIDENTIFIER;
+DECLARE @khachHang2 UNIQUEIDENTIFIER;
+DECLARE @khachHang3 UNIQUEIDENTIFIER;
+DECLARE @khachHang4 UNIQUEIDENTIFIER;
+DECLARE @khachHang5 UNIQUEIDENTIFIER;
+DECLARE @nhanVien1 UNIQUEIDENTIFIER;
+
+SELECT @khachHang1 = user_id FROM khach_hang WHERE ma_khach_hang = 'KH001';
+SELECT @khachHang2 = user_id FROM khach_hang WHERE ma_khach_hang = 'KH002';
+SELECT @khachHang3 = user_id FROM khach_hang WHERE ma_khach_hang = 'KH003';
+SELECT @khachHang4 = user_id FROM khach_hang WHERE ma_khach_hang = 'KH004';
+SELECT @khachHang5 = user_id FROM khach_hang WHERE ma_khach_hang = 'KH005';
+SELECT @nhanVien1 = user_id FROM nhan_vien WHERE ma_nhan_vien = 'NV002';
+
+-- Hóa đơn đã thanh toán (trang_thai = 2: Đã thanh toán, trang_thai_thanh_toan = 1: Đã thanh toán)
+INSERT INTO hoa_don (ma, id_khach_hang, id_nhan_vien, loai_hoa_don, trang_thai, trang_thai_thanh_toan, tong_tien_sau_giam, ngay_tao, ngay_thanh_toan, dia_chi, sdt, ten_khach_hang) VALUES
+('HD001', @khachHang1, @nhanVien1, 0, 2, 1, 22990000, DATEADD(DAY, -30, GETDATE()), DATEADD(DAY, -30, GETDATE()), '123 Đường Lê Lợi, Quận 1, TP.HCM', '0901234567', 'Nguyễn Văn An'),
+('HD002', @khachHang2, @nhanVien1, 0, 2, 1, 24990000, DATEADD(DAY, -28, GETDATE()), DATEADD(DAY, -28, GETDATE()), '456 Đường Nguyễn Huệ, Quận 1, TP.HCM', '0901234568', 'Trần Thị Bình'),
+('HD003', @khachHang1, @nhanVien1, 0, 2, 1, 19990000, DATEADD(DAY, -25, GETDATE()), DATEADD(DAY, -25, GETDATE()), '123 Đường Lê Lợi, Quận 1, TP.HCM', '0901234567', 'Nguyễn Văn An'),
+('HD004', @khachHang3, @nhanVien1, 0, 2, 1, 26990000, DATEADD(DAY, -22, GETDATE()), DATEADD(DAY, -22, GETDATE()), '789 Đường Đồng Khởi, Quận 1, TP.HCM', '0901234569', 'Lê Văn Cường'),
+('HD005', @khachHang2, @nhanVien1, 0, 2, 1, 12990000, DATEADD(DAY, -20, GETDATE()), DATEADD(DAY, -20, GETDATE()), '456 Đường Nguyễn Huệ, Quận 1, TP.HCM', '0901234568', 'Trần Thị Bình'),
+('HD006', @khachHang4, @nhanVien1, 0, 2, 1, 21990000, DATEADD(DAY, -18, GETDATE()), DATEADD(DAY, -18, GETDATE()), '321 Đường Pasteur, Quận 3, TP.HCM', '0901234570', 'Phạm Thị Dung'),
+('HD007', @khachHang1, @nhanVien1, 0, 2, 1, 14990000, DATEADD(DAY, -15, GETDATE()), DATEADD(DAY, -15, GETDATE()), '123 Đường Lê Lợi, Quận 1, TP.HCM', '0901234567', 'Nguyễn Văn An'),
+('HD008', @khachHang5, @nhanVien1, 0, 2, 1, 23990000, DATEADD(DAY, -12, GETDATE()), DATEADD(DAY, -12, GETDATE()), '654 Đường Võ Văn Tần, Quận 3, TP.HCM', '0901234571', 'Hoàng Văn Em'),
+('HD009', @khachHang3, @nhanVien1, 0, 2, 1, 27990000, DATEADD(DAY, -10, GETDATE()), DATEADD(DAY, -10, GETDATE()), '789 Đường Đồng Khởi, Quận 1, TP.HCM', '0901234569', 'Lê Văn Cường'),
+('HD010', @khachHang2, @nhanVien1, 0, 2, 1, 13990000, DATEADD(DAY, -8, GETDATE()), DATEADD(DAY, -8, GETDATE()), '456 Đường Nguyễn Huệ, Quận 1, TP.HCM', '0901234568', 'Trần Thị Bình'),
+('HD011', @khachHang4, @nhanVien1, 0, 2, 1, 16990000, DATEADD(DAY, -5, GETDATE()), DATEADD(DAY, -5, GETDATE()), '321 Đường Pasteur, Quận 3, TP.HCM', '0901234570', 'Phạm Thị Dung'),
+('HD012', @khachHang1, @nhanVien1, 0, 2, 1, 32990000, DATEADD(DAY, -3, GETDATE()), DATEADD(DAY, -3, GETDATE()), '123 Đường Lê Lợi, Quận 1, TP.HCM', '0901234567', 'Nguyễn Văn An'),
+('HD013', @khachHang5, @nhanVien1, 0, 2, 1, 11990000, DATEADD(DAY, -2, GETDATE()), DATEADD(DAY, -2, GETDATE()), '654 Đường Võ Văn Tần, Quận 3, TP.HCM', '0901234571', 'Hoàng Văn Em'),
+('HD014', @khachHang3, @nhanVien1, 0, 2, 1, 34990000, DATEADD(DAY, -1, GETDATE()), DATEADD(DAY, -1, GETDATE()), '789 Đường Đồng Khởi, Quận 1, TP.HCM', '0901234569', 'Lê Văn Cường'),
+('HD015', @khachHang2, @nhanVien1, 0, 2, 1, 10990000, GETDATE(), GETDATE(), '456 Đường Nguyễn Huệ, Quận 1, TP.HCM', '0901234568', 'Trần Thị Bình');
+GO
+
+-- Chi tiết hóa đơn (tạo best-selling products - CTSP004, CTSP006, CTSP008 được mua nhiều nhất)
+INSERT INTO hoa_don_chi_tiet (id_don_hang, id_ctsp, so_luong, don_gia) VALUES
+-- HD001 - CTSP004 (MSI Katana GF66) - best seller
+((SELECT id FROM hoa_don WHERE ma = 'HD001'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP004'), 1, 22990000),
+-- HD002 - CTSP006 (ASUS TUF Gaming F15) - best seller
+((SELECT id FROM hoa_don WHERE ma = 'HD002'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP006'), 1, 24990000),
+-- HD003 - CTSP008 (Acer Nitro 5) - best seller
+((SELECT id FROM hoa_don WHERE ma = 'HD003'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP008'), 1, 19990000),
+-- HD004 - CTSP011 (Lenovo Legion 5)
+((SELECT id FROM hoa_don WHERE ma = 'HD004'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP011'), 1, 26990000),
+-- HD005 - CTSP013 (Dell Inspiron 15)
+((SELECT id FROM hoa_don WHERE ma = 'HD005'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP013'), 1, 12990000),
+-- HD006 - CTSP009 (Acer Nitro 5 RTX 3060) - best seller
+((SELECT id FROM hoa_don WHERE ma = 'HD006'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP009'), 1, 21990000),
+-- HD007 - CTSP014 (Dell Inspiron 15 nâng cấp)
+((SELECT id FROM hoa_don WHERE ma = 'HD007'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP014'), 1, 14990000),
+-- HD008 - CTSP010 (HP Victus 16)
+((SELECT id FROM hoa_don WHERE ma = 'HD008'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP010'), 1, 23990000),
+-- HD009 - CTSP005 (MSI Katana GF66 RTX 3060) - best seller
+((SELECT id FROM hoa_don WHERE ma = 'HD009'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP005'), 1, 27990000),
+-- HD010 - CTSP015 (ASUS VivoBook 15)
+((SELECT id FROM hoa_don WHERE ma = 'HD010'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP015'), 1, 13990000),
+-- HD011 - CTSP016 (ASUS VivoBook 15 nâng cấp)
+((SELECT id FROM hoa_don WHERE ma = 'HD011'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP016'), 1, 16990000),
+-- HD012 - CTSP021 (MacBook Air M3 512GB)
+((SELECT id FROM hoa_don WHERE ma = 'HD012'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP021'), 1, 32990000),
+-- HD013 - CTSP017 (Acer Aspire 5)
+((SELECT id FROM hoa_don WHERE ma = 'HD013'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP017'), 1, 11990000),
+-- HD014 - CTSP012 (Lenovo Legion 5 RTX 4060)
+((SELECT id FROM hoa_don WHERE ma = 'HD014'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP012'), 1, 34990000),
+-- HD015 - CTSP018 (HP 15s)
+((SELECT id FROM hoa_don WHERE ma = 'HD015'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP018'), 1, 10990000),
+-- Thêm một số hóa đơn có nhiều sản phẩm để tăng số lượng bán
+-- HD001 thêm CTSP008
+((SELECT id FROM hoa_don WHERE ma = 'HD001'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP008'), 1, 19990000),
+-- HD002 thêm CTSP004
+((SELECT id FROM hoa_don WHERE ma = 'HD002'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP004'), 1, 22990000),
+-- HD003 thêm CTSP006
+((SELECT id FROM hoa_don WHERE ma = 'HD003'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP006'), 1, 24990000),
+-- HD004 thêm CTSP008
+((SELECT id FROM hoa_don WHERE ma = 'HD004'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP008'), 1, 19990000),
+-- HD005 thêm CTSP004
+((SELECT id FROM hoa_don WHERE ma = 'HD005'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP004'), 1, 22990000);
+GO
+
+-- Cập nhật tổng tiền cho các hóa đơn có nhiều sản phẩm
+UPDATE hoa_don SET tong_tien_sau_giam = (SELECT SUM(so_luong * don_gia) FROM hoa_don_chi_tiet WHERE id_don_hang = hoa_don.id) WHERE ma IN ('HD001', 'HD002', 'HD003', 'HD004', 'HD005');
+GO
+
+-- 10. Thêm đánh giá (reviews) - ít nhất 10-15 đánh giá từ khách hàng
+-- Khai báo lại các biến trong batch mới
+DECLARE @khachHang1 UNIQUEIDENTIFIER;
+DECLARE @khachHang2 UNIQUEIDENTIFIER;
+DECLARE @khachHang3 UNIQUEIDENTIFIER;
+DECLARE @khachHang4 UNIQUEIDENTIFIER;
+DECLARE @khachHang5 UNIQUEIDENTIFIER;
+
+SELECT @khachHang1 = user_id FROM khach_hang WHERE ma_khach_hang = 'KH001';
+SELECT @khachHang2 = user_id FROM khach_hang WHERE ma_khach_hang = 'KH002';
+SELECT @khachHang3 = user_id FROM khach_hang WHERE ma_khach_hang = 'KH003';
+SELECT @khachHang4 = user_id FROM khach_hang WHERE ma_khach_hang = 'KH004';
+SELECT @khachHang5 = user_id FROM khach_hang WHERE ma_khach_hang = 'KH005';
+
+-- Sử dụng cách đơn giản: lấy hoa_don_chi_tiet_id từ các hóa đơn đã tạo
+DECLARE @hdct004_1 UNIQUEIDENTIFIER;
+DECLARE @hdct004_2 UNIQUEIDENTIFIER;
+DECLARE @hdct006_1 UNIQUEIDENTIFIER;
+DECLARE @hdct006_2 UNIQUEIDENTIFIER;
+DECLARE @hdct008_1 UNIQUEIDENTIFIER;
+DECLARE @hdct008_2 UNIQUEIDENTIFIER;
+DECLARE @hdct008_3 UNIQUEIDENTIFIER;
+
+SELECT TOP 1 @hdct004_1 = id FROM hoa_don_chi_tiet WHERE id_ctsp = (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP004');
+SELECT TOP 1 @hdct004_2 = id FROM hoa_don_chi_tiet WHERE id_ctsp = (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP004') AND id != @hdct004_1;
+SELECT TOP 1 @hdct006_1 = id FROM hoa_don_chi_tiet WHERE id_ctsp = (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP006');
+SELECT TOP 1 @hdct006_2 = id FROM hoa_don_chi_tiet WHERE id_ctsp = (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP006') AND id != @hdct006_1;
+SELECT TOP 1 @hdct008_1 = id FROM hoa_don_chi_tiet WHERE id_ctsp = (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP008');
+SELECT TOP 1 @hdct008_2 = id FROM hoa_don_chi_tiet WHERE id_ctsp = (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP008') AND id != @hdct008_1;
+SELECT TOP 1 @hdct008_3 = id FROM hoa_don_chi_tiet WHERE id_ctsp = (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP008') AND id != @hdct008_1 AND id != @hdct008_2;
+
+INSERT INTO danh_gia (khach_hang_id, san_pham_chi_tiet_id, hoa_don_chi_tiet_id, so_sao, noi_dung, trang_thai_danh_gia, ngay_danh_gia) VALUES
+-- Đánh giá cho CTSP004 (MSI Katana GF66) - best seller
+(@khachHang1, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP004'), @hdct004_1, 5, 'Laptop gaming rất tốt, chơi game mượt mà, thiết kế đẹp. Đáng giá tiền!', 1, DATEADD(DAY, -28, GETDATE())),
+(@khachHang2, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP004'), @hdct004_2, 4, 'Sản phẩm tốt, pin ổn định, nhưng hơi nặng một chút.', 1, DATEADD(DAY, -25, GETDATE())),
+-- Đánh giá cho CTSP006 (ASUS TUF Gaming F15)
+(@khachHang2, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP006'), @hdct006_1, 5, 'Laptop ASUS TUF rất bền, thiết kế quân đội đẹp, hiệu năng mạnh mẽ.', 1, DATEADD(DAY, -26, GETDATE())),
+(@khachHang3, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP006'), @hdct006_2, 4, 'Tốt, nhưng giá hơi cao so với các dòng khác.', 1, DATEADD(DAY, -20, GETDATE())),
+-- Đánh giá cho CTSP008 (Acer Nitro 5) - best seller
+(@khachHang1, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP008'), @hdct008_1, 5, 'Giá tốt, hiệu năng ổn định cho game thủ budget. Rất hài lòng!', 1, DATEADD(DAY, -23, GETDATE())),
+(@khachHang4, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP008'), @hdct008_2, 4, 'Laptop tốt, giá hợp lý, phù hợp cho sinh viên.', 1, DATEADD(DAY, -18, GETDATE())),
+(@khachHang3, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP008'), @hdct008_3, 5, 'Mua được laptop gaming giá tốt như này là quá tuyệt!', 1, DATEADD(DAY, -15, GETDATE())),
+-- Đánh giá cho CTSP013 (Dell Inspiron 15)
+(@khachHang2, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP013'), (SELECT TOP 1 id FROM hoa_don_chi_tiet WHERE id_ctsp = (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP013')), 4, 'Laptop văn phòng tốt, giá rẻ, phù hợp công việc hàng ngày.', 1, DATEADD(DAY, -18, GETDATE())),
+-- Đánh giá cho CTSP015 (ASUS VivoBook 15)
+(@khachHang2, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP015'), (SELECT TOP 1 id FROM hoa_don_chi_tiet WHERE id_ctsp = (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP015')), 5, 'Laptop mỏng nhẹ, pin trâu, thiết kế đẹp. Rất thích!', 1, DATEADD(DAY, -6, GETDATE())),
+-- Đánh giá cho CTSP021 (MacBook Air M3)
+(@khachHang1, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP021'), (SELECT TOP 1 id FROM hoa_don_chi_tiet WHERE id_ctsp = (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP021')), 5, 'MacBook Air M3 siêu mỏng nhẹ, pin 18 giờ, hiệu năng vượt trội. Đáng giá!', 1, DATEADD(DAY, -1, GETDATE())),
+-- Đánh giá cho CTSP011 (Lenovo Legion 5)
+(@khachHang3, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP011'), (SELECT TOP 1 id FROM hoa_don_chi_tiet WHERE id_ctsp = (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP011')), 5, 'Laptop gaming Lenovo Legion rất tốt, chơi game mượt, tản nhiệt tốt.', 1, DATEADD(DAY, -20, GETDATE())),
+-- Đánh giá cho CTSP014 (Dell Inspiron 15 nâng cấp)
+(@khachHang1, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP014'), (SELECT TOP 1 id FROM hoa_don_chi_tiet WHERE id_ctsp = (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP014')), 4, 'Laptop tốt, RAM 16GB đủ dùng, giá hợp lý.', 1, DATEADD(DAY, -13, GETDATE())),
+-- Đánh giá cho CTSP016 (ASUS VivoBook 15 nâng cấp)
+(@khachHang4, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP016'), (SELECT TOP 1 id FROM hoa_don_chi_tiet WHERE id_ctsp = (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP016')), 5, 'Laptop đẹp, hiệu năng tốt, pin lâu. Rất hài lòng!', 1, DATEADD(DAY, -3, GETDATE())),
+-- Đánh giá cho CTSP017 (Acer Aspire 5)
+(@khachHang5, (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP017'), (SELECT TOP 1 id FROM hoa_don_chi_tiet WHERE id_ctsp = (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP017')), 4, 'Laptop giá rẻ, phù hợp sinh viên, hiệu năng ổn định.', 1, DATEADD(DAY, 0, GETDATE()));
+GO
+
+-- 11. Thêm hóa đơn mới (HD016-HD025) để tạo best-selling rõ ràng
+DECLARE @khachHang1 UNIQUEIDENTIFIER;
+DECLARE @khachHang2 UNIQUEIDENTIFIER;
+DECLARE @khachHang3 UNIQUEIDENTIFIER;
+DECLARE @khachHang4 UNIQUEIDENTIFIER;
+DECLARE @khachHang5 UNIQUEIDENTIFIER;
+DECLARE @nhanVien1 UNIQUEIDENTIFIER;
+
+SELECT @khachHang1 = user_id FROM khach_hang WHERE ma_khach_hang = 'KH001';
+SELECT @khachHang2 = user_id FROM khach_hang WHERE ma_khach_hang = 'KH002';
+SELECT @khachHang3 = user_id FROM khach_hang WHERE ma_khach_hang = 'KH003';
+SELECT @khachHang4 = user_id FROM khach_hang WHERE ma_khach_hang = 'KH004';
+SELECT @khachHang5 = user_id FROM khach_hang WHERE ma_khach_hang = 'KH005';
+SELECT @nhanVien1 = user_id FROM nhan_vien WHERE ma_nhan_vien = 'NV002';
+
+-- Thêm 10 hóa đơn mới (HD016-HD025) với trang_thai=2 và trang_thai_thanh_toan=1
+INSERT INTO hoa_don (ma, id_khach_hang, id_nhan_vien, loai_hoa_don, trang_thai, trang_thai_thanh_toan, tong_tien_sau_giam, ngay_tao, ngay_thanh_toan, dia_chi, sdt, ten_khach_hang) VALUES
+('HD016', @khachHang1, @nhanVien1, 0, 2, 1, 22990000, DATEADD(DAY, -6, GETDATE()), DATEADD(DAY, -6, GETDATE()), '123 Đường Lê Lợi, Quận 1, TP.HCM', '0901234567', 'Nguyễn Văn An'),
+('HD017', @khachHang2, @nhanVien1, 0, 2, 1, 24990000, DATEADD(DAY, -5, GETDATE()), DATEADD(DAY, -5, GETDATE()), '456 Đường Nguyễn Huệ, Quận 1, TP.HCM', '0901234568', 'Trần Thị Bình'),
+('HD018', @khachHang3, @nhanVien1, 0, 2, 1, 19990000, DATEADD(DAY, -4, GETDATE()), DATEADD(DAY, -4, GETDATE()), '789 Đường Đồng Khởi, Quận 1, TP.HCM', '0901234569', 'Lê Văn Cường'),
+('HD019', @khachHang4, @nhanVien1, 0, 2, 1, 21990000, DATEADD(DAY, -3, GETDATE()), DATEADD(DAY, -3, GETDATE()), '321 Đường Pasteur, Quận 3, TP.HCM', '0901234570', 'Phạm Thị Dung'),
+('HD020', @khachHang5, @nhanVien1, 0, 2, 1, 27990000, DATEADD(DAY, -2, GETDATE()), DATEADD(DAY, -2, GETDATE()), '654 Đường Võ Văn Tần, Quận 3, TP.HCM', '0901234571', 'Hoàng Văn Em'),
+('HD021', @khachHang1, @nhanVien1, 0, 2, 1, 22990000, DATEADD(DAY, -1, GETDATE()), DATEADD(DAY, -1, GETDATE()), '123 Đường Lê Lợi, Quận 1, TP.HCM', '0901234567', 'Nguyễn Văn An'),
+('HD022', @khachHang2, @nhanVien1, 0, 2, 1, 24990000, DATEADD(DAY, -1, GETDATE()), DATEADD(DAY, -1, GETDATE()), '456 Đường Nguyễn Huệ, Quận 1, TP.HCM', '0901234568', 'Trần Thị Bình'),
+('HD023', @khachHang3, @nhanVien1, 0, 2, 1, 19990000, GETDATE(), GETDATE(), '789 Đường Đồng Khởi, Quận 1, TP.HCM', '0901234569', 'Lê Văn Cường'),
+('HD024', @khachHang4, @nhanVien1, 0, 2, 1, 21990000, GETDATE(), GETDATE(), '321 Đường Pasteur, Quận 3, TP.HCM', '0901234570', 'Phạm Thị Dung'),
+('HD025', @khachHang5, @nhanVien1, 0, 2, 1, 27990000, GETDATE(), GETDATE(), '654 Đường Võ Văn Tần, Quận 3, TP.HCM', '0901234571', 'Hoàng Văn Em');
+GO
+
+-- 12. Thêm chi tiết hóa đơn với các sản phẩm best-selling (CTSP004, CTSP006, CTSP008, CTSP009, CTSP005)
+-- Mỗi sản phẩm best-selling sẽ có ít nhất 3-5 lần mua
+INSERT INTO hoa_don_chi_tiet (id_don_hang, id_ctsp, so_luong, don_gia) VALUES
+-- CTSP004 (MSI Katana GF66) - best seller - thêm 5 lần mua
+((SELECT id FROM hoa_don WHERE ma = 'HD016'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP004'), 1, 22990000),
+((SELECT id FROM hoa_don WHERE ma = 'HD017'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP004'), 1, 22990000),
+((SELECT id FROM hoa_don WHERE ma = 'HD018'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP004'), 2, 22990000),
+((SELECT id FROM hoa_don WHERE ma = 'HD021'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP004'), 1, 22990000),
+((SELECT id FROM hoa_don WHERE ma = 'HD023'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP004'), 1, 22990000),
+-- CTSP006 (ASUS TUF Gaming F15) - best seller - thêm 4 lần mua
+((SELECT id FROM hoa_don WHERE ma = 'HD017'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP006'), 1, 24990000),
+((SELECT id FROM hoa_don WHERE ma = 'HD019'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP006'), 1, 24990000),
+((SELECT id FROM hoa_don WHERE ma = 'HD022'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP006'), 1, 24990000),
+((SELECT id FROM hoa_don WHERE ma = 'HD024'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP006'), 1, 24990000),
+-- CTSP008 (Acer Nitro 5) - best seller - thêm 5 lần mua
+((SELECT id FROM hoa_don WHERE ma = 'HD018'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP008'), 1, 19990000),
+((SELECT id FROM hoa_don WHERE ma = 'HD019'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP008'), 1, 19990000),
+((SELECT id FROM hoa_don WHERE ma = 'HD020'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP008'), 1, 19990000),
+((SELECT id FROM hoa_don WHERE ma = 'HD023'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP008'), 1, 19990000),
+((SELECT id FROM hoa_don WHERE ma = 'HD025'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP008'), 1, 19990000),
+-- CTSP009 (Acer Nitro 5 RTX 3060) - best seller - thêm 4 lần mua
+((SELECT id FROM hoa_don WHERE ma = 'HD016'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP009'), 1, 21990000),
+((SELECT id FROM hoa_don WHERE ma = 'HD020'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP009'), 1, 21990000),
+((SELECT id FROM hoa_don WHERE ma = 'HD021'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP009'), 1, 21990000),
+((SELECT id FROM hoa_don WHERE ma = 'HD024'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP009'), 1, 21990000),
+-- CTSP005 (MSI Katana GF66 RTX 3060) - best seller - thêm 3 lần mua
+((SELECT id FROM hoa_don WHERE ma = 'HD019'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP005'), 1, 27990000),
+((SELECT id FROM hoa_don WHERE ma = 'HD022'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP005'), 1, 27990000),
+((SELECT id FROM hoa_don WHERE ma = 'HD025'), (SELECT id FROM chi_tiet_san_pham WHERE ma_ctsp = 'CTSP005'), 1, 27990000);
+GO
+
+-- Cập nhật tổng tiền cho các hóa đơn mới
+UPDATE hoa_don SET tong_tien_sau_giam = (SELECT SUM(so_luong * don_gia) FROM hoa_don_chi_tiet WHERE id_don_hang = hoa_don.id) WHERE ma IN ('HD016', 'HD017', 'HD018', 'HD019', 'HD020', 'HD021', 'HD022', 'HD023', 'HD024', 'HD025');
+GO
+
+-- 13. Cập nhật ngay_tao cho sản phẩm mới (SP011-SP025) với ngày gần đây (1-7 ngày trước)
+UPDATE san_pham SET ngay_tao = DATEADD(DAY, -7, GETDATE()) WHERE ma_san_pham IN ('SP011', 'SP012');
+UPDATE san_pham SET ngay_tao = DATEADD(DAY, -6, GETDATE()) WHERE ma_san_pham IN ('SP013', 'SP014');
+UPDATE san_pham SET ngay_tao = DATEADD(DAY, -5, GETDATE()) WHERE ma_san_pham IN ('SP015', 'SP016');
+UPDATE san_pham SET ngay_tao = DATEADD(DAY, -4, GETDATE()) WHERE ma_san_pham IN ('SP017', 'SP018');
+UPDATE san_pham SET ngay_tao = DATEADD(DAY, -3, GETDATE()) WHERE ma_san_pham IN ('SP019', 'SP020');
+UPDATE san_pham SET ngay_tao = DATEADD(DAY, -2, GETDATE()) WHERE ma_san_pham IN ('SP021', 'SP022');
+UPDATE san_pham SET ngay_tao = DATEADD(DAY, -1, GETDATE()) WHERE ma_san_pham IN ('SP023', 'SP024', 'SP025');
+GO
+
+-- 14. Cập nhật ngay_tao cho sản phẩm cũ (SP001-SP010) với ngày xa hơn (30-60 ngày trước)
+UPDATE san_pham SET ngay_tao = DATEADD(DAY, -60, GETDATE()) WHERE ma_san_pham IN ('SP001', 'SP002');
+UPDATE san_pham SET ngay_tao = DATEADD(DAY, -55, GETDATE()) WHERE ma_san_pham IN ('SP003', 'SP004');
+UPDATE san_pham SET ngay_tao = DATEADD(DAY, -50, GETDATE()) WHERE ma_san_pham IN ('SP005', 'SP006');
+UPDATE san_pham SET ngay_tao = DATEADD(DAY, -45, GETDATE()) WHERE ma_san_pham IN ('SP007', 'SP008');
+UPDATE san_pham SET ngay_tao = DATEADD(DAY, -40, GETDATE()) WHERE ma_san_pham IN ('SP009', 'SP010');
+GO
+
+-- 15. Kiểm tra và đảm bảo flash sale có ít nhất 10 sản phẩm active
+-- Flash sale "Flash Sale Cuối Tuần" đã được tạo với ngayBatDau = GETDATE() và ngayKetThuc = DATEADD(DAY, 7, GETDATE())
+-- Đã có 15 sản phẩm trong dot_giam_gia_chi_tiet, đủ điều kiện
+-- Chỉ cần đảm bảo trang_thai = 1
+UPDATE dot_giam_gia SET trang_thai = 1 WHERE ten_km = 'Flash Sale Cuối Tuần' AND ngayBatDau <= GETDATE() AND ngayKetThuc >= GETDATE();
+GO
+
+PRINT 'Hoàn tất insert dữ liệu mẫu cho homepage components!';
+GO

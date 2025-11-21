@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -70,5 +71,28 @@ public class DotGiamGiaCustomerService {
         response.put("totalElements", idCtspPage.getTotalElements());
         
         return response;
+    }
+
+    /**
+     * Lấy danh sách banners cho homepage slider
+     * @param type Loại banner (main-slider, etc.)
+     * @return Danh sách banners với bannerImageUrl và đang active
+     */
+    public List<Map<String, Object>> getBanners(String type) {
+        Instant now = Instant.now();
+        List<DotGiamGia> activePromotions = repository.findByTrangThaiAndNgayBatDauLessThanEqualAndNgayKetThucGreaterThanEqualAndBannerImageUrlIsNotNull(1, now, now);
+        
+        return activePromotions.stream()
+                .map(promo -> {
+                    Map<String, Object> banner = new HashMap<>();
+                    banner.put("id", promo.getId());
+                    banner.put("title", promo.getTenKm());
+                    banner.put("description", promo.getMoTa());
+                    banner.put("image", promo.getBannerImageUrl());
+                    banner.put("link", "/promotions/campaigns/" + promo.getId());
+                    banner.put("buttonText", "Xem ngay");
+                    return banner;
+                })
+                .collect(java.util.stream.Collectors.toList());
     }
 }

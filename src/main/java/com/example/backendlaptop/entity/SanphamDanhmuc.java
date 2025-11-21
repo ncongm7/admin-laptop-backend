@@ -4,22 +4,24 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.UUID;
+
 @Getter
 @Setter
 @Entity
 @Table(name = "sanpham_danhmuc")
 public class SanphamDanhmuc {
-    @EmbeddedId
-    private SanphamDanhmucId id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column(name = "id", nullable = false)
+    private UUID id;
 
-    @MapsId("idSanPham")
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "id_san_pham", nullable = false)
+    @JoinColumn(name = "san_pham_id", nullable = false)
     private SanPham idSanPham;
 
-    @MapsId("idDanhMuc")
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "id_danh_muc", nullable = false)
+    @JoinColumn(name = "danh_muc_id", nullable = false)
     private DanhMuc idDanhMuc;
 
 }

@@ -22,4 +22,8 @@ public interface DotGiamGiaRepository extends JpaRepository<DotGiamGia, UUID> {
     // Tìm các chương trình sắp diễn ra (upcoming)
     Page<DotGiamGia> findByTrangThaiAndNgayBatDauAfter(
         Integer trangThai, Instant ngayBatDau, Pageable pageable);
+    
+    // Tìm các chương trình đang diễn ra có banner (không phân trang)
+    List<DotGiamGia> findByTrangThaiAndNgayBatDauLessThanEqualAndNgayKetThucGreaterThanEqualAndBannerImageUrlIsNotNull(
+        Integer trangThai, Instant ngayBatDau, Instant ngayKetThuc);
 }

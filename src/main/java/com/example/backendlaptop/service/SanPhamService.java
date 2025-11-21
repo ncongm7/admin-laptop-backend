@@ -9,11 +9,13 @@ import com.example.backendlaptop.entity.SanPham;
 import com.example.backendlaptop.expection.ApiException;
 import com.example.backendlaptop.repository.ChiTietSanPhamRepository;
 import com.example.backendlaptop.repository.DotGiamGiaChiTietRepository;
+import com.example.backendlaptop.repository.HinhAnhRepository;
 import com.example.backendlaptop.repository.SanPhamRepository;
 import com.example.backendlaptop.until.MapperUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +36,7 @@ public class SanPhamService {
     private final SanPhamRepository sanPhamRepository;
     private final ChiTietSanPhamRepository chiTietSanPhamRepository;
     private final DotGiamGiaChiTietRepository dotGiamGiaChiTietRepository;
+    private final HinhAnhRepository hinhAnhRepository;
     
     public SanPhamResponse createSanPham(SanPhamRequest request) {
         // Kiểm tra mã sản phẩm đã tồn tại
@@ -410,6 +413,19 @@ public class SanPhamService {
         // Tìm thông tin giảm giá từ dot_giam_gia_chi_tiet
         applyDiscountToResponse(chiTietSanPham, response);
         
+        // Load hình ảnh cho variant
+        List<com.example.backendlaptop.entity.HinhAnh> hinhAnhs = hinhAnhRepository.findByIdSpctId(chiTietSanPham.getId());
+        List<ChiTietSanPhamResponse.HinhAnhResponse> hinhAnhResponses = hinhAnhs.stream()
+                .map(ha -> {
+                    ChiTietSanPhamResponse.HinhAnhResponse imgResponse = new ChiTietSanPhamResponse.HinhAnhResponse();
+                    imgResponse.setId(ha.getId());
+                    imgResponse.setUrl(ha.getUrl());
+                    imgResponse.setAnhChinhDaiDien(ha.getAnhChinhDaiDien());
+                    return imgResponse;
+                })
+                .collect(Collectors.toList());
+        response.setHinhAnhs(hinhAnhResponses);
+        
         return response;
     }
     
@@ -459,5 +475,34 @@ public class SanPhamService {
             response.setGiaGiam(chiTietSanPham.getGiaBan());
             response.setPhanTramGiam(0);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public List<SanPhamResponse> getBestSellingProducts(Integer limit) {
+        // Lấy top sản phẩm bán chạy dựa trên số lượng bán từ hoa_don_chi_tiet
+        List<Object[]> bestSelling = chiTietSanPhamRepository.findBestSellingProducts(limit != null ? limit : 10);
+        
+        return bestSelling.stream()
+                .map(row -> {
+                    UUID sanPhamId = UUID.fromString(row[0].toString());
+                    SanPham sanPham = sanPhamRepository.findById(sanPhamId)
+                            .orElse(null);
+                    if (sanPham == null) return null;
+                    // Load variants và hình ảnh để hiển thị đầy đủ
+                    return enrichSanPhamWithVariants(sanPham);
+                })
+                .filter(response -> response != null)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<SanPhamResponse> getNewestProducts(Integer limit) {
+        // Lấy sản phẩm mới nhất sắp xếp theo ngay_tao DESC
+        List<SanPham> newestProducts = sanPhamRepository.findTopByTrangThaiOrderByNgayTaoDesc(
+                1, PageRequest.of(0, limit != null ? limit : 10));
+        
+        return newestProducts.stream()
+                .map(this::enrichSanPhamWithVariants)
+                .collect(Collectors.toList());
     }
 }

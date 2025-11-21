@@ -13,4 +13,7 @@ import java.util.UUID;
 public interface HoaDonRepository extends JpaRepository<HoaDon, UUID>, JpaSpecificationExecutor<HoaDon> {
     // Tìm các hóa đơn theo trạng thái
     List<HoaDon> findByTrangThai(TrangThaiHoaDon trangThai);
+    
+    // Đếm số lượng hóa đơn theo trạng thái
+    Long countByTrangThai(TrangThaiHoaDon trangThai);
 }

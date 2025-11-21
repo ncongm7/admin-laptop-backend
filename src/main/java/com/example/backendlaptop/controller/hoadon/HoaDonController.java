@@ -131,5 +131,35 @@ public class HoaDonController {
         HoaDonDetailResponse result = hoaDonService.huyDonHangOnline(idHoaDon, nhanVienId);
         return ResponseEntity.ok(new ResponseObject<>(result, "Hủy đơn hàng thành công"));
     }
+
+    /**
+     * API 6: Lấy danh sách đơn hàng online chờ xác nhận
+     * 
+     * GET /api/v1/hoa-don/pending-online
+     * 
+     * Chức năng:
+     * - Lấy danh sách đơn hàng online (loai_hoa_don = 1) ở trạng thái chờ xác nhận (trang_thai = 0)
+     * - Dùng cho Pending Order Ticker component
+     */
+    @GetMapping("/pending-online")
+    public ResponseEntity<ResponseObject<java.util.List<com.example.backendlaptop.dto.hoadon.PendingOrderResponse>>> getPendingOnlineOrders() {
+        java.util.List<com.example.backendlaptop.dto.hoadon.PendingOrderResponse> result = hoaDonService.getPendingOnlineOrders();
+        return ResponseEntity.ok(new ResponseObject<>(result, "Lấy danh sách đơn hàng chờ xác nhận thành công"));
+    }
+
+    /**
+     * API 7: Lấy số lượng hóa đơn theo từng trạng thái
+     * 
+     * GET /api/v1/hoa-don/status-counts
+     * 
+     * Chức năng:
+     * - Đếm số lượng hóa đơn theo từng trạng thái
+     * - Dùng cho hiển thị badge counts trên UI
+     */
+    @GetMapping("/status-counts")
+    public ResponseEntity<ResponseObject<com.example.backendlaptop.dto.hoadon.StatusCountResponse>> getStatusCounts() {
+        com.example.backendlaptop.dto.hoadon.StatusCountResponse result = hoaDonService.getStatusCounts();
+        return ResponseEntity.ok(new ResponseObject<>(result, "Lấy số lượng hóa đơn theo trạng thái thành công"));
+    }
 }
 

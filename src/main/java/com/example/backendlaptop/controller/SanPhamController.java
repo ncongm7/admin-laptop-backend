@@ -6,6 +6,7 @@ import com.example.backendlaptop.service.SanPhamService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -53,7 +54,22 @@ public class SanPhamController {
     }
     
     @GetMapping("/page")
-    public ResponseEntity<Page<SanPhamResponse>> getAllSanPham(Pageable pageable) {
+    public ResponseEntity<Page<SanPhamResponse>> getAllSanPham(
+            @RequestParam(value = "sortBy", required = false) String sortBy,
+            Pageable pageable) {
+        // Nếu sortBy = "best-selling", dùng method riêng
+        if (sortBy != null && sortBy.equalsIgnoreCase("best-selling")) {
+            int limit = pageable.getPageSize();
+            List<SanPhamResponse> bestSelling = sanPhamService.getBestSellingProducts(limit);
+            return ResponseEntity.ok(new PageImpl<>(bestSelling, pageable, bestSelling.size()));
+        }
+        // Nếu sortBy = "newest", dùng method riêng
+        if (sortBy != null && sortBy.equalsIgnoreCase("newest")) {
+            int limit = pageable.getPageSize();
+            List<SanPhamResponse> newest = sanPhamService.getNewestProducts(limit);
+            return ResponseEntity.ok(new PageImpl<>(newest, pageable, newest.size()));
+        }
+        // Mặc định: dùng method thông thường
         Page<SanPhamResponse> responses = sanPhamService.getAllSanPham(pageable);
         return ResponseEntity.ok(responses);
     }
@@ -207,6 +223,20 @@ public class SanPhamController {
             @RequestParam(required = false) String keyword,
             Pageable pageable) {
         Page<SanPhamResponse> responses = sanPhamService.searchSanPhamWithVariants(keyword, pageable);
+        return ResponseEntity.ok(responses);
+    }
+
+    @GetMapping("/best-selling")
+    public ResponseEntity<List<SanPhamResponse>> getBestSellingProducts(
+            @RequestParam(value = "limit", defaultValue = "10") Integer limit) {
+        List<SanPhamResponse> responses = sanPhamService.getBestSellingProducts(limit);
+        return ResponseEntity.ok(responses);
+    }
+
+    @GetMapping("/newest")
+    public ResponseEntity<List<SanPhamResponse>> getNewestProducts(
+            @RequestParam(value = "limit", defaultValue = "10") Integer limit) {
+        List<SanPhamResponse> responses = sanPhamService.getNewestProducts(limit);
         return ResponseEntity.ok(responses);
     }
 }

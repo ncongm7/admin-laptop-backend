@@ -9,6 +9,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/promotions/campaigns")
+@CrossOrigin("*")
 public class DotGiamGiaCustomerController {
     @Autowired
     private DotGiamGiaCustomerService dotGiamGiaCustomerService;
@@ -28,4 +29,10 @@ public class DotGiamGiaCustomerController {
     public ResponseObject<?> getCampaignDetail(@PathVariable UUID id, @RequestParam(value = "pageNo", defaultValue = "0") Integer pageNo) {
         return new ResponseObject<>(dotGiamGiaCustomerService.getCampaignDetail(id, pageNo));
     }
+
+    @GetMapping("/banners")
+    public ResponseObject<?> getBanners(@RequestParam(value = "type", defaultValue = "main-slider") String type) {
+        return new ResponseObject<>(dotGiamGiaCustomerService.getBanners(type));
+    }
 }
+

@@ -64,4 +64,14 @@ public class ChiTietSanPhamResponse {
     private Boolean coGiamGia;           // Có đang giảm giá không
     private Instant ngayBatDauGiam;      // Ngày bắt đầu giảm giá
     private Instant ngayKetThucGiam;     // Ngày kết thúc giảm giá
+    
+    // Hình ảnh của variant
+    private java.util.List<HinhAnhResponse> hinhAnhs;
+    
+    @Data
+    public static class HinhAnhResponse {
+        private UUID id;
+        private String url;
+        private Boolean anhChinhDaiDien;
+    }
 }
