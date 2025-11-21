@@ -6,9 +6,12 @@ import com.example.backendlaptop.entity.SerialDaBan;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.rmi.server.UID;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 @Getter
 @Setter
 public class PhieuBaoHanhResponse {
@@ -20,6 +23,7 @@ public class PhieuBaoHanhResponse {
     private Instant ngayBatDau;
     private Instant ngayKetThuc;
     private Integer trangThai;
+    private List<String> hinhAnh; // Danh sách URLs hình ảnh
 
     public PhieuBaoHanhResponse(PhieuBaoHanh entity){
         this.id = entity.getId();
@@ -58,6 +62,19 @@ public class PhieuBaoHanhResponse {
         this.ngayBatDau = entity.getNgayBatDau();
         this.ngayKetThuc = entity.getNgayKetThuc();
         this.trangThai = entity.getTrangThaiBaoHanh();
+        
+        // Parse JSON array từ hinhAnh
+        if (entity.getHinhAnh() != null && !entity.getHinhAnh().trim().isEmpty()) {
+            try {
+                ObjectMapper mapper = new ObjectMapper();
+                this.hinhAnh = mapper.readValue(entity.getHinhAnh(), new TypeReference<List<String>>() {});
+            } catch (Exception e) {
+                // Nếu parse lỗi, để null hoặc empty list
+                this.hinhAnh = null;
+            }
+        } else {
+            this.hinhAnh = null;
+        }
     }
 
 }

@@ -920,7 +920,6 @@ DELETE FROM vai_tro WHERE ma_vai_tro IN ('STAFF', 'MANAGER', 'CASHIER', 'CUSTOME
 PRINT 'Đã xóa các vai trò không dùng';
 GO
 */
-"ALTER TABLE cpu DROP COLUMN update_at; ALTER TABLE cpu ADD updated_at DATETIME2; ALTER TABLE gpu DROP COLUMN update_at; ALTER TABLE gpu ADD updated_at DATETIME2; ALTER TABLE ram DROP COLUMN update_at; ALTER TABLE ram ADD updated_at DATETIME2; ALTER TABLE o_cung DROP COLUMN update_at; ALTER TABLE o_cung ADD updated_at DATETIME2; ALTER TABLE loai_man_hinh DROP COLUMN update_at; ALTER TABLE loai_man_hinh ADD updated_at DATETIME2; ALTER TABLE pin DROP COLUMN update_at; ALTER TABLE pin ADD updated_at DATETIME2; ALTER TABLE mau_sac DROP COLUMN update_at; ALTER TABLE mau_sac ADD updated_at DATETIME2;"
 
 PRINT 'Hoàn tất cập nhật role!';
 PRINT 'Hệ thống hiện có 3 vai trò chính: ADMIN, NHAN_VIEN, KHACH_HANG';
@@ -933,6 +932,56 @@ GO
 -- LƯU Ý: Nếu chạy lại từ đầu (DROP DATABASE), các cột này đã có trong CREATE TABLE
 --        Các ALTER này chỉ cần thiết nếu database đã tồn tại từ trước
 -- ===================================================================================
+
+-- Sửa các cột updated_at cho các bảng danh mục (nếu có cột update_at cũ)
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('cpu') AND name = 'update_at')
+BEGIN
+    ALTER TABLE cpu DROP COLUMN update_at;
+    ALTER TABLE cpu ADD updated_at DATETIME2;
+END
+GO
+
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('gpu') AND name = 'update_at')
+BEGIN
+    ALTER TABLE gpu DROP COLUMN update_at;
+    ALTER TABLE gpu ADD updated_at DATETIME2;
+END
+GO
+
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('ram') AND name = 'update_at')
+BEGIN
+    ALTER TABLE ram DROP COLUMN update_at;
+    ALTER TABLE ram ADD updated_at DATETIME2;
+END
+GO
+
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('o_cung') AND name = 'update_at')
+BEGIN
+    ALTER TABLE o_cung DROP COLUMN update_at;
+    ALTER TABLE o_cung ADD updated_at DATETIME2;
+END
+GO
+
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('loai_man_hinh') AND name = 'update_at')
+BEGIN
+    ALTER TABLE loai_man_hinh DROP COLUMN update_at;
+    ALTER TABLE loai_man_hinh ADD updated_at DATETIME2;
+END
+GO
+
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('pin') AND name = 'update_at')
+BEGIN
+    ALTER TABLE pin DROP COLUMN update_at;
+    ALTER TABLE pin ADD updated_at DATETIME2;
+END
+GO
+
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('mau_sac') AND name = 'update_at')
+BEGIN
+    ALTER TABLE mau_sac DROP COLUMN update_at;
+    ALTER TABLE mau_sac ADD updated_at DATETIME2;
+END
+GO
 
 -- Kiểm tra và thêm cột loai_dot_giam_gia nếu chưa có
 IF NOT EXISTS (
@@ -1021,6 +1070,18 @@ GO
 
 
 -- =======HIỀN THÊM 21-11-2025============================================================================
+ALTER TABLE phieu_bao_hanh
+ADD mo_ta NVARCHAR(MAX),
+   chi_phi DECIMAL(18, 2) DEFAULT 0,
+   so_lan_sua_chua INT DEFAULT 0;
+   
+
+ALTER TABLE lich_su_bao_hanh
+ADD chi_phi DECIMAL(18, 2) DEFAULT 0,
+   phuong_thuc_sua_chua NVARCHAR(255),
+   ghi_chu_nhan_vien NVARCHAR(MAX);
+
+
 -- Bảng yêu cầu trả hàng
 CREATE TABLE yeu_cau_tra_hang (
    id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
@@ -1069,3 +1130,29 @@ CREATE TABLE lich_su_tra_hang (
    thoi_gian DATETIME2 DEFAULT GETDATE()
 );
 
+-- Thêm Foreign Keys cho bảng trả hàng
+ALTER TABLE yeu_cau_tra_hang ADD CONSTRAINT FK_YeuCauTraHang_HoaDon FOREIGN KEY (id_hoa_don) REFERENCES hoa_don(id);
+ALTER TABLE yeu_cau_tra_hang ADD CONSTRAINT FK_YeuCauTraHang_KhachHang FOREIGN KEY (id_khach_hang) REFERENCES khach_hang(user_id);
+ALTER TABLE yeu_cau_tra_hang ADD CONSTRAINT FK_YeuCauTraHang_NhanVien FOREIGN KEY (id_nhan_vien_xu_ly) REFERENCES nhan_vien(user_id);
+ALTER TABLE chi_tiet_tra_hang ADD CONSTRAINT FK_ChiTietTraHang_YeuCau FOREIGN KEY (id_yeu_cau_tra_hang) REFERENCES yeu_cau_tra_hang(id);
+ALTER TABLE chi_tiet_tra_hang ADD CONSTRAINT FK_ChiTietTraHang_HDCT FOREIGN KEY (id_hoa_don_chi_tiet) REFERENCES hoa_don_chi_tiet(id);
+ALTER TABLE chi_tiet_tra_hang ADD CONSTRAINT FK_ChiTietTraHang_SerialDaBan FOREIGN KEY (id_serial_da_ban) REFERENCES serial_da_ban(id);
+ALTER TABLE lich_su_tra_hang ADD CONSTRAINT FK_LichSuTraHang_YeuCau FOREIGN KEY (id_yeu_cau_tra_hang) REFERENCES yeu_cau_tra_hang(id);
+ALTER TABLE lich_su_tra_hang ADD CONSTRAINT FK_LichSuTraHang_NhanVien FOREIGN KEY (id_nhan_vien) REFERENCES nhan_vien(user_id);
+GO
+
+-- Thêm cột hinh_anh cho phieu_bao_hanh nếu chưa có
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('phieu_bao_hanh') AND name = 'hinh_anh')
+BEGIN
+    ALTER TABLE phieu_bao_hanh
+    ADD hinh_anh NVARCHAR(MAX) NULL;
+    PRINT 'Đã thêm cột hinh_anh cho phieu_bao_hanh';
+END
+ELSE
+BEGIN
+    PRINT 'Cột hinh_anh đã tồn tại trong phieu_bao_hanh';
+END
+GO
+
+PRINT 'Hoàn tất tạo các bảng trả hàng và cập nhật bảng bảo hành!';
+GO

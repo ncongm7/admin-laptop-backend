@@ -35,4 +35,8 @@ public class PhieuBaoHanh {
     @Column(name = "trang_thai_bao_hanh")
     private Integer trangThaiBaoHanh;
 
+    @Lob
+    @Column(name = "hinh_anh")
+    private String hinhAnh; // JSON array of URLs - Ví dụ: ["url1", "url2"]
+
 }

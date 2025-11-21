@@ -1,0 +1,94 @@
+Changed database context to 'master'.
+Nonqualified transactions are being rolled back. Estimated rollback completion: 0%.
+Nonqualified transactions are being rolled back. Estimated rollback completion: 100%.
+Database QuanLyBanHangLaptop_TheoERD1_New đã được xóa.
+Changed database context to 'QuanLyBanHangLaptop_TheoERD1_New'.
+Đã tạo UNIQUE INDEX UX_PBH_OnePerSdb thành công.
+Đã tạo UNIQUE INDEX UX_NhanVien_MaTaiKhoan_NotNull thành công.
+Đã tạo UNIQUE INDEX UQ_khach_hang_ma_tai_khoan_notnull thành công.
+Đã tạo INDEX IX_HoaDon_TrangThai_LoaiHoaDon thành công.
+Đã tạo INDEX IX_HoaDon_KhachHang_TrangThai thành công.
+Đã tạo INDEX IX_HoaDon_NgayTao_TrangThai thành công.
+
+(5 rows affected)
+
+(5 rows affected)
+
+(5 rows affected)
+
+(5 rows affected)
+
+(5 rows affected)
+
+(5 rows affected)
+
+(5 rows affected)
+
+(5 rows affected)
+
+(5 rows affected)
+
+(5 rows affected)
+
+(5 rows affected)
+
+(5 rows affected)
+
+(5 rows affected)
+
+(9 rows affected)
+
+(5 rows affected)
+
+(3 rows affected)
+
+(3 rows affected)
+
+(3 rows affected)
+
+(3 rows affected)
+
+(2 rows affected)
+
+(6 rows affected)
+
+(5 rows affected)
+
+(5 rows affected)
+
+(3 rows affected)
+Đã cập nhật giá nhập cho các sản phẩm hiện có
+
+(0 rows affected)
+Đã cập nhật version cho các chi tiết sản phẩm hiện có
+===================================================================================
+HOÀN TẤT TẠO DATABASE VÀ DỮ LIỆU MẪU
+Database: QuanLyBanHangLaptop_TheoERD1_New
+Tất cả các bảng, constraints, indexes và dữ liệu mẫu đã được tạo thành công!
+===================================================================================
+Bắt đầu cập nhật role...
+
+(1 rows affected)
+Đã tạo vai trò NHAN_VIEN
+
+(1 rows affected)
+Đã tạo vai trò KHACH_HANG
+
+(3 rows affected)
+Đã cập nhật các tài khoản STAFF/MANAGER/CASHIER thành NHAN_VIEN
+
+(5 rows affected)
+Đã cập nhật các tài khoản CUSTOMER thành KHACH_HANG
+Msg 103, Level 15, State 4, Server DESKTOP-675S91T\SQLEXPRESS, Line 1
+The identifier that starts with 'ALTER TABLE cpu DROP COLUMN update_at; ALTER TABLE cpu ADD updated_at DATETIME2; ALTER TABLE gpu DROP COLUMN update_at; ALTER TA' is too long. Maximum length is 128.
+Cột loai_dot_giam_gia đã tồn tại, bỏ qua
+Cột so_tien_giam_toi_da đã tồn tại, bỏ qua
+Cột gia_tri đã là DECIMAL hoặc không tồn tại, bỏ qua
+
+(0 rows affected)
+Đã set NOT NULL cho cột loai_dot_giam_gia
+
+(0 rows affected)
+Hoàn tất cập nhật bảng dot_giam_gia với loại giảm giá % và số tiền giảm tối đa!
+Đã thêm cột hinh_anh cho phieu_bao_hanh
+Hoàn tất tạo các bảng trả hàng và cập nhật bảng bảo hành!
