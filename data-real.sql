@@ -379,7 +379,15 @@ CREATE TABLE chat (
     khach_hang_id UNIQUEIDENTIFIER,
     nhan_vien_id UNIQUEIDENTIFIER,
     noi_dung NVARCHAR(MAX),
-    ngay_phan_hoi DATETIME2
+    ngay_phan_hoi DATETIME2 DEFAULT GETDATE(),
+    is_from_customer BIT DEFAULT 0, -- 1 = tin nhắn từ khách hàng, 0 = từ nhân viên
+    is_read BIT DEFAULT 0, -- Đã đọc chưa (0 = chưa đọc, 1 = đã đọc)
+    conversation_id UNIQUEIDENTIFIER, -- ID cuộc hội thoại để nhóm các tin nhắn
+    message_type NVARCHAR(50) DEFAULT 'text', -- Loại tin nhắn: text, image, file, system
+    file_url NVARCHAR(500), -- URL file/ảnh nếu có
+    reply_to_id UNIQUEIDENTIFIER, -- ID tin nhắn được reply (nếu có)
+    created_at DATETIME2 DEFAULT GETDATE(), -- Thời gian tạo
+    updated_at DATETIME2 DEFAULT GETDATE() -- Thời gian cập nhật
 );
 
 -- ===================================================================================
@@ -589,8 +597,16 @@ ALTER TABLE danh_gia ADD CONSTRAINT FK_DanhGia_HDCT FOREIGN KEY (hoa_don_chi_tie
 ALTER TABLE media_danh_gia ADD CONSTRAINT FK_MediaDanhGia_DanhGia FOREIGN KEY (danh_gia_id) REFERENCES danh_gia(id);
 ALTER TABLE phan_hoi_danh_gia ADD CONSTRAINT FK_PhanHoiDanhGia_DanhGia FOREIGN KEY (danh_gia_id) REFERENCES danh_gia(id);
 ALTER TABLE phan_hoi_danh_gia ADD CONSTRAINT FK_PhanHoiDanhGia_NhanVien FOREIGN KEY (nhan_vien_id) REFERENCES nhan_vien(user_id);
-ALTER TABLE chat ADD CONSTRAINT FK_Chat_KhachHang FOREIGN KEY (khach_hang_id) REFERENCES khach_hang(user_id);
-ALTER TABLE chat ADD CONSTRAINT FK_Chat_NhanVien FOREIGN KEY (nhan_vien_id) REFERENCES nhan_vien(user_id);
+-- Foreign Keys cho bảng chat
+ALTER TABLE chat ADD CONSTRAINT FK_Chat_KhachHang 
+    FOREIGN KEY (khach_hang_id) REFERENCES khach_hang(user_id) ON DELETE CASCADE;
+ALTER TABLE chat ADD CONSTRAINT FK_Chat_NhanVien 
+    FOREIGN KEY (nhan_vien_id) REFERENCES nhan_vien(user_id) ON DELETE SET NULL;
+-- Self-reference cho reply_to_id (tin nhắn được reply)
+ALTER TABLE chat ADD CONSTRAINT FK_Chat_ReplyTo 
+    FOREIGN KEY (reply_to_id) REFERENCES chat(id) ON DELETE NO ACTION;
+-- Self-reference cho conversation_id (nhóm tin nhắn theo cuộc hội thoại)
+-- Note: conversation_id có thể NULL hoặc trỏ đến tin nhắn đầu tiên trong cuộc hội thoại
 
 -- Point System
 ALTER TABLE tich_diem ADD CONSTRAINT FK_TichDiem_KhachHang FOREIGN KEY (user_id) REFERENCES khach_hang(user_id);
@@ -636,6 +652,18 @@ ON dbo.khach_hang(ma_tai_khoan)
 WHERE ma_tai_khoan IS NOT NULL;
 
 PRINT 'Đã tạo UNIQUE INDEX UQ_khach_hang_ma_tai_khoan_notnull thành công.';
+GO
+
+-- Indexes cho bảng chat: Tối ưu truy vấn chat
+CREATE INDEX IX_Chat_KhachHangId ON chat(khach_hang_id);
+CREATE INDEX IX_Chat_NhanVienId ON chat(nhan_vien_id);
+CREATE INDEX IX_Chat_ConversationId ON chat(conversation_id) WHERE conversation_id IS NOT NULL;
+CREATE INDEX IX_Chat_NgayPhanHoi ON chat(ngay_phan_hoi);
+CREATE INDEX IX_Chat_IsRead ON chat(is_read) WHERE is_read = 0; -- Filtered index cho tin nhắn chưa đọc
+CREATE INDEX IX_Chat_IsFromCustomer ON chat(is_from_customer);
+CREATE INDEX IX_Chat_CreatedAt ON chat(created_at);
+
+PRINT 'Đã tạo indexes cho bảng chat thành công.';
 GO
 
 -- Indexes cho bảng hoa_don: Tối ưu query đơn hàng online

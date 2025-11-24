@@ -8,6 +8,7 @@ import com.example.backendlaptop.entity.PhieuGiamGia;
 import com.example.backendlaptop.expection.ApiException;
 import com.example.backendlaptop.model.TrangThaiHoaDon;
 import com.example.backendlaptop.repository.PhieuGiamGiaRepository;
+import com.example.backendlaptop.repository.PhieuGiamGiaKhachHangRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,9 @@ public class KhuyenMaiService {
 
     @Autowired
     private PhieuGiamGiaRepository phieuGiamGiaRepository;
+    
+    @Autowired
+    private PhieuGiamGiaKhachHangRepository phieuGiamGiaKhachHangRepository;
 
     @Autowired
     private BanHangHoaDonService hoaDonService;
@@ -93,11 +97,18 @@ public class KhuyenMaiService {
                     // Kiểm tra voucher riêng tư
                     if (Boolean.TRUE.equals(pgg.getRiengTu())) {
                         // Voucher riêng tư - chỉ áp dụng cho khách hàng cụ thể
-                        // TODO: Nếu có bảng liên kết PhieuGiamGia với KhachHang, kiểm tra ở đây
                         if (idKhachHang == null) {
                             System.out.println("    ❌ Bị loại: Voucher riêng tư nhưng không có khách hàng");
                             return false; // Khách lẻ không dùng được voucher riêng tư
                         }
+                        // Kiểm tra khách hàng có quyền sử dụng voucher này không
+                        boolean coQuyen = phieuGiamGiaKhachHangRepository.existsByPhieuGiamGia_IdAndKhachHang_Id(
+                            pgg.getId(), idKhachHang);
+                        if (!coQuyen) {
+                            System.out.println("    ❌ Bị loại: Khách hàng không có quyền sử dụng voucher riêng tư này");
+                            return false; // Khách hàng không có trong danh sách được gán voucher
+                        }
+                        System.out.println("    ✅ Khách hàng có quyền sử dụng voucher riêng tư");
                     }
                     
                     System.out.println("    ✅ Voucher hợp lệ!");
@@ -258,7 +269,12 @@ public class KhuyenMaiService {
             if (idKhachHang == null) {
                 throw new ApiException("Voucher này chỉ dành cho khách hàng thành viên", "VOUCHER_PRIVATE");
             }
-            // TODO: Nếu có bảng liên kết, kiểm tra khách hàng có quyền dùng voucher này không
+            // Kiểm tra khách hàng có quyền sử dụng voucher này không
+            boolean coQuyen = phieuGiamGiaKhachHangRepository.existsByPhieuGiamGia_IdAndKhachHang_Id(
+                phieuGiamGia.getId(), idKhachHang);
+            if (!coQuyen) {
+                throw new ApiException("Bạn không có quyền sử dụng phiếu giảm giá này", "VOUCHER_NO_PERMISSION");
+            }
         }
     }
     

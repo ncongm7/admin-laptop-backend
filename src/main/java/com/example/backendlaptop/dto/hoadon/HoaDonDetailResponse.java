@@ -171,8 +171,13 @@ public class HoaDonDetailResponse {
         private Integer soLuong;
         private BigDecimal donGia;
         private BigDecimal thanhTien;
+        private List<String> serialNumbers; // Danh sách serial đã quét (từ SerialDaBan)
         
         public SanPhamInfo(HoaDonChiTiet hdct) {
+            this(hdct, null);
+        }
+        
+        public SanPhamInfo(HoaDonChiTiet hdct, List<String> serialNumbers) {
             this.id = hdct.getId();
             this.soLuong = hdct.getSoLuong();
             this.donGia = hdct.getDonGia();
@@ -189,6 +194,9 @@ public class HoaDonDetailResponse {
                     this.tenSanPham = hdct.getChiTietSanPham().getSanPham().getTenSanPham();
                 }
             }
+            
+            // Map serial numbers
+            this.serialNumbers = serialNumbers;
         }
     }
     

@@ -103,7 +103,22 @@ public class HoaDonService {
 
             System.out.println("✅ [HoaDonService] Tìm thấy hóa đơn: " + hoaDon.getMa());
             
-            return new HoaDonDetailResponse(hoaDon);
+            // Load serial numbers cho từng chi tiết hóa đơn
+            HoaDonDetailResponse response = new HoaDonDetailResponse(hoaDon);
+            
+            // Map serial numbers vào từng sản phẩm
+            if (response.getChiTietList() != null) {
+                for (HoaDonDetailResponse.SanPhamInfo sanPham : response.getChiTietList()) {
+                    List<SerialDaBan> serials = serialDaBanRepository.findByIdHoaDonChiTiet_Id(sanPham.getId());
+                    List<String> serialNumbers = serials.stream()
+                        .map(sdb -> sdb.getIdSerial() != null ? sdb.getIdSerial().getSerialNo() : null)
+                        .filter(sn -> sn != null)
+                        .collect(Collectors.toList());
+                    sanPham.setSerialNumbers(serialNumbers);
+                }
+            }
+            
+            return response;
         } catch (ApiException e) {
             throw e;
         } catch (Exception e) {

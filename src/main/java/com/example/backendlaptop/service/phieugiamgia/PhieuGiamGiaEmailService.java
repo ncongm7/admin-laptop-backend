@@ -10,7 +10,6 @@ import com.example.backendlaptop.service.EmailService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -54,6 +53,23 @@ public class PhieuGiamGiaEmailService {
                 System.err.println("Lỗi khi gửi email cho khách hàng " + customerId + ": " + e.getMessage());
             }
         }
+    }
+    
+    public void guiEmailXinLoiKhiXoaKhachHang(UUID phieuGiamGiaId, UUID customerId) {
+        PhieuGiamGia phieuGiamGia = phieuGiamGiaRepository.findById(phieuGiamGiaId)
+                .orElseThrow(() -> new ApiException("Không tìm thấy phiếu giảm giá", "NOT_FOUND"));
+        
+        KhachHang khachHang = khachHangRepository.findById(customerId)
+                .orElseThrow(() -> new ApiException("Không tìm thấy khách hàng", "NOT_FOUND"));
+        
+        if (khachHang.getEmail() == null || khachHang.getEmail().trim().isEmpty()) {
+            throw new ApiException("Khách hàng chưa có email", "BAD_REQUEST");
+        }
+        
+        String subject = "Thông báo về phiếu giảm giá từ Dell Viet Laptop";
+        String htmlContent = buildEmailXinLoiContent(khachHang, phieuGiamGia);
+        
+        emailService.sendPhieuGiamGiaEmail(khachHang.getEmail(), subject, htmlContent);
     }
     
     private String buildPhieuGiamGiaEmailContent(KhachHang khachHang, PhieuGiamGia phieuGiamGia) {
@@ -113,6 +129,50 @@ public class PhieuGiamGiaEmailService {
             </body>
             </html>
             """, tenKhachHang, tenPhieu, maPhieu, giaTriGiamGia, ngayHetHan);
+    }
+    
+    private String buildEmailXinLoiContent(KhachHang khachHang, PhieuGiamGia phieuGiamGia) {
+        String tenKhachHang = khachHang.getHoTen() != null ? khachHang.getHoTen() : "Quý khách";
+        String maPhieu = phieuGiamGia.getMa() != null ? phieuGiamGia.getMa() : "";
+        String tenPhieu = phieuGiamGia.getTenPhieuGiamGia() != null ? phieuGiamGia.getTenPhieuGiamGia() : "";
+        
+        return String.format("""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background-color: #dc3545; color: white; padding: 20px; text-align: center; }
+                    .content { padding: 20px; background-color: #f9f9f9; }
+                    .apology-box { border: 2px solid #dc3545; padding: 20px; margin: 20px 0; text-align: center; background-color: white; border-radius: 5px; }
+                    .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>Dell Viet Laptop</h1>
+                    </div>
+                    <div class="content">
+                        <p>Xin chào <strong>%s</strong>,</p>
+                        <p>Chúng tôi rất tiếc phải thông báo rằng phiếu giảm giá <strong>%s</strong> (Mã: <strong>%s</strong>) đã được thu hồi khỏi tài khoản của bạn.</p>
+                        <div class="apology-box">
+                            <h2>Xin Lỗi Về Sự Bất Tiện</h2>
+                            <p>Chúng tôi chân thành xin lỗi về sự bất tiện này. Việc thu hồi phiếu giảm giá có thể do các lý do kỹ thuật hoặc chính sách của công ty.</p>
+                        </div>
+                        <p>Chúng tôi cam kết sẽ tiếp tục mang đến cho bạn những ưu đãi tốt nhất trong tương lai.</p>
+                        <p>Nếu bạn có bất kỳ thắc mắc nào, vui lòng liên hệ với chúng tôi qua email hoặc hotline.</p>
+                        <p>Trân trọng,<br>Đội ngũ Dell Viet Laptop</p>
+                    </div>
+                    <div class="footer">
+                        <p>© 2024 Dell Viet Laptop. Tất cả quyền được bảo lưu.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """, tenKhachHang, tenPhieu, maPhieu);
     }
 }
 

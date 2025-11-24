@@ -52,5 +52,17 @@ public class PhieuGiamGiaKhachHangController {
         service.capNhatKhachHangChoPhieuGiamGia(phieuGiamGiaId, request.getKhachHangIds());
         return new ResponseObject<>(null, "Cập nhật khách hàng cho phiếu giảm giá thành công");
     }
+    
+    @DeleteMapping("/{phieuGiamGiaId}/khach-hang/{khachHangId}")
+    public ResponseObject<?> xoaKhachHangKhoiPhieuGiamGia(
+            @PathVariable UUID phieuGiamGiaId,
+            @PathVariable UUID khachHangId,
+            @RequestParam(defaultValue = "true") boolean guiEmailXinLoi) {
+        service.xoaKhachHangKhoiPhieuGiamGia(phieuGiamGiaId, khachHangId, guiEmailXinLoi);
+        String message = guiEmailXinLoi 
+            ? "Đã xóa khách hàng khỏi phiếu giảm giá và gửi email xin lỗi thành công"
+            : "Đã xóa khách hàng khỏi phiếu giảm giá thành công";
+        return new ResponseObject<>(null, message);
+    }
 }
 

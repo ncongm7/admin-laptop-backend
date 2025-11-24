@@ -38,6 +38,9 @@ public class PhieuGiamGiaKhachHangService {
     @Autowired
     private KhachHangRepository khachHangRepository;
     
+    @Autowired
+    private PhieuGiamGiaEmailService emailService;
+    
     @Transactional
     public void ganPhieuGiamGiaChoKhachHang(GanPhieuGiamGiaChoKhachHangRequest request) {
         PhieuGiamGia phieuGiamGia = phieuGiamGiaRepository.findById(request.getPhieuGiamGiaId())
@@ -220,6 +223,33 @@ public class PhieuGiamGiaKhachHangService {
                 .map(PhieuGiamGiaKhachHang::getKhachHang)
                 .map(KhachHangPhieuGiamGiaResponse::new)
                 .collect(Collectors.toList());
+    }
+    
+    @Transactional
+    public void xoaKhachHangKhoiPhieuGiamGia(UUID phieuGiamGiaId, UUID khachHangId, boolean guiEmailXinLoi) {
+        PhieuGiamGia phieuGiamGia = phieuGiamGiaRepository.findById(phieuGiamGiaId)
+                .orElseThrow(() -> new ApiException("Không tìm thấy phiếu giảm giá", "NOT_FOUND"));
+        
+        if (phieuGiamGia.getRiengTu() == null || !phieuGiamGia.getRiengTu()) {
+            throw new ApiException("Chỉ có thể xóa khách hàng khỏi phiếu giảm giá cá nhân", "BAD_REQUEST");
+        }
+        
+        if (!repository.existsByPhieuGiamGia_IdAndKhachHang_Id(phieuGiamGiaId, khachHangId)) {
+            throw new ApiException("Khách hàng không có trong danh sách phiếu giảm giá này", "NOT_FOUND");
+        }
+        
+        // Xóa khách hàng khỏi phiếu giảm giá
+        repository.deleteByPhieuGiamGia_IdAndKhachHang_Id(phieuGiamGiaId, khachHangId);
+        
+        // Gửi email xin lỗi nếu được yêu cầu
+        if (guiEmailXinLoi) {
+            try {
+                emailService.guiEmailXinLoiKhiXoaKhachHang(phieuGiamGiaId, khachHangId);
+            } catch (Exception e) {
+                // Log lỗi nhưng không throw để đảm bảo việc xóa vẫn thành công
+                System.err.println("Lỗi khi gửi email xin lỗi cho khách hàng " + khachHangId + ": " + e.getMessage());
+            }
+        }
     }
 }
 

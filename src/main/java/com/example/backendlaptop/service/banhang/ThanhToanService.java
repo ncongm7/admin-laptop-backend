@@ -255,6 +255,28 @@ public class ThanhToanService {
         hoaDon.setTrangThai(TrangThaiHoaDon.DA_THANH_TOAN);
         hoaDon.setTrangThaiThanhToan(1); // 1: Đã thanh toán
         hoaDon.setNgayThanhToan(Instant.now());
+        
+        // 5.1. Cập nhật thông tin giao hàng (nếu có)
+        if (Boolean.TRUE.equals(request.getCanGiaoHang())) {
+            // Nếu có thông tin người nhận riêng, cập nhật vào hóa đơn
+            if (request.getTenNguoiNhan() != null && !request.getTenNguoiNhan().trim().isEmpty()) {
+                hoaDon.setTenKhachHang(request.getTenNguoiNhan());
+            }
+            if (request.getSdtNguoiNhan() != null && !request.getSdtNguoiNhan().trim().isEmpty()) {
+                hoaDon.setSdt(request.getSdtNguoiNhan());
+            }
+            if (request.getDiaChiGiaoHang() != null && !request.getDiaChiGiaoHang().trim().isEmpty()) {
+                hoaDon.setDiaChi(request.getDiaChiGiaoHang());
+            }
+            // Thêm ghi chú giao hàng vào ghi chú hóa đơn (nếu có)
+            if (request.getGhiChuGiaoHang() != null && !request.getGhiChuGiaoHang().trim().isEmpty()) {
+                String ghiChuHienTai = hoaDon.getGhiChu() != null ? hoaDon.getGhiChu() : "";
+                String ghiChuMoi = ghiChuHienTai.isEmpty() 
+                    ? "Giao hàng: " + request.getGhiChuGiaoHang()
+                    : ghiChuHienTai + "\nGiao hàng: " + request.getGhiChuGiaoHang();
+                hoaDon.setGhiChu(ghiChuMoi);
+            }
+        }
 
         // 6. Ghi nhận chi tiết thanh toán
         PhuongThucThanhToan pttt = phuongThucThanhToanRepository.findById(request.getIdPhuongThucThanhToan())

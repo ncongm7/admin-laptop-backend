@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": "../admin-laptop"
+		},
+		{
+			"path": "."
+		},
+		{
+			"path": "../web-lap-top"
+		}
+	],
+	"settings": {
+		"java.compile.nullAnalysis.mode": "automatic"
+	}
+}

@@ -30,5 +30,12 @@ public class ThanhToanRequest {
      */
     @Valid
     private List<SerialThanhToanItem> serialNumbers;
+    
+    // Thông tin giao hàng (nếu cần)
+    private Boolean canGiaoHang; // Có cần giao hàng không
+    private String tenNguoiNhan; // Tên người nhận (nếu khác khách hàng)
+    private String sdtNguoiNhan; // Số điện thoại người nhận
+    private String diaChiGiaoHang; // Địa chỉ giao hàng
+    private String ghiChuGiaoHang; // Ghi chú giao hàng
 }
 
