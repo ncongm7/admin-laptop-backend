@@ -28,4 +28,6 @@ public interface PhieuBaoHanhRepository extends JpaRepository<PhieuBaoHanh, UUID
            "LEFT JOIN FETCH ctsp.sanPham " +
            "WHERE pbh.id = :id")
     Optional<PhieuBaoHanh> findByIdWithRelations(UUID id);
+
+    Optional<PhieuBaoHanh> findByIdSerialDaBan_Id(UUID idSerialDaBan);
 }
