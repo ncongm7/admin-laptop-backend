@@ -209,9 +209,24 @@ public class CustomerOrderService {
                     .orElseThrow(() -> new ApiException("Không tìm thấy đơn hàng", "ORDER_NOT_FOUND"));
 
             // 2. Kiểm tra quyền: đơn hàng phải thuộc về khách hàng này
-            if (hoaDon.getIdKhachHang() == null || !hoaDon.getIdKhachHang().getId().equals(khachHangId)) {
+            System.out.println("[CustomerOrderService] huyDonHang - khachHangId từ request: " + khachHangId);
+            System.out.println("[CustomerOrderService] huyDonHang - hoaDon.getIdKhachHang(): " + hoaDon.getIdKhachHang());
+            
+            if (hoaDon.getIdKhachHang() == null) {
+                System.out.println("⚠️ [CustomerOrderService] huyDonHang - Đơn hàng không có khách hàng (khách lẻ)");
                 throw new ApiException("Bạn không có quyền hủy đơn hàng này", "UNAUTHORIZED");
             }
+            
+            UUID orderKhachHangId = hoaDon.getIdKhachHang().getId();
+            System.out.println("🔍 [CustomerOrderService] huyDonHang - orderKhachHangId: " + orderKhachHangId);
+            System.out.println("🔍 [CustomerOrderService] huyDonHang - IDs match: " + orderKhachHangId.equals(khachHangId));
+            
+            if (!orderKhachHangId.equals(khachHangId)) {
+                System.out.println("❌ [CustomerOrderService] huyDonHang - ID không khớp!");
+                throw new ApiException("Bạn không có quyền hủy đơn hàng này", "UNAUTHORIZED");
+            }
+            
+            System.out.println("✅ [CustomerOrderService] huyDonHang - Quyền hợp lệ, tiếp tục hủy đơn hàng");
 
             // 3. Kiểm tra trạng thái: chỉ hủy được khi CHO_THANH_TOAN (chưa trừ kho)
             if (hoaDon.getTrangThai() != TrangThaiHoaDon.CHO_THANH_TOAN) {
