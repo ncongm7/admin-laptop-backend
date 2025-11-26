@@ -39,4 +39,13 @@ public class PhieuBaoHanh {
     @Column(name = "hinh_anh")
     private String hinhAnh; // JSON array of URLs - Ví dụ: ["url1", "url2"]
 
+    @Lob
+    @Column(name = "mo_ta")
+    private String moTa;
+
+    @Column(name = "chi_phi")
+    private java.math.BigDecimal chiPhi;
+
+    @Column(name = "so_lan_sua_chua")
+    private Integer soLanSuaChua;
 }

@@ -21,6 +21,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -36,6 +37,7 @@ public class TraHangService {
     private final HoaDonChiTietRepository hoaDonChiTietRepository;
     private final SerialDaBanRepository serialDaBanRepository;
     private final KhachHangRepository khachHangRepository;
+    private final PhieuBaoHanhRepository phieuBaoHanhRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -170,6 +172,12 @@ public class TraHangService {
             if (request.getIdSerialDaBan() != null) {
                 serialDaBan = serialDaBanRepository.findById(request.getIdSerialDaBan())
                         .orElseThrow(() -> new ApiException("Không tìm thấy serial", "NOT_FOUND"));
+            } else {
+                List<SerialDaBan> serialsOfDetail =
+                        serialDaBanRepository.findByIdHoaDonChiTiet_Id(request.getIdHoaDonChiTiet());
+                if (!serialsOfDetail.isEmpty()) {
+                    serialDaBan = serialsOfDetail.get(0);
+                }
             }
 
             // 2. Tính số ngày sau khi mua
@@ -223,7 +231,6 @@ public class TraHangService {
 
             // 6. Tạo entity YeuCauTraHang
             YeuCauTraHang yeuCau = new YeuCauTraHang();
-            yeuCau.setId(UUID.randomUUID());
             yeuCau.setIdHoaDon(hoaDon);
             yeuCau.setIdKhachHang(khachHang);
             yeuCau.setMaYeuCau(maYeuCau);
@@ -241,7 +248,6 @@ public class TraHangService {
 
             // 8. Tạo ChiTietTraHang
             ChiTietTraHang chiTiet = new ChiTietTraHang();
-            chiTiet.setId(UUID.randomUUID());
             chiTiet.setIdYeuCauTraHang(savedYeuCau);
             chiTiet.setIdHoaDonChiTiet(hoaDonChiTiet);
             if (serialDaBan != null) {
@@ -267,9 +273,56 @@ public class TraHangService {
             chiTiet.setNgayTao(now);
             chiTietTraHangRepository.save(chiTiet);
 
-            // 9. Tạo LichSuTraHang
+            // 9. Nếu yêu cầu bảo hành thì tạo phiếu bảo hành
+            if (request.getLoaiYeuCau() != null && request.getLoaiYeuCau() == 1) {
+                PhieuBaoHanh phieuBaoHanh;
+                if (serialDaBan != null) {
+                    phieuBaoHanh = phieuBaoHanhRepository.findByIdSerialDaBan_Id(serialDaBan.getId())
+                            .orElseGet(PhieuBaoHanh::new);
+                } else {
+                    phieuBaoHanh = new PhieuBaoHanh();
+                }
+
+                if (phieuBaoHanh.getId() == null) {
+                    phieuBaoHanh.setId(UUID.randomUUID());
+                }
+
+                phieuBaoHanh.setIdKhachHang(khachHang);
+                if (serialDaBan != null) {
+                    phieuBaoHanh.setIdSerialDaBan(serialDaBan);
+                }
+
+                String tenSanPham = null;
+                if (hoaDonChiTiet.getChiTietSanPham() != null
+                        && hoaDonChiTiet.getChiTietSanPham().getSanPham() != null) {
+                    tenSanPham = hoaDonChiTiet.getChiTietSanPham().getSanPham().getTenSanPham();
+                }
+
+                phieuBaoHanh.setMoTa(request.getMoTaTinhTrang() != null && !request.getMoTaTinhTrang().isBlank()
+                        ? request.getMoTaTinhTrang()
+                        : String.format("Yêu cầu bảo hành cho sản phẩm %s (đơn %s)",
+                        tenSanPham != null ? tenSanPham : "Không xác định",
+                        hoaDon.getMa()));
+                phieuBaoHanh.setChiPhi(BigDecimal.ZERO);
+                if (phieuBaoHanh.getSoLanSuaChua() == null) {
+                    phieuBaoHanh.setSoLanSuaChua(0);
+                }
+                phieuBaoHanh.setNgayBatDau(now);
+                phieuBaoHanh.setNgayKetThuc(now.plus(365, ChronoUnit.DAYS));
+                phieuBaoHanh.setTrangThaiBaoHanh(1); // 1: chờ xác nhận
+
+                if (!hinhAnhUrls.isEmpty()) {
+                    try {
+                        phieuBaoHanh.setHinhAnh(objectMapper.writeValueAsString(hinhAnhUrls));
+                    } catch (Exception e) {
+                        phieuBaoHanh.setHinhAnh(String.join(",", hinhAnhUrls));
+                    }
+                }
+                phieuBaoHanhRepository.save(phieuBaoHanh);
+            }
+
+            // 10. Tạo LichSuTraHang
             LichSuTraHang lichSu = new LichSuTraHang();
-            lichSu.setId(UUID.randomUUID());
             lichSu.setIdYeuCauTraHang(savedYeuCau);
             lichSu.setHanhDong("CREATE");
             lichSu.setMoTa("Khách hàng tạo yêu cầu trả hàng");
