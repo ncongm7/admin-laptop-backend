@@ -31,6 +31,11 @@ public class HoaDonDetailResponse {
     private Integer soDiemSuDung;
     private BigDecimal soTienQuyDoi;
     
+    // Thông tin giao hàng (lưu khi đặt hàng)
+    private String tenKhachHang;
+    private String soDienThoai;
+    private String diaChi;
+    
     // Fields hỗ trợ frontend
     private String trangThaiDisplay; // Text hiển thị trạng thái
     private Boolean canCancel; // Có thể hủy không (chỉ khi CHO_THANH_TOAN)
@@ -63,6 +68,11 @@ public class HoaDonDetailResponse {
         this.soDiemSuDung = hoaDon.getSoDiemSuDung();
         this.soTienQuyDoi = hoaDon.getSoTienQuyDoi();
         
+        // Thông tin giao hàng (lưu khi đặt hàng)
+        this.tenKhachHang = hoaDon.getTenKhachHang();
+        this.soDienThoai = hoaDon.getSdt();
+        this.diaChi = hoaDon.getDiaChi();
+        
         // Tính toán các field hỗ trợ frontend
         this.trangThaiDisplay = getTrangThaiDisplay(hoaDon.getTrangThai());
         this.canCancel = hoaDon.getTrangThai() == TrangThaiHoaDon.CHO_THANH_TOAN;
@@ -71,7 +81,8 @@ public class HoaDonDetailResponse {
         
         // Map thông tin khách hàng
         if (hoaDon.getIdKhachHang() != null) {
-            this.khachHang = new KhachHangInfo(hoaDon.getIdKhachHang());
+            // Lấy thông tin từ entity KhachHang, nhưng ưu tiên địa chỉ từ hóa đơn (địa chỉ khi đặt hàng)
+            this.khachHang = new KhachHangInfo(hoaDon.getIdKhachHang(), hoaDon.getDiaChi());
         } else {
             // Khách vãng lai
             this.khachHang = new KhachHangInfo(
@@ -134,11 +145,17 @@ public class HoaDonDetailResponse {
         private String diaChi;
         
         public KhachHangInfo(KhachHang kh) {
+            this(kh, null);
+        }
+        
+        public KhachHangInfo(KhachHang kh, String diaChiTuHoaDon) {
             this.id = kh.getId(); // FIXED: Dùng getId() thay vì getUserId()
             this.hoTen = kh.getHoTen();
             this.soDienThoai = kh.getSoDienThoai();
             this.email = kh.getEmail();
-            // Địa chỉ có thể lấy từ bảng dia_chi hoặc từ hóa đơn
+            // Ưu tiên địa chỉ từ hóa đơn (địa chỉ khi đặt hàng), nếu không có thì để null
+            // Frontend có thể lấy từ order.diaChi trực tiếp
+            this.diaChi = diaChiTuHoaDon;
         }
         
         public KhachHangInfo(String hoTen, String sdt, String diaChi) {
