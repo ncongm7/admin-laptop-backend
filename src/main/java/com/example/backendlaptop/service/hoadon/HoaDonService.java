@@ -135,6 +135,14 @@ public class HoaDonService {
      */
     private Specification<HoaDon> buildSpecification(HoaDonSearchRequest request) {
         return (root, query, criteriaBuilder) -> {
+            // Fetch join để tránh N+1 query và vòng lặp
+            if (query != null && query.getResultType() != null) {
+                if (query.getResultType() != Long.class && query.getResultType() != long.class) {
+                    // Select query - fetch join để tránh lazy loading
+                    root.fetch("idNhanVien", jakarta.persistence.criteria.JoinType.LEFT);
+                }
+            }
+            
             List<Predicate> predicates = new ArrayList<>();
 
             // 1. Tìm kiếm theo keyword (mã HĐ, tên KH, SĐT)
@@ -442,10 +450,27 @@ public class HoaDonService {
                     );
                 }
 
-                // 5.2. Lấy danh sách Serial có sẵn (trangThai = 1)
+                // 5.2. Kiểm tra số lượng tồn kho (tính cả tạm giữ của đơn offline)
+                // QUAN TRỌNG: Đơn offline tạm giữ ngay khi thêm sản phẩm, nên đơn online cần tính tạm giữ
+                int soLuongTon = ctsp.getSoLuongTon() != null ? ctsp.getSoLuongTon() : 0;
+                int soLuongTamGiu = ctsp.getSoLuongTamGiu() != null ? ctsp.getSoLuongTamGiu() : 0;
+                int soLuongKhaDungThucTe = soLuongTon - soLuongTamGiu;
+                
+                if (soLuongKhaDungThucTe < soLuongCan) {
+                    String tenSanPham = ctsp.getSanPham() != null ? ctsp.getSanPham().getTenSanPham() : "Sản phẩm";
+                    throw new ApiException(
+                        "Sản phẩm " + tenSanPham + " không đủ tồn kho. " +
+                        "Cần: " + soLuongCan + ", " +
+                        "Có sẵn: " + soLuongKhaDungThucTe + 
+                        " (Tồn kho: " + soLuongTon + ", Tạm giữ: " + soLuongTamGiu + ")",
+                        "INSUFFICIENT_STOCK"
+                    );
+                }
+
+                // 5.3. Lấy danh sách Serial có sẵn (trangThai = 1)
                 List<Serial> serials = serialRepository.findByCtspIdAndTrangThai(ctsp.getId(), 1);
                 
-                // 5.3. Xử lý từng Serial cần trừ
+                // 5.4. Xử lý từng Serial cần trừ
                 for (int i = 0; i < soLuongCan; i++) {
                     if (i >= serials.size()) {
                         throw new ApiException("Không đủ Serial để trừ kho cho sản phẩm: " + ctsp.getId(), "INSUFFICIENT_SERIAL");
@@ -453,32 +478,38 @@ public class HoaDonService {
 
                     Serial serial = serials.get(i);
 
-                    // 5.4. Kiểm tra Serial chưa được bán
+                    // 5.5. Kiểm tra Serial chưa được bán
                     if (serialDaBanRepository.existsBySerialId(serial.getId())) {
                         throw new ApiException("Serial " + serial.getSerialNo() + " đã được sử dụng", "SERIAL_ALREADY_SOLD");
                     }
 
-                    // 5.5. Cập nhật trạng thái Serial thành "Đã bán" (2)
+                    // 5.6. Cập nhật trạng thái Serial thành "Đã bán" (2)
                     serial.setTrangThai(2);
                     serialRepository.save(serial);
 
-                    // 5.6. Tạo bản ghi SerialDaBan
+                    // 5.7. Tạo bản ghi SerialDaBan
                     SerialDaBan serialDaBan = new SerialDaBan();
                     serialDaBan.setId(UUID.randomUUID());
                     serialDaBan.setIdHoaDonChiTiet(hdct);
                     serialDaBan.setIdSerial(serial);
                     serialDaBan.setNgayTao(Instant.now());
                     serialDaBanRepository.save(serialDaBan);
-
-                    // 5.7. Cập nhật tồn kho (trừ 1 cho mỗi serial)
-                    int soLuongTon = ctsp.getSoLuongTon() != null ? ctsp.getSoLuongTon() : 0;
-                    ctsp.setSoLuongTon(Math.max(0, soLuongTon - 1));
-                    chiTietSanPhamRepository.save(ctsp);
                 }
+
+                // 5.8. Cập nhật tồn kho (trừ một lần sau khi xử lý tất cả serial)
+                int soLuongTonMoi = soLuongTon - soLuongCan;
+                if (soLuongTonMoi < 0) {
+                    throw new ApiException("Lỗi: Số lượng tồn kho không thể âm cho sản phẩm: " + ctsp.getId(), "INVALID_STOCK");
+                }
+                ctsp.setSoLuongTon(soLuongTonMoi);
+                chiTietSanPhamRepository.save(ctsp);
+                
+                System.out.println("✅ [HoaDonService] Đã trừ " + soLuongCan + " sản phẩm, tồn kho còn: " + soLuongTonMoi);
             }
 
             // 6. Cập nhật trạng thái hóa đơn
-            hoaDon.setTrangThai(TrangThaiHoaDon.DA_THANH_TOAN);
+            // Đơn hàng online sau khi xác nhận sẽ chuyển sang "Đang giao" (vì cần giao hàng)
+            hoaDon.setTrangThai(TrangThaiHoaDon.DANG_GIAO);
             hoaDon.setTrangThaiThanhToan(1); // Đã thanh toán
             hoaDon.setNgayThanhToan(Instant.now());
             
@@ -493,18 +524,33 @@ public class HoaDonService {
 
             System.out.println("✅ [HoaDonService] Xác nhận đơn hàng thành công, đã trừ kho");
             
+            // Load serial numbers cho từng chi tiết hóa đơn (giống như getHoaDonDetail)
+            HoaDonDetailResponse response = new HoaDonDetailResponse(hoaDon);
+            
+            // Map serial numbers vào từng sản phẩm
+            if (response.getChiTietList() != null) {
+                for (HoaDonDetailResponse.SanPhamInfo sanPham : response.getChiTietList()) {
+                    List<SerialDaBan> serials = serialDaBanRepository.findByIdHoaDonChiTiet_Id(sanPham.getId());
+                    List<String> serialNumbers = serials.stream()
+                        .map(sdb -> sdb.getIdSerial() != null ? sdb.getIdSerial().getSerialNo() : null)
+                        .filter(sn -> sn != null)
+                        .collect(Collectors.toList());
+                    sanPham.setSerialNumbers(serialNumbers);
+                }
+            }
+            
             // Gửi WebSocket notification về thay đổi trạng thái
             try {
                 webSocketNotificationService.notifyOrderStatusChanged(
                     hoaDon.getId(),
                     0, // CHO_THANH_TOAN
-                    1  // DA_THANH_TOAN
+                    3  // DANG_GIAO (Đang giao hàng)
                 );
             } catch (Exception e) {
                 System.err.println("⚠️ [HoaDonService] Lỗi khi gửi WebSocket notification (không ảnh hưởng đến xác nhận đơn): " + e.getMessage());
             }
             
-            return new HoaDonDetailResponse(hoaDon);
+            return response;
         } catch (ApiException e) {
             throw e;
         } catch (Exception e) {

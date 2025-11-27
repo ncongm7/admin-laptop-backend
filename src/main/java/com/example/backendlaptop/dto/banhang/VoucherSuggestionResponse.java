@@ -34,6 +34,13 @@ public class VoucherSuggestionResponse {
     // Loại voucher
     private String loaiVoucher; // "PHIEU_GIAM_GIA" hoặc "DOT_GIAM_GIA"
     
+    // Có phải phiếu giảm giá cá nhân (riêng tư) không
+    private Boolean riengTu; // true nếu là phiếu cá nhân, false nếu là phiếu công khai
+    
+    // Trạng thái phiếu giảm giá (1 = Hoạt động, 0 = Không hoạt động)
+    // Voucher từ suggestions API luôn có trangThai = 1 vì đã được filter
+    private Integer trangThai; // 1 = Hoạt động
+    
     // Constructor cho PhieuGiamGia
     public static VoucherSuggestionResponse fromPhieuGiamGia(
             com.example.backendlaptop.entity.PhieuGiamGia pgg,
@@ -51,6 +58,8 @@ public class VoucherSuggestionResponse {
         response.setNgayKetThuc(pgg.getNgayKetThuc());
         response.setMoTa(pgg.getMoTa());
         response.setLoaiVoucher("PHIEU_GIAM_GIA");
+        response.setRiengTu(pgg.getRiengTu()); // Lấy thông tin riêng tư
+        response.setTrangThai(pgg.getTrangThai()); // Lấy trạng thái (luôn = 1 vì đã được filter)
         
         // Tính toán số tiền giảm dự kiến
         response.setTienGiamDuKien(calculateTienGiam(pgg, tongTienHoaDon));
@@ -85,6 +94,8 @@ public class VoucherSuggestionResponse {
         // DotGiamGia thường áp dụng trên sản phẩm, không có điều kiện hóa đơn tối thiểu
         response.setHoaDonToiThieu(BigDecimal.ZERO);
         response.setSoLuongDung(null); // DotGiamGia không có giới hạn số lượng dùng
+        response.setRiengTu(false); // DotGiamGia luôn là công khai
+        response.setTrangThai(1); // DotGiamGia luôn hoạt động
         
         return response;
     }

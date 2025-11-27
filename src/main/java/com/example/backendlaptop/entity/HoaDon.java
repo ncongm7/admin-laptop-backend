@@ -1,6 +1,8 @@
 package com.example.backendlaptop.entity;
 
 import com.example.backendlaptop.model.TrangThaiHoaDon;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
@@ -15,6 +17,7 @@ import java.util.UUID;
 @Getter
 @Setter
 @Entity
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 @Table(name = "hoa_don")
 public class HoaDon {
     @Id
@@ -28,17 +31,21 @@ public class HoaDon {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_khach_hang")
+    @JsonIgnore
     private KhachHang idKhachHang;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_nhan_vien")
+    @JsonIgnore
     private NhanVien idNhanVien;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_phieu_giam_gia")
+    @JsonIgnore
     private PhieuGiamGia idPhieuGiamGia;
 
     @OneToMany(mappedBy = "hoaDon", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
     private Set<HoaDonChiTiet> hoaDonChiTiets;
 
     @Size(max = 50)

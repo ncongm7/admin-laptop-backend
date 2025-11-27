@@ -1,5 +1,7 @@
 package com.example.backendlaptop.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -10,6 +12,7 @@ import java.util.UUID;
 @Getter
 @Setter
 @Entity
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 @Table(name = "hoa_don_chi_tiet")
 public class HoaDonChiTiet {
     @Id
@@ -19,6 +22,7 @@ public class HoaDonChiTiet {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_don_hang")
+    @JsonIgnore
     private HoaDon hoaDon;
 
     @ManyToOne(fetch = FetchType.LAZY)
