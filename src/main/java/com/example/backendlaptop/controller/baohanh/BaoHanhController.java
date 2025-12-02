@@ -29,6 +29,14 @@ public class BaoHanhController {
         return ResponseEntity.ok(new ResponseObject<>(response, "Kiểm tra điều kiện thành công"));
     }
 
+    @GetMapping("/hoa-don/{idHoaDon}")
+    public ResponseEntity<ResponseObject<List<PhieuBaoHanhResponse>>> getWarrantiesByInvoice(
+            @PathVariable UUID idHoaDon
+    ) {
+        List<PhieuBaoHanhResponse> warranties = baoHanhService.getWarrantiesByInvoice(idHoaDon);
+        return ResponseEntity.ok(new ResponseObject<>(warranties, "Lấy danh sách bảo hành thành công"));
+    }
+
     @PostMapping("/tao-yeu-cau")
     public ResponseEntity<ResponseObject<PhieuBaoHanhResponse>> taoYeuCau(
             @RequestParam("idHoaDon") UUID idHoaDon,

@@ -30,4 +30,19 @@ public interface PhieuBaoHanhRepository extends JpaRepository<PhieuBaoHanh, UUID
     Optional<PhieuBaoHanh> findByIdWithRelations(UUID id);
 
     Optional<PhieuBaoHanh> findByIdSerialDaBan_Id(UUID idSerialDaBan);
+    
+    // Tìm các bảo hành theo idHoaDonChiTiet thông qua SerialDaBan
+    @Query("SELECT pbh FROM PhieuBaoHanh pbh " +
+           "JOIN pbh.idSerialDaBan sdb " +
+           "WHERE sdb.idHoaDonChiTiet.id = :idHoaDonChiTiet " +
+           "AND pbh.trangThaiBaoHanh != 3")
+    List<PhieuBaoHanh> findByHoaDonChiTietAndNotCompleted(UUID idHoaDonChiTiet);
+    
+    // Tìm tất cả bảo hành theo hóa đơn thông qua SerialDaBan và HoaDonChiTiet
+    @Query("SELECT DISTINCT pbh FROM PhieuBaoHanh pbh " +
+           "JOIN pbh.idSerialDaBan sdb " +
+           "JOIN sdb.idHoaDonChiTiet hdct " +
+           "JOIN hdct.hoaDon hd " +
+           "WHERE hd.id = :idHoaDon")
+    List<PhieuBaoHanh> findByHoaDonId(UUID idHoaDon);
 }
