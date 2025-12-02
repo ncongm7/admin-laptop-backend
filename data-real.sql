@@ -702,7 +702,8 @@ INSERT INTO phuong_thuc_thanh_toan (ten_phuong_thuc, loai_phuong_thuc) VALUES
 ('Chuyển khoản ngân hàng', 'Bank Transfer'),
 ('Ví điện tử Momo', 'E-Wallet'),
 ('Thẻ tín dụng', 'Credit Card'),
-('Thẻ ATM', 'Debit Card');
+('Thẻ ATM', 'Debit Card'),
+('Chuyển khoản QR', 'QR Payment');
 
 INSERT INTO cpu (ma_cpu, ten_cpu, mo_ta, trang_thai) VALUES
 ('CPU001', 'Intel Core i5-12400F', 'Bộ xử lý Intel thế hệ 12, 6 nhân 12 luồng', 1),
@@ -1839,3 +1840,21 @@ CREATE INDEX IX_PhieuGiamGiaKhachHang_PhieuGiamGiaId
     ON phieu_giam_gia_khach_hang(phieu_giam_gia_id);
 GO
 -- ===== END: PHIEU_GIAM_GIA_KHACH_HANG =====
+
+USE QuanLyBanHangLaptop_TheoERD1_New;
+GO
+
+-- Xóa dữ liệu cũ nếu có (tùy chọn)
+DELETE FROM phuong_thuc_thanh_toan;
+
+-- Thêm các phương thức thanh toán
+INSERT INTO phuong_thuc_thanh_toan (ten_phuong_thuc, loai_phuong_thuc) VALUES
+('Tiền mặt', 'Cash'),
+('Chuyển khoản QR', 'QR Payment');
+
+-- Kiểm tra kết quả
+SELECT * FROM phuong_thuc_thanh_toan;
+GO
+
+PRINT 'Đã thêm 2 phương thức thanh toán thành công!';
+GO

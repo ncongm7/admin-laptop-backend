@@ -1,0 +1,185 @@
+### ===================================================================
+### TEST VIETQR PAYMENT API
+### File: test-vietqr-payment.http
+### ===================================================================
+
+@baseUrl = http://localhost:8080/api/v1
+@paymentUrl = http://localhost:8080/api/v1/payment
+
+### 1. Tạo QR Code thanh toán
+# Endpoint: POST /api/v1/payment/qr/generate
+# Request Body: {hoaDonId, amount, orderCode, description}
+
+POST {{paymentUrl}}/qr/generate
+Content-Type: application/json
+
+{
+  "hoaDonId": null,
+  "amount": 1500000,
+  "orderCode": "HD-20251202-0001",
+  "description": "Thanh toan don hang laptop Dell XPS 13"
+}
+
+### Expected Response:
+# {
+#   "qrCodeUrl": "https://img.vietqr.io/image/970415-0866668888-compact2.png?amount=1500000&addInfo=HD-20251202-0001&accountName=...",
+#   "qrCodeDataUrl": null,
+#   "paymentUrl": "https://img.vietqr.io/image/...",
+#   "expiryTime": "2025-12-02T10:30:00Z",
+#   "orderCode": "HD-20251202-0001",
+#   "amount": 1500000,
+#   "description": "Thanh toan don hang laptop Dell XPS 13",
+#   "bankInfo": {
+#     "bankName": "VietinBank",
+#     "accountNo": "0866668888",
+#     "accountName": "CONG TY TNHH VIETLAPTOP"
+#   }
+# }
+
+### ===================================================================
+
+### 2. Tạo QR Code với ID hóa đơn thực
+# Trước tiên cần có UUID hóa đơn từ database
+
+POST {{paymentUrl}}/qr/generate
+Content-Type: application/json
+
+{
+  "hoaDonId": "12345678-1234-1234-1234-123456789abc",
+  "amount": 2500000,
+  "orderCode": "HD-20251202-0002",
+  "description": "Thanh toan don hang laptop Asus ROG"
+}
+
+### ===================================================================
+
+### 3. Mock Webhook Callback - Xác nhận thanh toán
+# Endpoint: POST /api/v1/payment/webhook/callback
+# Request Body: {orderCode, transactionId, amount}
+# Lưu ý: Trong thực tế, webhook này được gọi từ bank/payment gateway
+
+POST {{paymentUrl}}/webhook/callback
+Content-Type: application/json
+
+{
+  "orderCode": "HD-20251202-0001",
+  "transactionId": "VTB2025120212345678",
+  "amount": 1500000,
+  "bankCode": "970415",
+  "timestamp": "2025-12-02T10:25:30Z"
+}
+
+### Expected Response:
+# {
+#   "message": "success",
+#   "orderId": "12345678-1234-1234-1234-123456789abc",
+#   "transactionId": "VTB2025120212345678"
+# }
+
+### ===================================================================
+
+### 4. Kiểm tra trạng thái thanh toán
+# Endpoint: GET /api/v1/payment/status/{orderId}
+
+@orderId = 12345678-1234-1234-1234-123456789abc
+
+GET {{paymentUrl}}/status/{{orderId}}
+
+### Expected Response:
+# {
+#   "hoaDonId": "12345678-1234-1234-1234-123456789abc",
+#   "orderCode": "HD-20251202-0001",
+#   "trangThaiThanhToan": 1,
+#   "amount": 1500000,
+#   "transactionId": "VTB2025120212345678",
+#   "paymentTime": "2025-12-02T10:25:30Z",
+#   "paymentMethod": "QR_CODE"
+# }
+
+### ===================================================================
+
+### 5. Tạo QR Code với số tiền lớn (test formatting)
+
+POST {{paymentUrl}}/qr/generate
+Content-Type: application/json
+
+{
+  "hoaDonId": null,
+  "amount": 45990000,
+  "orderCode": "HD-20251202-0003",
+  "description": "Laptop Gaming MSI GE76 Raider"
+}
+
+### ===================================================================
+
+### 6. Test error case - Missing order code
+
+POST {{paymentUrl}}/qr/generate
+Content-Type: application/json
+
+{
+  "hoaDonId": null,
+  "amount": 1500000,
+  "orderCode": "",
+  "description": "Test"
+}
+
+### Expected: 400 Bad Request - "Mã đơn hàng không được để trống"
+
+### ===================================================================
+
+### 7. Test error case - Invalid amount (0 or negative)
+
+POST {{paymentUrl}}/qr/generate
+Content-Type: application/json
+
+{
+  "hoaDonId": null,
+  "amount": 0,
+  "orderCode": "HD-TEST-001",
+  "description": "Test invalid amount"
+}
+
+### Expected: 400 Bad Request - "Số tiền thanh toán phải lớn hơn 0"
+
+### ===================================================================
+
+### 8. Test webhook với orderCode không tồn tại
+
+POST {{paymentUrl}}/webhook/callback
+Content-Type: application/json
+
+{
+  "orderCode": "HD-NOTFOUND-999",
+  "transactionId": "TXN123456",
+  "amount": 1000000
+}
+
+### Expected: 400 Bad Request - "Không tìm thấy hóa đơn"
+
+### ===================================================================
+
+### 9. Kiểm tra payment status với orderId không tồn tại
+
+GET {{paymentUrl}}/status/00000000-0000-0000-0000-000000000000
+
+### Expected: 400 Bad Request - "Không tìm thấy hóa đơn"
+
+### ===================================================================
+
+### NOTES:
+# 1. VietQR API URL: https://img.vietqr.io/image/{BIN}-{ACCOUNT_NO}-{TEMPLATE}.png
+#    - BIN: 970415 (VietinBank)
+#    - ACCOUNT_NO: 0866668888
+#    - TEMPLATE: compact2
+#    - Query params: amount, addInfo, accountName
+#
+# 2. QR Code timeout: 15 phút (900 giây)
+#
+# 3. Webhook signature validation: Chưa implement (TODO)
+#
+# 4. Refund process: Manual hoặc cần tích hợp thêm API từ bank
+#
+# 5. WebSocket notification topics:
+#    - /topic/payment-confirmed
+#    - /topic/payment-confirmed/{orderId}

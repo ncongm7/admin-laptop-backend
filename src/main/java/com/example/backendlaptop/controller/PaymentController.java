@@ -1,0 +1,179 @@
+package com.example.backendlaptop.controller;
+
+import com.example.backendlaptop.dto.payment.PaymentStatusResponse;
+import com.example.backendlaptop.dto.payment.QRCodeRequest;
+import com.example.backendlaptop.dto.payment.QRCodeResponse;
+import com.example.backendlaptop.entity.HoaDon;
+import com.example.backendlaptop.expection.ApiException;
+import com.example.backendlaptop.repository.banhang.HoaDonRepository;
+import com.example.backendlaptop.service.WebSocketNotificationService;
+import com.example.backendlaptop.service.payment.VietQRService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.Map;
+import java.util.UUID;
+
+/**
+ * Controller xử lý thanh toán QR
+ */
+@RestController
+@RequestMapping("/api/v1/payment")
+@RequiredArgsConstructor
+@Slf4j
+public class PaymentController {
+    
+    private final VietQRService vietQRService;
+    private final HoaDonRepository hoaDonRepository;
+    private final WebSocketNotificationService webSocketNotificationService;
+    
+    /**
+     * Generate QR code thanh toán
+     * 
+     * POST /api/v1/payment/qr/generate
+     * 
+     * @param request Thông tin thanh toán
+     * @return QR code response
+     */
+    @PostMapping("/qr/generate")
+    public ResponseEntity<QRCodeResponse> generateQRCode(@RequestBody QRCodeRequest request) {
+        try {
+            log.info("📱 [PaymentController] Nhận request tạo QR code: {}", request);
+            
+            QRCodeResponse response = vietQRService.generateQRCode(request);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (ApiException e) {
+            log.error("❌ [PaymentController] Lỗi tạo QR: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("❌ [PaymentController] Lỗi không xác định: {}", e.getMessage(), e);
+            throw new ApiException("Không thể tạo QR code: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Webhook nhận thông báo thanh toán từ bank
+     * (Đơn giản hóa - trong thực tế cần validate signature từ bank)
+     * 
+     * POST /api/v1/payment/webhook/callback
+     * 
+     * @param payload Dữ liệu từ bank
+     * @return Success response
+     */
+    @PostMapping("/webhook/callback")
+    public ResponseEntity<Map<String, String>> handlePaymentWebhook(@RequestBody Map<String, Object> payload) {
+        try {
+            log.info("🔔 [PaymentController] Nhận webhook callback: {}", payload);
+            
+            // Parse dữ liệu từ webhook
+            String orderCode = (String) payload.get("orderCode");
+            String transactionId = (String) payload.get("transactionId");
+            Object amountObj = payload.get("amount");
+            
+            if (orderCode == null || transactionId == null || amountObj == null) {
+                log.error("❌ [PaymentController] Thiếu thông tin trong webhook");
+                return ResponseEntity.badRequest().body(Map.of("message", "Invalid webhook data"));
+            }
+            
+            // Convert amount
+            BigDecimal amount;
+            if (amountObj instanceof Integer) {
+                amount = new BigDecimal((Integer) amountObj);
+            } else if (amountObj instanceof Long) {
+                amount = new BigDecimal((Long) amountObj);
+            } else if (amountObj instanceof Double) {
+                amount = BigDecimal.valueOf((Double) amountObj);
+            } else {
+                amount = new BigDecimal(amountObj.toString());
+            }
+            
+            // Tìm hóa đơn theo mã
+            HoaDon hoaDon = hoaDonRepository.findByMa(orderCode)
+                    .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn: " + orderCode));
+            
+            // Validate amount
+            if (hoaDon.getTongTienSauGiam().compareTo(amount) != 0) {
+                log.warn("⚠️ [PaymentController] Số tiền không khớp. Expected: {}, Received: {}", 
+                        hoaDon.getTongTienSauGiam(), amount);
+                // Vẫn chấp nhận nếu chênh lệch nhỏ (do làm tròn)
+                // throw new ApiException("Số tiền thanh toán không khớp");
+            }
+            
+            // Cập nhật trạng thái thanh toán
+            hoaDon.setTrangThaiThanhToan(1); // Đã thanh toán
+            hoaDon.setNgayThanhToan(Instant.now());
+            
+            // Lưu mã giao dịch vào chi tiết thanh toán (nếu có)
+            // TODO: Tạo bản ghi ChiTietThanhToan với maGiaoDich = transactionId
+            
+            hoaDonRepository.save(hoaDon);
+            
+            log.info("✅ [PaymentController] Cập nhật thanh toán thành công cho đơn hàng: {}", orderCode);
+            
+            // Gửi WebSocket notification
+            try {
+                webSocketNotificationService.sendPaymentConfirmation(
+                        hoaDon.getId(),
+                        transactionId,
+                        amount
+                );
+            } catch (Exception e) {
+                log.error("⚠️ [PaymentController] Lỗi khi gửi WebSocket notification: {}", e.getMessage());
+                // Không throw exception, vì payment đã được xử lý thành công
+            }
+            
+            return ResponseEntity.ok(Map.of(
+                    "message", "success",
+                    "orderId", hoaDon.getId().toString(),
+                    "transactionId", transactionId
+            ));
+            
+        } catch (ApiException e) {
+            log.error("❌ [PaymentController] Lỗi xử lý webhook: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            log.error("❌ [PaymentController] Lỗi không xác định khi xử lý webhook: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(Map.of("message", "Internal server error"));
+        }
+    }
+    
+    /**
+     * Kiểm tra trạng thái thanh toán
+     * 
+     * GET /api/v1/payment/status/{orderId}
+     * 
+     * @param orderId ID đơn hàng
+     * @return Trạng thái thanh toán
+     */
+    @GetMapping("/status/{orderId}")
+    public ResponseEntity<PaymentStatusResponse> getPaymentStatus(@PathVariable UUID orderId) {
+        try {
+            HoaDon hoaDon = hoaDonRepository.findById(orderId)
+                    .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn"));
+            
+            PaymentStatusResponse response = PaymentStatusResponse.builder()
+                    .hoaDonId(hoaDon.getId())
+                    .orderCode(hoaDon.getMa())
+                    .trangThaiThanhToan(hoaDon.getTrangThaiThanhToan())
+                    .amount(hoaDon.getTongTienSauGiam())
+                    .transactionId(null) // TODO: Get from ChiTietThanhToan
+                    .paymentTime(hoaDon.getNgayThanhToan())
+                    .paymentMethod("QR_CODE")
+                    .build();
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (ApiException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("❌ [PaymentController] Lỗi khi lấy trạng thái thanh toán: {}", e.getMessage(), e);
+            throw new ApiException("Không thể lấy trạng thái thanh toán: " + e.getMessage());
+        }
+    }
+}

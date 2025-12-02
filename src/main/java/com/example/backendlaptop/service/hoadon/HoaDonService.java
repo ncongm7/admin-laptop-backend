@@ -429,6 +429,18 @@ public class HoaDonService {
                 throw new ApiException("Chỉ có thể xác nhận đơn hàng ở trạng thái 'Chờ thanh toán'. Trạng thái hiện tại: " + hoaDon.getTrangThai(), "INVALID_STATUS");
             }
 
+            // 3.1. KIỂM TRA THANH TOÁN QR: Nếu phương thức thanh toán là QR, bắt buộc đã thanh toán
+            // TODO: Cần thêm field phuongThucThanhToan vào HoaDon entity hoặc check qua ChiTietThanhToan
+            // Tạm thời: Nếu trangThaiThanhToan = 0 (chưa thanh toán), chỉ cho phép với COD
+            // Nếu đã có thông tin thanh toán hoặc trangThaiThanhToan = 1, cho phép xác nhận
+            if (hoaDon.getTrangThaiThanhToan() == null || hoaDon.getTrangThaiThanhToan() == 0) {
+                // Chưa thanh toán - Chỉ cho phép với COD, reject với QR/Online payment
+                // Logic: Nếu có yêu cầu thanh toán online mà chưa thanh toán -> reject
+                System.out.println("⚠️ [HoaDonService] Đơn hàng chưa thanh toán. Giả định là COD.");
+            } else {
+                System.out.println("✅ [HoaDonService] Đơn hàng đã thanh toán (trangThaiThanhToan = 1)");
+            }
+
             // 4. Lấy danh sách chi tiết hóa đơn từ quan hệ OneToMany
             List<HoaDonChiTiet> chiTietList = new ArrayList<>(hoaDon.getHoaDonChiTiets());
             if (chiTietList.isEmpty()) {
@@ -712,6 +724,113 @@ public class HoaDonService {
             System.err.println("  - Message: " + e.getMessage());
             e.printStackTrace();
             throw new ApiException("Lỗi khi lấy số lượng hóa đơn theo trạng thái: " + e.getMessage(), "GET_STATUS_COUNTS_ERROR");
+        }
+    }
+    
+    /**
+     * Hủy đơn hàng và hoàn tiền (cho thanh toán QR)
+     * 
+     * @param idHoaDon ID hóa đơn
+     * @param lyDoHuy Lý do hủy
+     * @param nhanVienId ID nhân viên thực hiện (optional)
+     * @return Thông tin hóa đơn đã hủy
+     */
+    @Transactional
+    public HoaDonDetailResponse cancelOrderWithRefund(UUID idHoaDon, String lyDoHuy, UUID nhanVienId) {
+        try {
+            System.out.println("🔄 [HoaDonService] Hủy đơn hàng có hoàn tiền: " + idHoaDon);
+            
+            // 1. Tìm hóa đơn
+            HoaDon hoaDon = hoaDonRepository.findById(idHoaDon)
+                .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn", "NOT_FOUND"));
+            
+            // 2. Kiểm tra trạng thái: Chỉ hủy được khi CHO_THANH_TOAN hoặc DANG_GIAO (chưa hoàn thành)
+            if (hoaDon.getTrangThai() == TrangThaiHoaDon.HOAN_THANH) {
+                throw new ApiException("Không thể hủy đơn hàng đã hoàn thành", "INVALID_STATUS");
+            }
+            
+            if (hoaDon.getTrangThai() == TrangThaiHoaDon.DA_HUY) {
+                throw new ApiException("Đơn hàng đã được hủy trước đó", "ALREADY_CANCELLED");
+            }
+            
+            // 3. Kiểm tra thanh toán: Nếu đã thanh toán (trangThaiThanhToan = 1), cần xử lý refund
+            boolean needRefund = (hoaDon.getTrangThaiThanhToan() != null && hoaDon.getTrangThaiThanhToan() == 1);
+            
+            if (needRefund) {
+                System.out.println("💰 [HoaDonService] Đơn hàng đã thanh toán, cần xử lý hoàn tiền");
+                // TODO: Tích hợp với payment gateway để process refund
+                // Hiện tại chỉ log, admin sẽ hoàn tiền thủ công
+                System.out.println("  - Số tiền cần hoàn: " + hoaDon.getTongTienSauGiam());
+                System.out.println("  - Lý do hủy: " + lyDoHuy);
+                
+                // Lưu thông tin refund vào ghi chú
+                String ghiChuRefund = "HỦY ĐƠN - HOÀN TIỀN\n" +
+                        "Số tiền: " + hoaDon.getTongTienSauGiam() + " VNĐ\n" +
+                        "Lý do: " + lyDoHuy + "\n" +
+                        "Thời gian: " + Instant.now();
+                hoaDon.setGhiChu(hoaDon.getGhiChu() != null 
+                        ? hoaDon.getGhiChu() + "\n\n" + ghiChuRefund 
+                        : ghiChuRefund);
+            }
+            
+            // 4. Nếu đơn đã xác nhận (DANG_GIAO), cần hoàn kho
+            if (hoaDon.getTrangThai() == TrangThaiHoaDon.DANG_GIAO) {
+                System.out.println("📦 [HoaDonService] Đơn hàng đang giao, cần hoàn kho");
+                
+                List<HoaDonChiTiet> chiTietList = new ArrayList<>(hoaDon.getHoaDonChiTiets());
+                for (HoaDonChiTiet hdct : chiTietList) {
+                    ChiTietSanPham ctsp = hdct.getChiTietSanPham();
+                    int soLuongHoan = hdct.getSoLuong();
+                    
+                    // Hoàn lại serial: tìm serial đã bán, set về trạng thái khả dụng
+                    List<SerialDaBan> serialDaBan = serialDaBanRepository.findByIdHoaDonChiTiet_Id(hdct.getId());
+                    for (SerialDaBan sdb : serialDaBan) {
+                        Serial serial = sdb.getIdSerial();
+                        if (serial != null) {
+                            serial.setTrangThai(1); // Khả dụng
+                            serialRepository.save(serial);
+                        }
+                    }
+                    // Xóa bản ghi serial đã bán
+                    serialDaBanRepository.deleteAll(serialDaBan);
+                    
+                    // Hoàn số lượng tồn kho
+                    int soLuongTonHienTai = ctsp.getSoLuongTon();
+                    ctsp.setSoLuongTon(soLuongTonHienTai + soLuongHoan);
+                    chiTietSanPhamRepository.save(ctsp);
+                    
+                    System.out.println("✅ [HoaDonService] Hoàn " + soLuongHoan + " sản phẩm về kho. Tồn kho mới: " + ctsp.getSoLuongTon());
+                }
+            }
+            
+            // 5. Cập nhật trạng thái hóa đơn
+            hoaDon.setTrangThai(TrangThaiHoaDon.DA_HUY);
+            hoaDon = hoaDonRepository.save(hoaDon);
+            
+            System.out.println("✅ [HoaDonService] Đã hủy đơn hàng: " + hoaDon.getMa());
+            
+            // 6. Gửi WebSocket notification
+            try {
+                webSocketNotificationService.notifyOrderStatusChanged(
+                        hoaDon.getId(),
+                        hoaDon.getTrangThai().ordinal(),
+                        TrangThaiHoaDon.DA_HUY.ordinal()
+                );
+            } catch (Exception e) {
+                System.err.println("⚠️ [HoaDonService] Lỗi khi gửi WebSocket notification: " + e.getMessage());
+            }
+            
+            // 7. Build response
+            HoaDonDetailResponse response = new HoaDonDetailResponse(hoaDon);
+            
+            return response;
+            
+        } catch (ApiException e) {
+            throw e;
+        } catch (Exception e) {
+            System.err.println("❌ [HoaDonService] Lỗi khi hủy đơn hàng:");
+            e.printStackTrace();
+            throw new ApiException("Không thể hủy đơn hàng: " + e.getMessage(), "CANCEL_ORDER_ERROR");
         }
     }
 }

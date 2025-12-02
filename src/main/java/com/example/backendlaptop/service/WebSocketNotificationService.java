@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -73,6 +74,34 @@ public class WebSocketNotificationService {
     }
 
     /**
+     * Gửi thông báo khi thanh toán QR được xác nhận
+     */
+    public void sendPaymentConfirmation(UUID orderId, String transactionId, BigDecimal amount) {
+        try {
+            System.out.println("💰 [WebSocketNotificationService] Gửi thông báo thanh toán QR: " + orderId);
+            
+            PaymentConfirmationMessage message = new PaymentConfirmationMessage();
+            message.setType("payment_confirmed");
+            message.setEventType("payment_confirmed");
+            message.setOrderId(orderId);
+            message.setTransactionId(transactionId);
+            message.setAmount(amount);
+            message.setTimestamp(Instant.now().toString());
+            
+            // Gửi đến topic chung
+            messagingTemplate.convertAndSend("/topic/payment-confirmed", message);
+            
+            // Gửi đến topic riêng cho từng đơn hàng
+            messagingTemplate.convertAndSend("/topic/payment-confirmed/" + orderId, message);
+            
+            System.out.println("✅ [WebSocketNotificationService] Đã gửi thông báo thanh toán QR");
+        } catch (Exception e) {
+            System.err.println("❌ [WebSocketNotificationService] Lỗi khi gửi thông báo thanh toán: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
      * DTO cho message đơn hàng mới
      */
     public static class OrderNotificationMessage {
@@ -94,6 +123,32 @@ public class WebSocketNotificationService {
         public void setOrderCode(String orderCode) { this.orderCode = orderCode; }
         public String getCustomerName() { return customerName; }
         public void setCustomerName(String customerName) { this.customerName = customerName; }
+        public String getTimestamp() { return timestamp; }
+        public void setTimestamp(String timestamp) { this.timestamp = timestamp; }
+    }
+    
+    /**
+     * DTO cho message xác nhận thanh toán QR
+     */
+    public static class PaymentConfirmationMessage {
+        private String type;
+        private String eventType;
+        private UUID orderId;
+        private String transactionId;
+        private BigDecimal amount;
+        private String timestamp;
+
+        // Getters and Setters
+        public String getType() { return type; }
+        public void setType(String type) { this.type = type; }
+        public String getEventType() { return eventType; }
+        public void setEventType(String eventType) { this.eventType = eventType; }
+        public UUID getOrderId() { return orderId; }
+        public void setOrderId(UUID orderId) { this.orderId = orderId; }
+        public String getTransactionId() { return transactionId; }
+        public void setTransactionId(String transactionId) { this.transactionId = transactionId; }
+        public BigDecimal getAmount() { return amount; }
+        public void setAmount(BigDecimal amount) { this.amount = amount; }
         public String getTimestamp() { return timestamp; }
         public void setTimestamp(String timestamp) { this.timestamp = timestamp; }
     }
