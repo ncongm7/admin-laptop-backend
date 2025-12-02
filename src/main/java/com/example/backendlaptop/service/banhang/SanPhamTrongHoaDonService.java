@@ -6,10 +6,12 @@ import com.example.backendlaptop.entity.ChiTietSanPham;
 import com.example.backendlaptop.entity.DotGiamGiaChiTiet;
 import com.example.backendlaptop.entity.HoaDon;
 import com.example.backendlaptop.entity.HoaDonChiTiet;
+import com.example.backendlaptop.entity.PhieuGiamGia;
 import com.example.backendlaptop.expection.ApiException;
 import com.example.backendlaptop.model.TrangThaiHoaDon;
 import com.example.backendlaptop.repository.ChiTietSanPhamRepository;
 import com.example.backendlaptop.repository.DotGiamGiaChiTietRepository;
+import com.example.backendlaptop.repository.PhieuGiamGiaRepository;
 import com.example.backendlaptop.repository.banhang.HoaDonChiTietRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,6 +42,9 @@ public class SanPhamTrongHoaDonService {
 
     @Autowired
     private BanHangHoaDonService hoaDonService;
+
+    @Autowired
+    private PhieuGiamGiaRepository phieuGiamGiaRepository;
 
     /**
      * Thêm sản phẩm vào hóa đơn chờ
@@ -136,6 +141,10 @@ public class SanPhamTrongHoaDonService {
 
         // 9. Tính lại tổng tiền
         hoaDonService.capNhatTongTien(hoaDon);
+        
+        // 10. Tính lại voucher nếu có (vì giá trị hóa đơn đã thay đổi)
+        recalculateVoucherIfNeeded(hoaDon);
+        
         System.out.println("✅ [SanPhamTrongHoaDonService] Hoàn tất thêm sản phẩm vào hóa đơn!");
         
         return new HoaDonResponse(hoaDonService.findById(idHoaDon));
@@ -210,6 +219,9 @@ public class SanPhamTrongHoaDonService {
 
         // 6. Tính lại tổng tiền
         hoaDonService.capNhatTongTien(hoaDon);
+        
+        // 7. Tính lại voucher nếu có (vì giá trị hóa đơn đã thay đổi)
+        recalculateVoucherIfNeeded(hoaDon);
 
         return new HoaDonResponse(hoaDonService.findById(hoaDon.getId()));
     }
@@ -277,8 +289,142 @@ public class SanPhamTrongHoaDonService {
 
         // 8. Tính lại tổng tiền
         hoaDonService.capNhatTongTien(hoaDon);
+        
+        // 9. Tính lại voucher nếu có (vì giá trị hóa đơn đã thay đổi)
+        recalculateVoucherIfNeeded(hoaDon);
 
         return new HoaDonResponse(hoaDonService.findById(hoaDon.getId()));
+    }
+    
+    /**
+     * Tính lại tiền giảm voucher nếu có voucher và voucher vẫn hợp lệ
+     * Tự động xóa voucher nếu không hợp lệ
+     * Được gọi sau mọi thay đổi giá trị hóa đơn (thêm/xóa/cập nhật sản phẩm)
+     */
+    private void recalculateVoucherIfNeeded(HoaDon hoaDon) {
+        if (hoaDon.getIdPhieuGiamGia() == null) {
+            return; // Không có voucher, không cần tính lại
+        }
+        
+        UUID voucherId = hoaDon.getIdPhieuGiamGia().getId();
+        PhieuGiamGia voucher = phieuGiamGiaRepository.findById(voucherId).orElse(null);
+        if (voucher == null) {
+            // Voucher không còn tồn tại, xóa khỏi hóa đơn
+            hoaDon.setIdPhieuGiamGia(null);
+            hoaDon.setTienDuocGiam(BigDecimal.ZERO);
+            BigDecimal tongTien = hoaDon.getTongTien() != null ? hoaDon.getTongTien() : BigDecimal.ZERO;
+            hoaDon.setTongTienSauGiam(tongTien);
+            hoaDonService.save(hoaDon);
+            return;
+        }
+        
+        // Kiểm tra voucher vẫn hợp lệ (trạng thái, ngày, số lượng, điều kiện)
+        Instant now = Instant.now();
+        BigDecimal tongTien = hoaDon.getTongTien() != null ? hoaDon.getTongTien() : BigDecimal.ZERO;
+        boolean voucherHopLe = true;
+        String lyDoKhongHopLe = null;
+        
+        // Check trạng thái
+        if (voucher.getTrangThai() == null || voucher.getTrangThai() != 1) {
+            voucherHopLe = false;
+            lyDoKhongHopLe = "Voucher đã bị tắt";
+        }
+        // Check ngày hiệu lực
+        else if (voucher.getNgayBatDau() != null && voucher.getNgayBatDau().isAfter(now)) {
+            voucherHopLe = false;
+            lyDoKhongHopLe = "Voucher chưa đến thời gian hiệu lực";
+        }
+        else if (voucher.getNgayKetThuc() != null && voucher.getNgayKetThuc().isBefore(now)) {
+            voucherHopLe = false;
+            lyDoKhongHopLe = "Voucher đã hết hạn";
+        }
+        // Check số lượng
+        else if (voucher.getSoLuongDung() != null && voucher.getSoLuongDung() <= 0) {
+            voucherHopLe = false;
+            lyDoKhongHopLe = "Voucher đã hết lượt sử dụng";
+        }
+        // Check điều kiện hóa đơn tối thiểu
+        else if (voucher.getHoaDonToiThieu() != null && tongTien.compareTo(voucher.getHoaDonToiThieu()) < 0) {
+            voucherHopLe = false;
+            lyDoKhongHopLe = String.format("Hóa đơn không đủ điều kiện (tối thiểu: %s)", formatCurrency(voucher.getHoaDonToiThieu()));
+        }
+        
+        if (voucherHopLe) {
+            // Voucher hợp lệ, tính lại tiền giảm dựa trên tổng tiền mới
+            BigDecimal tienDuocGiam = calculateTienGiam(voucher, tongTien);
+            hoaDon.setTienDuocGiam(tienDuocGiam);
+            
+            // Tính lại tổng tiền sau giảm
+            BigDecimal soTienQuyDoi = hoaDon.getSoTienQuyDoi() != null ? hoaDon.getSoTienQuyDoi() : BigDecimal.ZERO;
+            BigDecimal tongTienSauGiam = tongTien.subtract(tienDuocGiam).subtract(soTienQuyDoi);
+            if (tongTienSauGiam.compareTo(BigDecimal.ZERO) < 0) {
+                tongTienSauGiam = BigDecimal.ZERO;
+            }
+            hoaDon.setTongTienSauGiam(tongTienSauGiam);
+            hoaDonService.save(hoaDon);
+            
+            System.out.println("✅ [SanPhamTrongHoaDonService] Đã tính lại tiền giảm voucher: " + tienDuocGiam);
+        } else {
+            // Voucher không hợp lệ, xóa voucher
+            hoaDon.setIdPhieuGiamGia(null);
+            hoaDon.setTienDuocGiam(BigDecimal.ZERO);
+            BigDecimal soTienQuyDoi = hoaDon.getSoTienQuyDoi() != null ? hoaDon.getSoTienQuyDoi() : BigDecimal.ZERO;
+            BigDecimal tongTienSauGiam = tongTien.subtract(soTienQuyDoi);
+            if (tongTienSauGiam.compareTo(BigDecimal.ZERO) < 0) {
+                tongTienSauGiam = BigDecimal.ZERO;
+            }
+            hoaDon.setTongTienSauGiam(tongTienSauGiam);
+            hoaDonService.save(hoaDon);
+            
+            System.out.println("⚠️ [SanPhamTrongHoaDonService] Voucher không hợp lệ, đã xóa: " + lyDoKhongHopLe);
+        }
+    }
+    
+    /**
+     * Tính toán số tiền giảm dựa trên voucher và tổng tiền hóa đơn
+     * (Logic giống với KhuyenMaiService)
+     */
+    private BigDecimal calculateTienGiam(PhieuGiamGia pgg, BigDecimal tongTien) {
+        if (tongTien == null || tongTien.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        
+        BigDecimal tienGiam = BigDecimal.ZERO;
+        
+        // LoaiPhieuGiamGia: 0 = Phần trăm, 1 = Tiền mặt
+        if (pgg.getLoaiPhieuGiamGia() != null && pgg.getLoaiPhieuGiamGia() == 0) {
+            // Giảm theo phần trăm
+            if (pgg.getGiaTriGiamGia() != null && pgg.getGiaTriGiamGia().compareTo(BigDecimal.ZERO) > 0) {
+                tienGiam = tongTien
+                        .multiply(pgg.getGiaTriGiamGia())
+                        .divide(new BigDecimal(100), 2, java.math.RoundingMode.HALF_UP);
+                
+                // Áp dụng giới hạn tối đa (nếu có)
+                if (pgg.getSoTienGiamToiDa() != null && tienGiam.compareTo(pgg.getSoTienGiamToiDa()) > 0) {
+                    tienGiam = pgg.getSoTienGiamToiDa();
+                }
+            }
+        } else {
+            // Giảm theo số tiền cố định
+            if (pgg.getGiaTriGiamGia() != null) {
+                tienGiam = pgg.getGiaTriGiamGia();
+            }
+        }
+        
+        // Không được giảm nhiều hơn tổng tiền hóa đơn
+        if (tienGiam.compareTo(tongTien) > 0) {
+            tienGiam = tongTien;
+        }
+        
+        return tienGiam;
+    }
+    
+    /**
+     * Helper: Format currency (để hiển thị trong log/error message)
+     */
+    private String formatCurrency(BigDecimal amount) {
+        if (amount == null) return "0";
+        return amount.toString();
     }
 
     /**

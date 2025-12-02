@@ -30,9 +30,10 @@ public class BanHangTaiQuayController {
 
     @PostMapping("/hoa-don/{idHoaDon}/them-san-pham")
     public ResponseEntity<ResponseObject<HoaDonResponse>> themSanPhamVaoHoaDon(
-            @PathVariable UUID idHoaDon,
+            @PathVariable String idHoaDon,
             @Valid @RequestBody ThemSanPhamRequest request) {
-        HoaDonResponse response = banHangTaiQuayFacade.themSanPhamVaoHoaDon(idHoaDon, request);
+        UUID hoaDonUUID = parseHoaDonId(idHoaDon);
+        HoaDonResponse response = banHangTaiQuayFacade.themSanPhamVaoHoaDon(hoaDonUUID, request);
         return ResponseEntity.ok(new ResponseObject<>(response, "Thêm sản phẩm vào hóa đơn thành công"));
     }
 
@@ -52,9 +53,10 @@ public class BanHangTaiQuayController {
      */
     @PostMapping("/hoa-don/{idHoaDon}/thanh-toan")
     public ResponseEntity<ResponseObject<HoaDonResponse>> thanhToanHoaDon(
-            @PathVariable UUID idHoaDon,
+            @PathVariable String idHoaDon,
             @Valid @RequestBody ThanhToanRequest request) {
-        HoaDonResponse response = banHangTaiQuayFacade.thanhToanHoaDon(idHoaDon, request);
+        UUID hoaDonUUID = parseHoaDonId(idHoaDon);
+        HoaDonResponse response = banHangTaiQuayFacade.thanhToanHoaDon(hoaDonUUID, request);
         return ResponseEntity.ok(new ResponseObject<>(response, "Thanh toán hóa đơn thành công"));
     }
 
@@ -92,8 +94,9 @@ public class BanHangTaiQuayController {
      * Endpoint: DELETE /api/v1/ban-hang/hoa-don/{idHoaDon}
      */
     @DeleteMapping("/hoa-don/{idHoaDon}")
-    public ResponseEntity<ResponseObject<String>> xoaHoaDonCho(@PathVariable UUID idHoaDon) {
-        banHangTaiQuayFacade.xoaHoaDonCho(idHoaDon);
+    public ResponseEntity<ResponseObject<String>> xoaHoaDonCho(@PathVariable String idHoaDon) {
+        UUID hoaDonUUID = parseHoaDonId(idHoaDon);
+        banHangTaiQuayFacade.xoaHoaDonCho(hoaDonUUID);
         return ResponseEntity.ok(new ResponseObject<>("Xóa hóa đơn chờ thành công", "Xóa hóa đơn chờ thành công"));
     }
 
@@ -103,9 +106,10 @@ public class BanHangTaiQuayController {
      */
     @PutMapping("/hoa-don/{idHoaDon}/khach-hang")
     public ResponseEntity<ResponseObject<HoaDonResponse>> capNhatKhachHang(
-            @PathVariable UUID idHoaDon,
+            @PathVariable String idHoaDon,
             @RequestBody CapNhatKhachHangRequest request) {
-        HoaDonResponse response = banHangTaiQuayFacade.capNhatKhachHang(idHoaDon, request);
+        UUID hoaDonUUID = parseHoaDonId(idHoaDon);
+        HoaDonResponse response = banHangTaiQuayFacade.capNhatKhachHang(hoaDonUUID, request);
         return ResponseEntity.ok(new ResponseObject<>(response, "Cập nhật khách hàng cho hóa đơn thành công"));
     }
 
@@ -117,8 +121,9 @@ public class BanHangTaiQuayController {
      */
     @GetMapping("/hoa-don/{idHoaDon}/goi-y-voucher")
     public ResponseEntity<ResponseObject<List<VoucherSuggestionResponse>>> getVoucherSuggestions(
-            @PathVariable UUID idHoaDon) {
-        List<VoucherSuggestionResponse> suggestions = banHangTaiQuayFacade.getVoucherSuggestions(idHoaDon);
+            @PathVariable String idHoaDon) {
+        UUID hoaDonUUID = parseHoaDonId(idHoaDon);
+        List<VoucherSuggestionResponse> suggestions = banHangTaiQuayFacade.getVoucherSuggestions(hoaDonUUID);
         return ResponseEntity.ok(new ResponseObject<>(suggestions, "Lấy danh sách gợi ý voucher thành công"));
     }
 
@@ -128,9 +133,10 @@ public class BanHangTaiQuayController {
      */
     @PostMapping("/hoa-don/{idHoaDon}/ap-dung-voucher")
     public ResponseEntity<ResponseObject<HoaDonResponse>> apDungVoucher(
-            @PathVariable UUID idHoaDon,
+            @PathVariable String idHoaDon,
             @Valid @RequestBody ApDungVoucherRequest request) {
-        HoaDonResponse response = banHangTaiQuayFacade.apDungVoucher(idHoaDon, request);
+        UUID hoaDonUUID = parseHoaDonId(idHoaDon);
+        HoaDonResponse response = banHangTaiQuayFacade.apDungVoucher(hoaDonUUID, request);
         return ResponseEntity.ok(new ResponseObject<>(response, "Áp dụng voucher thành công"));
     }
 
@@ -139,8 +145,9 @@ public class BanHangTaiQuayController {
      * Endpoint: DELETE /api/v1/ban-hang/hoa-don/{idHoaDon}/voucher
      */
     @DeleteMapping("/hoa-don/{idHoaDon}/voucher")
-    public ResponseEntity<ResponseObject<HoaDonResponse>> xoaVoucher(@PathVariable UUID idHoaDon) {
-        HoaDonResponse response = banHangTaiQuayFacade.xoaVoucher(idHoaDon);
+    public ResponseEntity<ResponseObject<HoaDonResponse>> xoaVoucher(@PathVariable String idHoaDon) {
+        UUID hoaDonUUID = parseHoaDonId(idHoaDon);
+        HoaDonResponse response = banHangTaiQuayFacade.xoaVoucher(hoaDonUUID);
         return ResponseEntity.ok(new ResponseObject<>(response, "Xóa voucher thành công"));
     }
 
@@ -157,16 +164,71 @@ public class BanHangTaiQuayController {
     }
 
     /**
+     * API: Kiểm tra và cập nhật giá sản phẩm trước khi thanh toán
+     * Endpoint: POST /api/v1/ban-hang/hoa-don/{idHoaDon}/kiem-tra-cap-nhat-gia
+     * 
+     * Kiểm tra giá sản phẩm có thay đổi không (do đợt giảm giá)
+     * Nếu có thay đổi, tự động cập nhật giá và trả về thông tin thay đổi
+     */
+    @PostMapping("/hoa-don/{idHoaDon}/kiem-tra-cap-nhat-gia")
+    public ResponseEntity<ResponseObject<com.example.backendlaptop.dto.banhang.CapNhatGiaResponse>> kiemTraVaCapNhatGia(
+            @PathVariable String idHoaDon) {
+        UUID hoaDonUUID = parseHoaDonId(idHoaDon);
+        com.example.backendlaptop.dto.banhang.CapNhatGiaResponse response = banHangTaiQuayFacade.kiemTraVaCapNhatGia(hoaDonUUID);
+        
+        String message = response.isCoThayDoi() 
+            ? String.format("Đã cập nhật giá của %d sản phẩm", response.getSoSanPhamThayDoi())
+            : "Giá sản phẩm không có thay đổi";
+        
+        return ResponseEntity.ok(new ResponseObject<>(response, message));
+    }
+
+    /**
+     * API: Kiểm tra toàn bộ (giá, voucher, điểm) trước khi xác nhận thanh toán
+     * Endpoint: POST /api/v1/ban-hang/hoa-don/{idHoaDon}/kiem-tra-truoc-thanh-toan
+     * 
+     * Kiểm tra giá sản phẩm, voucher, và điểm tích lũy có thay đổi không
+     * Nếu có thay đổi, tự động cập nhật hóa đơn và trả về thông tin thay đổi
+     * Frontend sẽ hiển thị thông báo và yêu cầu người dùng xác nhận lại
+     */
+    @PostMapping("/hoa-don/{idHoaDon}/kiem-tra-truoc-thanh-toan")
+    public ResponseEntity<ResponseObject<com.example.backendlaptop.dto.banhang.KiemTraTruocThanhToanResponse>> kiemTraTruocThanhToan(
+            @PathVariable String idHoaDon) {
+        UUID hoaDonUUID = parseHoaDonId(idHoaDon);
+        com.example.backendlaptop.dto.banhang.KiemTraTruocThanhToanResponse response = banHangTaiQuayFacade.kiemTraTruocThanhToan(hoaDonUUID);
+        return ResponseEntity.ok(new ResponseObject<>(response, response.getMessage()));
+    }
+
+    /**
      * API: In hóa đơn
      * Endpoint: GET /api/v1/ban-hang/hoa-don/{idHoaDon}/in
      * 
      * Trả về HTML invoice để in hoặc xuất PDF
      */
     @GetMapping("/hoa-don/{idHoaDon}/in")
-    public ResponseEntity<String> inHoaDon(@PathVariable UUID idHoaDon) {
-        String html = banHangTaiQuayFacade.inHoaDon(idHoaDon);
+    public ResponseEntity<String> inHoaDon(@PathVariable String idHoaDon) {
+        UUID hoaDonUUID = parseHoaDonId(idHoaDon);
+        String html = banHangTaiQuayFacade.inHoaDon(hoaDonUUID);
         return ResponseEntity.ok()
                 .header("Content-Type", "text/html; charset=UTF-8")
                 .body(html);
+    }
+
+    /**
+     * Helper method: Parse hóa đơn ID từ String sang UUID
+     * Cho phép cả TEMP ID và UUID thật
+     */
+    private UUID parseHoaDonId(String idHoaDon) {
+        // Nếu là TEMP ID (bắt đầu bằng "TEMP_"), tìm hóa đơn theo mã
+        if (idHoaDon != null && idHoaDon.startsWith("TEMP_")) {
+            throw new IllegalArgumentException("TEMP ID không được hỗ trợ cho endpoint này. Vui lòng tạo hóa đơn thực trước.");
+        }
+        
+        // Parse UUID
+        try {
+            return UUID.fromString(idHoaDon);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid hóa đơn ID: " + idHoaDon);
+        }
     }
 }

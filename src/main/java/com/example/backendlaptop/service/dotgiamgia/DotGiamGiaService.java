@@ -109,4 +109,12 @@ public class DotGiamGiaService {
     public DotGiamGiaResponse detail(UUID id) {
         return new DotGiamGiaResponse(repository.findById(id).orElseThrow(() -> new ApiException("Not Found", "NF")));
     }
+
+    public void toggleStatus(UUID id) {
+        DotGiamGia existed = repository.findById(id)
+                .orElseThrow(() -> new ApiException("Not Found", "NF"));
+        // Toggle: 1 -> 0, 0 hoặc null -> 1
+        existed.setTrangThai(existed.getTrangThai() == 1 ? 0 : 1);
+        repository.save(existed);
+    }
 }

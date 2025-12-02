@@ -141,6 +141,22 @@ public class BanHangTaiQuayFacade {
     }
 
     /**
+     * API: Kiểm tra và cập nhật giá sản phẩm trước khi thanh toán
+     * Endpoint: POST /api/v1/ban-hang/hoa-don/{idHoaDon}/kiem-tra-cap-nhat-gia
+     */
+    public com.example.backendlaptop.dto.banhang.CapNhatGiaResponse kiemTraVaCapNhatGia(UUID idHoaDon) {
+        return thanhToanService.kiemTraVaCapNhatGia(idHoaDon);
+    }
+
+    /**
+     * API: Kiểm tra toàn bộ (giá, voucher, điểm) trước khi xác nhận thanh toán
+     * Endpoint: POST /api/v1/ban-hang/hoa-don/{idHoaDon}/kiem-tra-truoc-thanh-toan
+     */
+    public com.example.backendlaptop.dto.banhang.KiemTraTruocThanhToanResponse kiemTraTruocThanhToan(UUID idHoaDon) {
+        return thanhToanService.kiemTraTruocThanhToan(idHoaDon);
+    }
+
+    /**
      * API 6: Xác Thực Serial Number
      * Endpoint: POST /api/v1/ban-hang/hoa-don/xac-thuc-serial
      */

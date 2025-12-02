@@ -92,5 +92,47 @@ public class ThongKeController {
                     .body(new ResponseObject<>(false, null, "Không thể lấy danh sách sản phẩm bán chạy: " + e.getMessage()));
         }
     }
+    
+    /**
+     * API 4: Lấy giao dịch gần đây
+     * GET /api/v1/thongke/giao-dich-gan-day?limit=10
+     */
+    @GetMapping("/giao-dich-gan-day")
+    public ResponseEntity<ResponseObject<List<GiaoDichGanDayResponse>>> getGiaoDichGanDay(
+            @RequestParam(defaultValue = "10") Integer limit
+    ) {
+        log.info("📊 [ThongKeController] Nhận yêu cầu {} giao dịch gần đây", limit);
+        
+        try {
+            List<GiaoDichGanDayResponse> response = thongKeService.getGiaoDichGanDay(limit);
+            
+            return ResponseEntity.ok(new ResponseObject<>(response, "Lấy danh sách giao dịch gần đây thành công"));
+        } catch (Exception e) {
+            log.error("❌ [ThongKeController] Lỗi khi lấy giao dịch gần đây", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ResponseObject<>(false, null, "Không thể lấy danh sách giao dịch gần đây: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * API 5: Lấy hoạt động khách hàng gần đây
+     * GET /api/v1/thongke/hoat-dong-khach-hang?limit=10
+     */
+    @GetMapping("/hoat-dong-khach-hang")
+    public ResponseEntity<ResponseObject<List<HoatDongKhachHangResponse>>> getHoatDongKhachHang(
+            @RequestParam(defaultValue = "10") Integer limit
+    ) {
+        log.info("📊 [ThongKeController] Nhận yêu cầu {} hoạt động khách hàng gần đây", limit);
+        
+        try {
+            List<HoatDongKhachHangResponse> response = thongKeService.getHoatDongKhachHang(limit);
+            
+            return ResponseEntity.ok(new ResponseObject<>(response, "Lấy danh sách hoạt động khách hàng thành công"));
+        } catch (Exception e) {
+            log.error("❌ [ThongKeController] Lỗi khi lấy hoạt động khách hàng", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ResponseObject<>(false, null, "Không thể lấy danh sách hoạt động khách hàng: " + e.getMessage()));
+        }
+    }
 }
 
