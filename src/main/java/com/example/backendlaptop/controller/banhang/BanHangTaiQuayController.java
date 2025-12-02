@@ -157,6 +157,40 @@ public class BanHangTaiQuayController {
     }
 
     /**
+     * API: Kiểm tra và cập nhật giá sản phẩm trước khi thanh toán
+     * Endpoint: POST /api/v1/ban-hang/hoa-don/{idHoaDon}/kiem-tra-cap-nhat-gia
+     * 
+     * Kiểm tra giá sản phẩm có thay đổi không (do đợt giảm giá)
+     * Nếu có thay đổi, tự động cập nhật giá và trả về thông tin thay đổi
+     */
+    @PostMapping("/hoa-don/{idHoaDon}/kiem-tra-cap-nhat-gia")
+    public ResponseEntity<ResponseObject<com.example.backendlaptop.dto.banhang.CapNhatGiaResponse>> kiemTraVaCapNhatGia(
+            @PathVariable UUID idHoaDon) {
+        com.example.backendlaptop.dto.banhang.CapNhatGiaResponse response = banHangTaiQuayFacade.kiemTraVaCapNhatGia(idHoaDon);
+        
+        String message = response.isCoThayDoi() 
+            ? String.format("Đã cập nhật giá của %d sản phẩm", response.getSoSanPhamThayDoi())
+            : "Giá sản phẩm không có thay đổi";
+        
+        return ResponseEntity.ok(new ResponseObject<>(response, message));
+    }
+
+    /**
+     * API: Kiểm tra toàn bộ (giá, voucher, điểm) trước khi xác nhận thanh toán
+     * Endpoint: POST /api/v1/ban-hang/hoa-don/{idHoaDon}/kiem-tra-truoc-thanh-toan
+     * 
+     * Kiểm tra giá sản phẩm, voucher, và điểm tích lũy có thay đổi không
+     * Nếu có thay đổi, tự động cập nhật hóa đơn và trả về thông tin thay đổi
+     * Frontend sẽ hiển thị thông báo và yêu cầu người dùng xác nhận lại
+     */
+    @PostMapping("/hoa-don/{idHoaDon}/kiem-tra-truoc-thanh-toan")
+    public ResponseEntity<ResponseObject<com.example.backendlaptop.dto.banhang.KiemTraTruocThanhToanResponse>> kiemTraTruocThanhToan(
+            @PathVariable UUID idHoaDon) {
+        com.example.backendlaptop.dto.banhang.KiemTraTruocThanhToanResponse response = banHangTaiQuayFacade.kiemTraTruocThanhToan(idHoaDon);
+        return ResponseEntity.ok(new ResponseObject<>(response, response.getMessage()));
+    }
+
+    /**
      * API: In hóa đơn
      * Endpoint: GET /api/v1/ban-hang/hoa-don/{idHoaDon}/in
      * 

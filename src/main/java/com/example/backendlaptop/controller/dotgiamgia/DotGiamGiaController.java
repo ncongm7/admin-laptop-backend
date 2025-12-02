@@ -44,4 +44,10 @@ public class DotGiamGiaController {
         service.update(request,id);
         return new ResponseObject<>(null, "Update thanh cong");
     }
+
+    @PutMapping("/toggle-status/{id}")
+    public ResponseObject<?> toggleStatus(@PathVariable("id") UUID id){
+        service.toggleStatus(id);
+        return new ResponseObject<>(null, "Chuyển trạng thái thành công");
+    }
 }

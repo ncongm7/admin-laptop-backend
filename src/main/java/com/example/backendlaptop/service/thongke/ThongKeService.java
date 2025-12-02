@@ -1,6 +1,9 @@
 package com.example.backendlaptop.service.thongke;
 
 import com.example.backendlaptop.dto.thongke.*;
+import com.example.backendlaptop.entity.HoaDon;
+import com.example.backendlaptop.model.TrangThaiHoaDon;
+import com.example.backendlaptop.repository.banhang.HoaDonRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +18,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Service xử lý logic thống kê cho Dashboard
@@ -26,6 +30,7 @@ import java.util.UUID;
 public class ThongKeService {
     
     private final EntityManager entityManager;
+    private final HoaDonRepository hoaDonRepository;
     
     /**
      * Lấy thống kê tổng quan cho Dashboard
@@ -381,5 +386,101 @@ public class ThongKeService {
         Instant end = lastDayOfMonth.atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
         
         return countKhachHangMoi(start, end);
+    }
+    
+    /**
+     * Lấy danh sách giao dịch gần đây
+     * @param limit Số lượng giao dịch (mặc định: 10)
+     */
+    public List<GiaoDichGanDayResponse> getGiaoDichGanDay(Integer limit) {
+        log.info("🔍 [ThongKeService] Lấy {} giao dịch gần đây", limit);
+        
+        List<HoaDon> hoaDons = hoaDonRepository.findAll()
+                .stream()
+                .filter(hd -> hd.getTrangThai() == TrangThaiHoaDon.DA_THANH_TOAN || 
+                              hd.getTrangThai() == TrangThaiHoaDon.DA_HUY)
+                .sorted((a, b) -> {
+                    Instant timeA = a.getNgayTao() != null ? a.getNgayTao() : Instant.MIN;
+                    Instant timeB = b.getNgayTao() != null ? b.getNgayTao() : Instant.MIN;
+                    return timeB.compareTo(timeA); // Sắp xếp mới nhất trước
+                })
+                .limit(limit != null ? limit : 10)
+                .collect(Collectors.toList());
+        
+        List<GiaoDichGanDayResponse> results = new ArrayList<>();
+        for (HoaDon hd : hoaDons) {
+            String loai = hd.getTrangThai() == TrangThaiHoaDon.DA_HUY ? "refund" : "sale";
+            String tenKhachHang = hd.getTenKhachHang();
+            if (tenKhachHang == null && hd.getIdKhachHang() != null) {
+                tenKhachHang = hd.getIdKhachHang().getHoTen() != null ? 
+                               hd.getIdKhachHang().getHoTen() : "Khách lẻ";
+            }
+            if (tenKhachHang == null) {
+                tenKhachHang = "Khách lẻ";
+            }
+            
+            results.add(GiaoDichGanDayResponse.builder()
+                    .id(hd.getId())
+                    .maHoaDon(hd.getMa())
+                    .tenKhachHang(tenKhachHang)
+                    .tongTien(hd.getTongTienSauGiam() != null ? hd.getTongTienSauGiam() : 
+                             (hd.getTongTien() != null ? hd.getTongTien() : BigDecimal.ZERO))
+                    .ngayTao(hd.getNgayTao())
+                    .trangThai(hd.getTrangThai() != null ? hd.getTrangThai().name() : "UNKNOWN")
+                    .loai(loai)
+                    .build());
+        }
+        
+        log.info("✅ [ThongKeService] Trả về {} giao dịch gần đây", results.size());
+        return results;
+    }
+    
+    /**
+     * Lấy danh sách hoạt động khách hàng gần đây
+     * @param limit Số lượng hoạt động (mặc định: 10)
+     */
+    public List<HoatDongKhachHangResponse> getHoatDongKhachHang(Integer limit) {
+        log.info("🔍 [ThongKeService] Lấy {} hoạt động khách hàng gần đây", limit);
+        
+        // Lấy các hóa đơn gần đây để tạo hoạt động "purchase"
+        List<HoaDon> hoaDons = hoaDonRepository.findAll()
+                .stream()
+                .filter(hd -> hd.getTrangThai() == TrangThaiHoaDon.DA_THANH_TOAN)
+                .sorted((a, b) -> {
+                    Instant timeA = a.getNgayTao() != null ? a.getNgayTao() : Instant.MIN;
+                    Instant timeB = b.getNgayTao() != null ? b.getNgayTao() : Instant.MIN;
+                    return timeB.compareTo(timeA); // Sắp xếp mới nhất trước
+                })
+                .limit(limit != null ? limit : 10)
+                .collect(Collectors.toList());
+        
+        List<HoatDongKhachHangResponse> results = new ArrayList<>();
+        for (HoaDon hd : hoaDons) {
+            String tenKhachHang = hd.getTenKhachHang();
+            if (tenKhachHang == null && hd.getIdKhachHang() != null) {
+                tenKhachHang = hd.getIdKhachHang().getHoTen() != null ? 
+                               hd.getIdKhachHang().getHoTen() : "Khách lẻ";
+            }
+            if (tenKhachHang == null) {
+                tenKhachHang = "Khách lẻ";
+            }
+            
+            // Đếm số lượng sản phẩm
+            int soLuongSanPham = hd.getHoaDonChiTiets() != null ? hd.getHoaDonChiTiets().size() : 0;
+            String moTa = soLuongSanPham > 0 ? 
+                         String.format("Đã mua %d sản phẩm", soLuongSanPham) : 
+                         "Đã mua sản phẩm";
+            
+            results.add(HoatDongKhachHangResponse.builder()
+                    .id(hd.getId())
+                    .tenKhachHang(tenKhachHang)
+                    .moTa(moTa)
+                    .thoiGian(hd.getNgayTao())
+                    .loai("purchase")
+                    .build());
+        }
+        
+        log.info("✅ [ThongKeService] Trả về {} hoạt động khách hàng", results.size());
+        return results;
     }
 }

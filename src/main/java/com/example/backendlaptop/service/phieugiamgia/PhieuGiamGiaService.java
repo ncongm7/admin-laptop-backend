@@ -100,6 +100,14 @@ public class PhieuGiamGiaService {
         repository.deleteById(id);
     }
 
+    public void toggleStatus(UUID id) {
+        PhieuGiamGia existed = repository.findById(id)
+                .orElseThrow(() -> new ApiException("Not Found", "NF"));
+        // Toggle: 1 -> 0, 0 hoặc null -> 1
+        existed.setTrangThai(existed.getTrangThai() == 1 ? 0 : 1);
+        repository.save(existed);
+    }
+
     public PhieuGiamGiaResponse detail(UUID id){
         return new PhieuGiamGiaResponse(repository.findById(id).orElseThrow(() -> new ApiException("Not Found","NF")));
     }
