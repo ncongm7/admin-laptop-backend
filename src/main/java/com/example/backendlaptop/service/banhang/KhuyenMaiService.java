@@ -195,7 +195,6 @@ public class KhuyenMaiService {
     @Transactional
     public HoaDonResponse xoaVoucher(UUID idHoaDon) {
         System.out.println("🗑️ [KhuyenMaiService] Xóa voucher khỏi hóa đơn: " + idHoaDon);
-        
         // 1. Tìm hóa đơn
         HoaDon hoaDon = hoaDonService.findById(idHoaDon);
         
