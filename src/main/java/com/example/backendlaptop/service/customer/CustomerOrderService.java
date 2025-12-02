@@ -76,12 +76,28 @@ public class CustomerOrderService {
                 ChiTietSanPham ctsp = chiTietSanPhamRepository.findById(sp.getIdCtsp())
                         .orElseThrow(() -> new ApiException("Không tìm thấy sản phẩm: " + sp.getIdCtsp(), "PRODUCT_NOT_FOUND"));
 
-                // Kiểm tra số lượng tồn kho dựa trên Serial (trangThai = 1 = có sẵn)
-                // QUAN TRỌNG: Chỉ kiểm tra, KHÔNG trừ kho. Kho sẽ được trừ khi admin xác nhận đơn hàng.
                 String tenSanPham = ctsp.getSanPham() != null ? ctsp.getSanPham().getTenSanPham() : "Sản phẩm";
-                int soLuongKhaDung = serialRepository.countByCtspIdAndTrangThai(sp.getIdCtsp(), 1);
-                if (soLuongKhaDung < sp.getSoLuong()) {
-                    throw new ApiException("Sản phẩm " + tenSanPham + " không đủ số lượng. Còn lại: " + soLuongKhaDung, "INSUFFICIENT_STOCK");
+                
+                // Kiểm tra số lượng khả dụng (tính cả tạm giữ của đơn offline)
+                // Số lượng khả dụng = Tồn kho - Tạm giữ (của đơn offline)
+                int soLuongTon = ctsp.getSoLuongTon() != null ? ctsp.getSoLuongTon() : 0;
+                int soLuongTamGiu = ctsp.getSoLuongTamGiu() != null ? ctsp.getSoLuongTamGiu() : 0;
+                int soLuongKhaDung = soLuongTon - soLuongTamGiu;
+                
+                // Kiểm tra số lượng Serial có sẵn (trangThai = 1)
+                int soLuongSerialKhaDung = serialRepository.countByCtspIdAndTrangThai(sp.getIdCtsp(), 1);
+                
+                // Số lượng khả dụng thực tế = min(soLuongKhaDung, soLuongSerialKhaDung)
+                int soLuongKhaDungThucTe = Math.min(soLuongKhaDung, soLuongSerialKhaDung);
+                
+                if (soLuongKhaDungThucTe < sp.getSoLuong()) {
+                    throw new ApiException(
+                        "Sản phẩm " + tenSanPham + " không đủ số lượng. " +
+                        "Cần: " + sp.getSoLuong() + ", " +
+                        "Có sẵn: " + soLuongKhaDungThucTe + 
+                        " (Tồn kho: " + soLuongTon + ", Tạm giữ: " + soLuongTamGiu + ", Serial: " + soLuongSerialKhaDung + ")",
+                        "INSUFFICIENT_STOCK"
+                    );
                 }
 
                 HoaDonChiTiet chiTiet = new HoaDonChiTiet();

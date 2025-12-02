@@ -24,6 +24,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -189,6 +191,9 @@ public class ThanhToanService {
         }
 
         // 4. Xử lý Serial Numbers và cập nhật tồn kho
+        // Map để theo dõi số lượng serial đã xử lý cho mỗi sản phẩm
+        Map<UUID, Integer> serialCountByProduct = new HashMap<>();
+        
         for (SerialThanhToanItem serialItem : request.getSerialNumbers()) {
             // 4.1. Tìm hóa đơn chi tiết tương ứng
             HoaDonChiTiet hdct = hoaDon.getHoaDonChiTiets().stream()
@@ -237,18 +242,63 @@ public class ThanhToanService {
             serialDaBan.setNgayTao(Instant.now());
             serialDaBanRepository.save(serialDaBan);
 
-            // 4.7. Cập nhật tồn kho (trừ 1 cho mỗi serial)
+            // 4.7. Đếm số lượng serial đã xử lý cho sản phẩm này
+            UUID ctspId = hdct.getChiTietSanPham().getId();
+            serialCountByProduct.put(ctspId, serialCountByProduct.getOrDefault(ctspId, 0) + 1);
+        }
+
+        // 4.8. Cập nhật tồn kho cho từng sản phẩm (một lần sau khi xử lý tất cả serial)
+        for (HoaDonChiTiet hdct : hoaDon.getHoaDonChiTiets()) {
             ChiTietSanPham ctsp = hdct.getChiTietSanPham();
+            UUID ctspId = ctsp.getId();
+            int soLuongTrongDon = hdct.getSoLuong();
+            int soLuongSerialDaXuLy = serialCountByProduct.getOrDefault(ctspId, 0);
+
+            // Kiểm tra số lượng serial khớp với số lượng trong đơn
+            if (soLuongSerialDaXuLy != soLuongTrongDon) {
+                throw new ApiException(
+                    "Số lượng serial đã xử lý (" + soLuongSerialDaXuLy + ") không khớp với số lượng trong đơn (" + soLuongTrongDon + ")",
+                    "SERIAL_COUNT_MISMATCH"
+                );
+            }
+
+            // Kiểm tra và cập nhật tồn kho
             int soLuongTon = ctsp.getSoLuongTon() != null ? ctsp.getSoLuongTon() : 0;
             int soLuongTamGiu = ctsp.getSoLuongTamGiu() != null ? ctsp.getSoLuongTamGiu() : 0;
 
-            ctsp.setSoLuongTon(soLuongTon - 1);
-            ctsp.setSoLuongTamGiu(Math.max(0, soLuongTamGiu - 1));
+            // Kiểm tra số lượng tồn kho
+            if (soLuongTon < soLuongTrongDon) {
+                throw new ApiException(
+                    "Không đủ tồn kho cho sản phẩm. Cần: " + soLuongTrongDon + ", Tồn kho: " + soLuongTon,
+                    "INSUFFICIENT_STOCK"
+                );
+            }
+
+            // Kiểm tra số lượng tạm giữ
+            if (soLuongTamGiu < soLuongTrongDon) {
+                System.out.println("⚠️ [ThanhToanService] Cảnh báo: Số lượng tạm giữ (" + soLuongTamGiu + ") nhỏ hơn số lượng trong đơn (" + soLuongTrongDon + ")");
+            }
+
+            // Trừ tồn kho và giải phóng tạm giữ
+            int soLuongTonMoi = soLuongTon - soLuongTrongDon;
+            int soLuongTamGiuMoi = Math.max(0, soLuongTamGiu - soLuongTrongDon);
+
+            if (soLuongTonMoi < 0) {
+                throw new ApiException(
+                    "Lỗi: Số lượng tồn kho không thể âm. Tồn kho hiện tại: " + soLuongTon + ", Cần trừ: " + soLuongTrongDon,
+                    "INVALID_STOCK"
+                );
+            }
+
+            ctsp.setSoLuongTon(soLuongTonMoi);
+            ctsp.setSoLuongTamGiu(soLuongTamGiuMoi);
             
             // Fix: Đảm bảo version field không null
             ensureVersionNotNull(ctsp);
             
             chiTietSanPhamRepository.save(ctsp);
+            
+            System.out.println("✅ [ThanhToanService] Đã trừ " + soLuongTrongDon + " sản phẩm, tồn kho còn: " + soLuongTonMoi + ", tạm giữ còn: " + soLuongTamGiuMoi);
         }
 
         // 5. Cập nhật trạng thái hóa đơn
