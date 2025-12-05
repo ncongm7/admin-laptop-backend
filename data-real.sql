@@ -1858,3 +1858,6 @@ GO
 
 PRINT 'Đã thêm 2 phương thức thanh toán thành công!';
 GO
+
+DROP INDEX UX_PBH_OnePerSdb ON dbo.phieu_bao_hanh;
+GO
