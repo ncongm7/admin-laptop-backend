@@ -16,6 +16,7 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 import java.io.UnsupportedEncodingException;
+import java.util.UUID;
 
 @Service
 public class EmailService {
@@ -81,6 +82,118 @@ public class EmailService {
             logger.error("Lỗi không mong đợi khi gửi email đến {}: {}", toEmail, e.getMessage(), e);
             throw new ApiException("Lỗi không mong đợi khi gửi email: " + e.getMessage(), "EMAIL_SEND_FAILED");
         }
+    }
+
+    // Methods cho bảo hành
+    public void guiEmailXacNhan(UUID idBaoHanh, String toEmail, String tenKhachHang, String maPhieuBaoHanh) {
+        String subject = "Xác nhận đăng ký bảo hành - " + maPhieuBaoHanh;
+        String htmlContent = buildEmailXacNhanBaoHanh(tenKhachHang, maPhieuBaoHanh);
+        sendPhieuGiamGiaEmail(toEmail, subject, htmlContent);
+    }
+
+    public void guiEmailPhieuHen(com.example.backendlaptop.entity.PhieuHenBaoHanh phieuHen) {
+        String toEmail = phieuHen.getIdBaoHanh().getIdKhachHang().getEmail();
+        String tenKhachHang = phieuHen.getIdBaoHanh().getIdKhachHang().getHoTen();
+        String subject = "Phiếu hẹn bảo hành - " + phieuHen.getMaPhieuHen();
+        String htmlContent = buildEmailPhieuHen(phieuHen, tenKhachHang);
+        sendPhieuGiamGiaEmail(toEmail, subject, htmlContent);
+    }
+
+    public void guiEmailChiPhi(UUID idLichSuBaoHanh, String toEmail, String tenKhachHang, 
+                               java.math.BigDecimal chiPhiPhatSinh, String lyDo) {
+        String subject = "Thông báo chi phí phát sinh bảo hành";
+        String htmlContent = buildEmailChiPhi(tenKhachHang, chiPhiPhatSinh, lyDo);
+        sendPhieuGiamGiaEmail(toEmail, subject, htmlContent);
+    }
+
+    public void guiEmailHoanThanh(UUID idBaoHanh, String toEmail, String tenKhachHang, String maPhieuBaoHanh) {
+        String subject = "Hoàn thành bảo hành - " + maPhieuBaoHanh;
+        String htmlContent = buildEmailHoanThanh(tenKhachHang, maPhieuBaoHanh);
+        sendPhieuGiamGiaEmail(toEmail, subject, htmlContent);
+    }
+
+    private String buildEmailXacNhanBaoHanh(String tenKhachHang, String maPhieuBaoHanh) {
+        return "<!DOCTYPE html><html><head><meta charset='UTF-8'><style>" +
+                "body{font-family:Arial,sans-serif;line-height:1.6;color:#333;}" +
+                ".container{max-width:600px;margin:0 auto;padding:20px;}" +
+                ".header{background:#2563eb;color:#fff;padding:20px;text-align:center;}" +
+                ".content{padding:20px;background:#f9fafb;}" +
+                ".footer{padding:20px;text-align:center;color:#666;font-size:12px;}" +
+                "</style></head><body><div class='container'>" +
+                "<div class='header'><h1>Xác nhận đăng ký bảo hành</h1></div>" +
+                "<div class='content'><p>Xin chào <strong>" + tenKhachHang + "</strong>,</p>" +
+                "<p>Chúng tôi đã nhận được yêu cầu bảo hành của bạn với mã phiếu: <strong>" + maPhieuBaoHanh + "</strong></p>" +
+                "<p>Yêu cầu của bạn đang được xử lý. Chúng tôi sẽ liên hệ với bạn trong thời gian sớm nhất.</p>" +
+                "<p>Trân trọng,<br>Đội ngũ VietLaptop</p></div>" +
+                "<div class='footer'><p>Email này được gửi tự động, vui lòng không trả lời.</p></div>" +
+                "</div></body></html>";
+    }
+
+    private String buildEmailPhieuHen(com.example.backendlaptop.entity.PhieuHenBaoHanh phieuHen, String tenKhachHang) {
+        String ngayHen = phieuHen.getNgayHen() != null ? 
+            java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy").format(
+                java.time.LocalDateTime.ofInstant(phieuHen.getNgayHen(), java.time.ZoneId.systemDefault())) : "";
+        String gioHen = phieuHen.getGioHen() != null ? phieuHen.getGioHen().toString() : "";
+        return "<!DOCTYPE html><html><head><meta charset='UTF-8'><style>" +
+                "body{font-family:Arial,sans-serif;line-height:1.6;color:#333;}" +
+                ".container{max-width:600px;margin:0 auto;padding:20px;}" +
+                ".header{background:#10b981;color:#fff;padding:20px;text-align:center;}" +
+                ".content{padding:20px;background:#f9fafb;}" +
+                ".info-box{background:#fff;border-left:4px solid #10b981;padding:15px;margin:15px 0;}" +
+                ".footer{padding:20px;text-align:center;color:#666;font-size:12px;}" +
+                "</style></head><body><div class='container'>" +
+                "<div class='header'><h1>Phiếu hẹn bảo hành</h1></div>" +
+                "<div class='content'><p>Xin chào <strong>" + tenKhachHang + "</strong>,</p>" +
+                "<p>Chúng tôi đã sắp xếp lịch hẹn bảo hành cho bạn:</p>" +
+                "<div class='info-box'><p><strong>Mã phiếu hẹn:</strong> " + phieuHen.getMaPhieuHen() + "</p>" +
+                "<p><strong>Ngày hẹn:</strong> " + ngayHen + "</p>" +
+                "<p><strong>Giờ hẹn:</strong> " + gioHen + "</p>" +
+                "<p><strong>Địa điểm:</strong> " + (phieuHen.getDiaDiem() != null ? phieuHen.getDiaDiem() : "Trung tâm bảo hành") + "</p>" +
+                (phieuHen.getGhiChu() != null ? "<p><strong>Ghi chú:</strong> " + phieuHen.getGhiChu() + "</p>" : "") +
+                "</div><p>Vui lòng có mặt đúng giờ hẹn. Trân trọng!</p>" +
+                "<p>Trân trọng,<br>Đội ngũ VietLaptop</p></div>" +
+                "<div class='footer'><p>Email này được gửi tự động, vui lòng không trả lời.</p></div>" +
+                "</div></body></html>";
+    }
+
+    private String buildEmailChiPhi(String tenKhachHang, java.math.BigDecimal chiPhiPhatSinh, String lyDo) {
+        String chiPhiFormatted = java.text.NumberFormat.getCurrencyInstance(
+            new java.util.Locale("vi", "VN")).format(chiPhiPhatSinh);
+        return "<!DOCTYPE html><html><head><meta charset='UTF-8'><style>" +
+                "body{font-family:Arial,sans-serif;line-height:1.6;color:#333;}" +
+                ".container{max-width:600px;margin:0 auto;padding:20px;}" +
+                ".header{background:#f59e0b;color:#fff;padding:20px;text-align:center;}" +
+                ".content{padding:20px;background:#f9fafb;}" +
+                ".cost-box{background:#fff;border-left:4px solid #f59e0b;padding:15px;margin:15px 0;}" +
+                ".footer{padding:20px;text-align:center;color:#666;font-size:12px;}" +
+                "</style></head><body><div class='container'>" +
+                "<div class='header'><h1>Thông báo chi phí phát sinh</h1></div>" +
+                "<div class='content'><p>Xin chào <strong>" + tenKhachHang + "</strong>,</p>" +
+                "<p>Trong quá trình sửa chữa, có phát sinh chi phí như sau:</p>" +
+                "<div class='cost-box'><p><strong>Chi phí phát sinh:</strong> " + chiPhiFormatted + "</p>" +
+                "<p><strong>Lý do:</strong> " + (lyDo != null ? lyDo : "Không có") + "</p></div>" +
+                "<p>Vui lòng thanh toán chi phí này để tiếp tục quá trình bảo hành.</p>" +
+                "<p>Trân trọng,<br>Đội ngũ VietLaptop</p></div>" +
+                "<div class='footer'><p>Email này được gửi tự động, vui lòng không trả lời.</p></div>" +
+                "</div></body></html>";
+    }
+
+    private String buildEmailHoanThanh(String tenKhachHang, String maPhieuBaoHanh) {
+        return "<!DOCTYPE html><html><head><meta charset='UTF-8'><style>" +
+                "body{font-family:Arial,sans-serif;line-height:1.6;color:#333;}" +
+                ".container{max-width:600px;margin:0 auto;padding:20px;}" +
+                ".header{background:#10b981;color:#fff;padding:20px;text-align:center;}" +
+                ".content{padding:20px;background:#f9fafb;}" +
+                ".footer{padding:20px;text-align:center;color:#666;font-size:12px;}" +
+                "</style></head><body><div class='container'>" +
+                "<div class='header'><h1>Hoàn thành bảo hành</h1></div>" +
+                "<div class='content'><p>Xin chào <strong>" + tenKhachHang + "</strong>,</p>" +
+                "<p>Bảo hành của bạn với mã phiếu <strong>" + maPhieuBaoHanh + "</strong> đã hoàn thành.</p>" +
+                "<p>Bạn có thể đến trung tâm bảo hành để nhận lại sản phẩm.</p>" +
+                "<p>Cảm ơn bạn đã sử dụng dịch vụ của chúng tôi!</p>" +
+                "<p>Trân trọng,<br>Đội ngũ VietLaptop</p></div>" +
+                "<div class='footer'><p>Email này được gửi tự động, vui lòng không trả lời.</p></div>" +
+                "</div></body></html>";
     }
 }
 

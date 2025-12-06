@@ -413,9 +413,19 @@ public class SanPhamService {
         // Tìm thông tin giảm giá từ dot_giam_gia_chi_tiet
         applyDiscountToResponse(chiTietSanPham, response);
         
-        // Load hình ảnh cho variant
+        // Load hình ảnh cho variant - sắp xếp để hình ảnh chính ở đầu
         List<com.example.backendlaptop.entity.HinhAnh> hinhAnhs = hinhAnhRepository.findByIdSpctId(chiTietSanPham.getId());
         List<ChiTietSanPhamResponse.HinhAnhResponse> hinhAnhResponses = hinhAnhs.stream()
+                .sorted((ha1, ha2) -> {
+                    // Hình ảnh chính (anhChinhDaiDien = true) sẽ ở đầu
+                    if (ha1.getAnhChinhDaiDien() && !ha2.getAnhChinhDaiDien()) {
+                        return -1;
+                    }
+                    if (!ha1.getAnhChinhDaiDien() && ha2.getAnhChinhDaiDien()) {
+                        return 1;
+                    }
+                    return 0;
+                })
                 .map(ha -> {
                     ChiTietSanPhamResponse.HinhAnhResponse imgResponse = new ChiTietSanPhamResponse.HinhAnhResponse();
                     imgResponse.setId(ha.getId());

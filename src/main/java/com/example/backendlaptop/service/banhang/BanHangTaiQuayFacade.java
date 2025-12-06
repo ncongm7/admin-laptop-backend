@@ -1,6 +1,7 @@
 package com.example.backendlaptop.service.banhang;
 
 import com.example.backendlaptop.dto.banhang.*;
+import com.example.backendlaptop.entity.HoaDon;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -61,7 +62,7 @@ public class BanHangTaiQuayFacade {
     public void xoaHoaDonCho(UUID idHoaDon) {
         // Cần giải phóng tồn kho tạm giữ trước khi xóa
         // Lấy hóa đơn trước để có thông tin
-        var hoaDon = hoaDonService.findById(idHoaDon);
+        HoaDon hoaDon = hoaDonService.findById(idHoaDon);
         
         // Giải phóng tồn kho tạm giữ
         sanPhamTrongHoaDonService.giaiPhongTonKhoTamGiu(hoaDon);
@@ -138,6 +139,14 @@ public class BanHangTaiQuayFacade {
      */
     public HoaDonResponse thanhToanHoaDon(UUID idHoaDon, ThanhToanRequest request) {
         return thanhToanService.thanhToanHoaDon(idHoaDon, request);
+    }
+
+    /**
+     * API: Thanh toán COD (Cash on Delivery) khi giao hàng thành công
+     * Endpoint: POST /api/v1/ban-hang/hoa-don/{idHoaDon}/thanh-toan-cod
+     */
+    public HoaDonResponse thanhToanCOD(UUID idHoaDon, java.math.BigDecimal tienKhachDua) {
+        return thanhToanService.thanhToanCOD(idHoaDon, tienKhachDua);
     }
 
     /**

@@ -14,11 +14,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +30,7 @@ public class ChatService {
     private final ChatRepository chatRepository;
     private final KhachHangRepository khachHangRepository;
     private final NhanVienRepository nhanVienRepository;
+    private final RateLimitService rateLimitService;
 
     /**
      * Gửi tin nhắn mới
@@ -42,6 +46,18 @@ public class ChatService {
         }
         if (request.getNoiDung() == null || request.getNoiDung().trim().isEmpty()) {
             throw new ApiException("Nội dung tin nhắn không được để trống", "BAD_REQUEST");
+        }
+
+        // Check rate limit
+        UUID userId = request.getIsFromCustomer() ? request.getKhachHangId() : 
+                     (request.getNhanVienId() != null ? request.getNhanVienId() : null);
+        
+        if (userId != null) {
+            boolean isAllowed = rateLimitService.isAllowed(userId, request.getIsFromCustomer());
+            if (!isAllowed) {
+                int remaining = rateLimitService.getRemainingMessages(userId, request.getIsFromCustomer());
+                throw new com.example.backendlaptop.exception.ChatRateLimitExceededException(remaining);
+            }
         }
 
         // Validate khách hàng
@@ -79,7 +95,8 @@ public class ChatService {
             System.out.println("🆕 Tạo conversation mới với ID: " + conversationId);
         } else {
             // Kiểm tra xem conversation đã tồn tại chưa (tránh duplicate)
-            List<Chat> existingChats = chatRepository.findByConversationIdOrderByNgayPhanHoiAsc(conversationId);
+            Pageable pageable = PageRequest.of(0, 1);
+            List<Chat> existingChats = chatRepository.findByConversationIdOrderByNgayPhanHoiAsc(conversationId, pageable).getContent();
             if (existingChats.isEmpty()) {
                 System.out.println("⚠️ Conversation ID được cung cấp nhưng không tìm thấy tin nhắn nào. Tạo conversation mới.");
                 conversationId = chat.getId();
@@ -96,6 +113,27 @@ public class ChatService {
             chat.setReplyTo(replyTo);
         }
 
+        // Check for duplicate message (same content, same conversation, within 1 minute)
+        String messageHash = chat.generateMessageHash();
+        if (messageHash != null) {
+            Pageable pageable = PageRequest.of(0, 100); // Get last 100 messages
+            List<Chat> recentMessages = chatRepository.findByConversationIdOrderByNgayPhanHoiAsc(conversationId, pageable).getContent();
+            Instant oneMinuteAgo = Instant.now().minusSeconds(60);
+            
+            for (Chat existingChat : recentMessages) {
+                // Check if same content, same sender, within 1 minute
+                if (existingChat.getNoiDung() != null && 
+                    existingChat.getNoiDung().trim().equals(chat.getNoiDung().trim()) &&
+                    existingChat.getIsFromCustomer().equals(chat.getIsFromCustomer()) &&
+                    existingChat.getNgayPhanHoi() != null &&
+                    existingChat.getNgayPhanHoi().isAfter(oneMinuteAgo)) {
+                    
+                    System.out.println("⚠️ Duplicate message detected, returning existing message");
+                    return mapToResponse(existingChat);
+                }
+            }
+        }
+
         chat = chatRepository.save(chat);
 
         return mapToResponse(chat);
@@ -105,7 +143,9 @@ public class ChatService {
      * Lấy danh sách tin nhắn trong một conversation
      */
     public List<ChatResponse> getMessagesByConversationId(UUID conversationId) {
-        List<Chat> chats = chatRepository.findByConversationIdOrderByNgayPhanHoiAsc(conversationId);
+        // Use unpaged to get all messages
+        Pageable pageable = Pageable.unpaged();
+        List<Chat> chats = chatRepository.findByConversationIdOrderByNgayPhanHoiAsc(conversationId, pageable).getContent();
         return chats.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -115,7 +155,8 @@ public class ChatService {
      * Lấy danh sách conversation của một khách hàng
      */
     public List<ConversationResponse> getConversationsByKhachHang(UUID khachHangId) {
-        List<Chat> lastMessages = chatRepository.findLastMessagesByKhachHang(khachHangId);
+        Pageable pageable = Pageable.unpaged();
+        List<Chat> lastMessages = chatRepository.findLastMessagesByKhachHang(khachHangId, pageable).getContent();
         return lastMessages.stream()
                 .map(chat -> mapToConversationResponse(chat, true))
                 .collect(Collectors.toList());
@@ -125,7 +166,8 @@ public class ChatService {
      * Lấy danh sách conversation của một nhân viên
      */
     public List<ConversationResponse> getConversationsByNhanVien(UUID nhanVienId) {
-        List<Chat> lastMessages = chatRepository.findLastMessagesByNhanVien(nhanVienId);
+        Pageable pageable = Pageable.unpaged();
+        List<Chat> lastMessages = chatRepository.findLastMessagesByNhanVien(nhanVienId, pageable).getContent();
         return lastMessages.stream()
                 .map(chat -> mapToConversationResponse(chat, false))
                 .collect(Collectors.toList());
@@ -172,7 +214,9 @@ public class ChatService {
      */
     @Transactional
     public void markAsRead(UUID conversationId, Boolean isFromCustomer) {
-        List<Chat> unreadMessages = chatRepository.findByConversationIdOrderByNgayPhanHoiAsc(conversationId)
+        Pageable pageable = Pageable.unpaged();
+        List<Chat> unreadMessages = chatRepository.findByConversationIdOrderByNgayPhanHoiAsc(conversationId, pageable)
+                .getContent()
                 .stream()
                 .filter(chat -> !chat.getIsRead() && chat.getIsFromCustomer().equals(!isFromCustomer))
                 .collect(Collectors.toList());

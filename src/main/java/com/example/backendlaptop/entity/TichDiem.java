@@ -28,4 +28,7 @@ public class TichDiem {
     @Column(name = "tong_diem")
     private Integer tongDiem;
 
+    @Column(name = "trang_thai")
+    private Integer trangThai = 1; // 1 = Active, 0 = Inactive
+
 }

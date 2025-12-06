@@ -62,5 +62,32 @@ public class BaoHanhController {
         PhieuBaoHanhResponse response = baoHanhService.taoYeuCau(request, hinhAnh);
         return ResponseEntity.ok(new ResponseObject<>(response, "Tạo phiếu bảo hành thành công"));
     }
+
+    @PostMapping("/tiep-nhan/{idBaoHanh}")
+    public ResponseEntity<ResponseObject<PhieuBaoHanhResponse>> tiepNhanSanPham(
+            @PathVariable UUID idBaoHanh,
+            @ModelAttribute com.example.backendlaptop.model.request.baohanh.TiepNhanRequest request
+    ) {
+        PhieuBaoHanhResponse response = baoHanhService.tiepNhanSanPham(idBaoHanh, request);
+        return ResponseEntity.ok(new ResponseObject<>(response, "Tiếp nhận sản phẩm thành công"));
+    }
+
+    @PostMapping("/chi-phi/{idLichSuBaoHanh}")
+    public ResponseEntity<ResponseObject<com.example.backendlaptop.entity.LichSuBaoHanh>> themChiPhiPhatSinh(
+            @PathVariable UUID idLichSuBaoHanh,
+            @RequestBody com.example.backendlaptop.model.request.baohanh.ChiPhiPhatSinhRequest request
+    ) {
+        com.example.backendlaptop.entity.LichSuBaoHanh response = baoHanhService.themChiPhiPhatSinh(idLichSuBaoHanh, request);
+        return ResponseEntity.ok(new ResponseObject<>(response, "Thêm chi phí phát sinh thành công"));
+    }
+
+    @PostMapping("/ban-giao/{idBaoHanh}")
+    public ResponseEntity<ResponseObject<PhieuBaoHanhResponse>> banGiaoSanPham(
+            @PathVariable UUID idBaoHanh,
+            @ModelAttribute com.example.backendlaptop.model.request.baohanh.BanGiaoRequest request
+    ) {
+        PhieuBaoHanhResponse response = baoHanhService.banGiaoSanPham(idBaoHanh, request);
+        return ResponseEntity.ok(new ResponseObject<>(response, "Bàn giao sản phẩm thành công"));
+    }
 }
 

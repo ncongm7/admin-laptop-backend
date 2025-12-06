@@ -3,16 +3,20 @@ package com.example.backendlaptop.controller.chat;
 import com.example.backendlaptop.dto.chat.ChatRequest;
 import com.example.backendlaptop.dto.chat.ChatResponse;
 import com.example.backendlaptop.dto.chat.ConversationResponse;
+import com.example.backendlaptop.exception.*;
 import com.example.backendlaptop.model.response.ResponseObject;
 import com.example.backendlaptop.service.chat.ChatService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/chat")
 @RequiredArgsConstructor
@@ -26,21 +30,16 @@ public class ChatController {
      */
     @PostMapping("/send")
     public ResponseEntity<ResponseObject<ChatResponse>> sendMessage(@Valid @RequestBody ChatRequest request) {
-        try {
-            System.out.println("📨 Nhận request gửi tin nhắn:");
-            System.out.println("  - khachHangId: " + request.getKhachHangId());
-            System.out.println("  - nhanVienId: " + request.getNhanVienId());
-            System.out.println("  - noiDung: " + request.getNoiDung());
-            System.out.println("  - isFromCustomer: " + request.getIsFromCustomer());
-            System.out.println("  - conversationId: " + request.getConversationId());
-            
-            ChatResponse response = chatService.sendMessage(request);
-            return ResponseEntity.ok(new ResponseObject<>(response, "Gửi tin nhắn thành công"));
-        } catch (Exception e) {
-            System.err.println("❌ Lỗi khi gửi tin nhắn: " + e.getMessage());
-            e.printStackTrace();
-            throw e;
+        log.info("📨 Nhận request gửi tin nhắn: khachHangId={}, nhanVienId={}, isFromCustomer={}", 
+                request.getKhachHangId(), request.getNhanVienId(), request.getIsFromCustomer());
+        
+        // Validate message length
+        if (request.getNoiDung() != null && request.getNoiDung().length() > 5000) {
+            throw new ChatMessageTooLongException(5000, request.getNoiDung().length());
         }
+        
+        ChatResponse response = chatService.sendMessage(request);
+        return ResponseEntity.ok(new ResponseObject<>(response, "Gửi tin nhắn thành công"));
     }
 
     /**
@@ -129,6 +128,42 @@ public class ChatController {
             e.printStackTrace();
             return ResponseEntity.ok(new ResponseObject<>(null, "Chưa có conversation, sẽ tạo mới khi gửi tin nhắn"));
         }
+    }
+
+    // Exception handlers
+    @ExceptionHandler(ChatRateLimitExceededException.class)
+    public ResponseEntity<ResponseObject<Object>> handleRateLimitExceeded(ChatRateLimitExceededException e) {
+        log.warn("Rate limit exceeded: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(new ResponseObject<Object>(false, null, e.getUserMessage()));
+    }
+
+    @ExceptionHandler(ChatMessageTooLongException.class)
+    public ResponseEntity<ResponseObject<Object>> handleMessageTooLong(ChatMessageTooLongException e) {
+        log.warn("Message too long: {} characters (max: {})", e.getActualLength(), e.getMaxLength());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ResponseObject<Object>(false, null, e.getUserMessage()));
+    }
+
+    @ExceptionHandler(ChatConversationNotFoundException.class)
+    public ResponseEntity<ResponseObject<Object>> handleConversationNotFound(ChatConversationNotFoundException e) {
+        log.warn("Conversation not found: {}", e.getConversationId());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ResponseObject<Object>(false, null, e.getUserMessage()));
+    }
+
+    @ExceptionHandler(ChatException.class)
+    public ResponseEntity<ResponseObject<Object>> handleChatException(ChatException e) {
+        log.error("Chat error: {}", e.getMessage(), e);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ResponseObject<Object>(false, null, e.getUserMessage()));
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ResponseObject<Object>> handleGenericException(Exception e) {
+        log.error("Unexpected error in chat controller: {}", e.getMessage(), e);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ResponseObject<Object>(false, null, "Đã xảy ra lỗi. Vui lòng thử lại sau."));
     }
 }
 

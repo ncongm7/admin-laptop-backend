@@ -48,4 +48,17 @@ public class PhieuBaoHanh {
 
     @Column(name = "so_lan_sua_chua")
     private Integer soLanSuaChua;
+
+    @Column(name = "ma_phieu_bao_hanh", length = 50, unique = true)
+    private String maPhieuBaoHanh;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_hoa_don_chi_tiet")
+    private HoaDonChiTiet idHoaDonChiTiet;
+
+    @Column(name = "ngay_tao")
+    private Instant ngayTao = Instant.now();
+
+    @Column(name = "ngay_cap_nhat")
+    private Instant ngayCapNhat;
 }

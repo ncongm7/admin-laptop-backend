@@ -33,6 +33,7 @@ public class ThanhToanRequest {
     
     // Thông tin giao hàng (nếu cần)
     private Boolean canGiaoHang; // Có cần giao hàng không
+    private Boolean isCOD; // Thanh toán khi nhận hàng (Cash on Delivery) - chỉ áp dụng khi canGiaoHang = true
     private String tenNguoiNhan; // Tên người nhận (nếu khác khách hàng)
     private String sdtNguoiNhan; // Số điện thoại người nhận
     private String diaChiGiaoHang; // Địa chỉ giao hàng

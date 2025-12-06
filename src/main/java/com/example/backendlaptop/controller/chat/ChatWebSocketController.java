@@ -2,7 +2,9 @@ package com.example.backendlaptop.controller.chat;
 
 import com.example.backendlaptop.dto.chat.ChatRequest;
 import com.example.backendlaptop.dto.chat.ChatResponse;
+import com.example.backendlaptop.dto.chat.ChatbotResponse;
 import com.example.backendlaptop.service.chat.ChatService;
+import com.example.backendlaptop.service.chat.ChatbotService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -13,7 +15,7 @@ import org.springframework.stereotype.Controller;
 import java.util.UUID;
 
 /**
- * WebSocket Controller cho real-time chat
+ * WebSocket Controller cho real-time chat với AI Chatbot
  * Sử dụng STOMP protocol
  */
 @Slf4j
@@ -22,10 +24,12 @@ import java.util.UUID;
 public class ChatWebSocketController {
 
     private final ChatService chatService;
+    private final ChatbotService chatbotService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final com.example.backendlaptop.service.chat.RateLimitService rateLimitService;
 
     /**
-     * Xử lý tin nhắn mới từ client
+     * Xử lý tin nhắn mới từ client với AI Chatbot integration
      * Client gửi đến: /app/chat.send
      * Server broadcast đến: /topic/conversation/{conversationId}
      * 
@@ -33,45 +37,76 @@ public class ChatWebSocketController {
      */
     @MessageMapping("/chat.send")
     public void sendMessage(@Payload ChatRequest request) {
-        log.info("📨 Nhận tin nhắn từ WebSocket: {}", request);
+        log.info("📨 [WebSocket] Nhận tin nhắn: {}", request);
         
         try {
-            // Lưu tin nhắn vào database
-            ChatResponse response = chatService.sendMessage(request);
+            // Rate limiting is handled in ChatService.sendMessage()
+            // 1. Lưu tin nhắn khách hàng vào database
+            ChatResponse customerMessage = chatService.sendMessage(request);
             
-            // CHỈ gửi tin nhắn đến conversation cụ thể (KHÔNG dùng @SendTo để tránh duplicate)
-            UUID conversationId = response.getConversationId();
+            // 2. Broadcast tin nhắn khách hàng đến conversation
+            UUID conversationId = customerMessage.getConversationId();
             if (conversationId != null) {
-                messagingTemplate.convertAndSend("/topic/conversation/" + conversationId, response);
-                log.debug("✅ Đã gửi message đến conversation: {}", conversationId);
+                messagingTemplate.convertAndSend("/topic/conversation/" + conversationId, customerMessage);
+                log.debug("✅ [WebSocket] Đã gửi customer message đến conversation: {}", conversationId);
             }
             
-            // Gửi notification đến user cụ thể (nếu cần) - chỉ notification, không phải message
-            // Comment out để tránh duplicate, chỉ dùng conversation topic
-            /*
-            if (response.getIsFromCustomer()) {
-                // Gửi đến nhân viên
-                if (response.getNhanVienId() != null) {
-                    messagingTemplate.convertAndSendToUser(
-                        response.getNhanVienId().toString(),
-                        "/queue/notifications",
-                        response
-                    );
-                }
-            } else {
-                // Gửi đến khách hàng
-                if (response.getKhachHangId() != null) {
-                    messagingTemplate.convertAndSendToUser(
-                        response.getKhachHangId().toString(),
-                        "/queue/notifications",
-                        response
-                    );
+            // 3. Nếu tin nhắn từ khách hàng → Trigger chatbot
+            if (Boolean.TRUE.equals(request.getIsFromCustomer())) {
+                log.info("🤖 [WebSocket] Triggering chatbot for customer message");
+                
+                try {
+                    ChatbotResponse botResponse = chatbotService.processCustomerMessage(customerMessage);
+                    
+                    if (botResponse != null && Boolean.TRUE.equals(botResponse.getShouldSave())) {
+                        // Tạo tin nhắn bot
+                        ChatRequest botRequest = new ChatRequest();
+                        botRequest.setKhachHangId(request.getKhachHangId());
+                        botRequest.setNhanVienId(null); // Bot không phải nhân viên
+                        botRequest.setNoiDung(botResponse.getResponseText());
+                        botRequest.setConversationId(conversationId);
+                        botRequest.setMessageType("text");
+                        botRequest.setIsFromCustomer(false);
+                        
+                        // Lưu tin nhắn bot (với delay nhỏ để realistic)
+                        Thread.sleep(800); // Simulate typing delay
+                        
+                        ChatResponse botMessageResponse = chatService.sendMessage(botRequest);
+                        
+                        // Mark as bot message
+                        botMessageResponse.setIsBotMessage(true);
+                        botMessageResponse.setBotConfidence(botResponse.getConfidence());
+                        botMessageResponse.setIntentDetected(botResponse.getIntentCode());
+                        
+                        // Add quick replies
+                        if (botResponse.getQuickReplies() != null && !botResponse.getQuickReplies().isEmpty()) {
+                            botMessageResponse.setQuickReplies(botResponse.getQuickReplies());
+                        }
+                        
+                        // Broadcast bot response
+                        messagingTemplate.convertAndSend("/topic/conversation/" + conversationId, botMessageResponse);
+                        log.info("🤖 [WebSocket] Sent bot response with intent: {}", botResponse.getIntentCode());
+                        
+                        // Nếu cần escalate, gửi notification
+                        if (Boolean.TRUE.equals(botResponse.getShouldEscalate())) {
+                            messagingTemplate.convertAndSend("/topic/admin/escalations", 
+                                java.util.Map.of(
+                                    "conversationId", conversationId,
+                                    "reason", botResponse.getEscalationReason(),
+                                    "timestamp", java.time.Instant.now()
+                                )
+                            );
+                        }
+                    }
+                } catch (Exception botError) {
+                    log.error("❌ [WebSocket] Lỗi khi xử lý chatbot: ", botError);
+                    // Không throw, để khách vẫn nhận được tin nhắn của họ
                 }
             }
-            */
+            
         } catch (Exception e) {
-            log.error("❌ Lỗi khi xử lý tin nhắn WebSocket: ", e);
-            throw e;
+            log.error("❌ [WebSocket] Lỗi khi xử lý tin nhắn: ", e);
+            throw new RuntimeException("Lỗi khi gửi tin nhắn", e);
         }
     }
 

@@ -11,4 +11,13 @@ import java.util.UUID;
 public interface LichSuBaoHanhRepository extends JpaRepository<LichSuBaoHanh, UUID> {
     List<LichSuBaoHanh> findAllByIdBaoHanh_Id(UUID phieuBaoHanhId);
 
+    List<LichSuBaoHanh> findByIdBaoHanh_IdOrderByNgayTiepNhanDesc(UUID phieuBaoHanhId);
+
+    List<LichSuBaoHanh> findByIdPhieuHen_Id(UUID idPhieuHen);
+
+    List<LichSuBaoHanh> findByIdNhanVienTiepNhan_Id(UUID idNhanVien);
+
+    List<LichSuBaoHanh> findByIdNhanVienSuaChua_Id(UUID idNhanVien);
+
+    List<LichSuBaoHanh> findByDaThanhToanFalse();
 }

@@ -14,6 +14,16 @@ import com.example.backendlaptop.repository.PhieuBaoHanhRepository;
 import com.example.backendlaptop.repository.SerialDaBanRepository;
 import com.example.backendlaptop.repository.banhang.HoaDonChiTietRepository;
 import com.example.backendlaptop.repository.banhang.HoaDonRepository;
+import com.example.backendlaptop.entity.LichSuBaoHanh;
+import com.example.backendlaptop.entity.NhanVien;
+import com.example.backendlaptop.model.TrangThaiBaoHanh;
+import com.example.backendlaptop.model.request.baohanh.BanGiaoRequest;
+import com.example.backendlaptop.model.request.baohanh.ChiPhiPhatSinhRequest;
+import com.example.backendlaptop.model.request.baohanh.TiepNhanRequest;
+import com.example.backendlaptop.repository.LichSuBaoHanhRepository;
+import com.example.backendlaptop.repository.LyDoBaoHanhRepository;
+import com.example.backendlaptop.repository.NhanVienRepository;
+import com.example.backendlaptop.service.EmailService;
 import com.example.backendlaptop.service.trahang.TraHangService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +50,9 @@ public class BaoHanhService {
     private final HoaDonChiTietRepository hoaDonChiTietRepository;
     private final KhachHangRepository khachHangRepository;
     private final SerialDaBanRepository serialDaBanRepository;
+    private final EmailService emailService;
+    private final NhanVienRepository nhanVienRepository;
+    private final LichSuBaoHanhRepository lichSuBaoHanhRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public KiemTraDieuKienResponse kiemTraDieuKien(UUID idHoaDon) {
@@ -114,6 +127,12 @@ public class BaoHanhService {
             );
             phieuBaoHanh.setChiPhi(BigDecimal.ZERO);
             phieuBaoHanh.setSoLanSuaChua(0);
+            phieuBaoHanh.setIdHoaDonChiTiet(hoaDonChiTiet);
+            phieuBaoHanh.setNgayTao(now);
+            
+            // Generate mã phiếu bảo hành
+            String maPhieuBaoHanh = generateMaPhieuBaoHanh();
+            phieuBaoHanh.setMaPhieuBaoHanh(maPhieuBaoHanh);
 
             if (!uploadedImages.isEmpty()) {
                 try {
@@ -139,6 +158,18 @@ public class BaoHanhService {
             
             System.out.println("PhieuBaoHanh serial after save: " + 
                 (reloaded.getIdSerialDaBan() != null ? reloaded.getIdSerialDaBan().getId() : "null"));
+            
+            // Tự động gửi email xác nhận
+            try {
+                String emailKhachHang = khachHang.getEmail();
+                if (emailKhachHang != null && !emailKhachHang.isBlank()) {
+                    emailService.guiEmailXacNhan(reloaded.getId(), emailKhachHang, 
+                        khachHang.getHoTen(), maPhieuBaoHanh);
+                }
+            } catch (Exception e) {
+                // Log lỗi nhưng không throw để không ảnh hưởng đến việc tạo phiếu
+                System.err.println("Lỗi khi gửi email xác nhận: " + e.getMessage());
+            }
             
             return new PhieuBaoHanhResponse(reloaded);
         } catch (ApiException e) {
@@ -197,5 +228,141 @@ public class BaoHanhService {
             urls.add("/" + filePath);
         }
         return urls;
+    }
+
+    private String generateMaPhieuBaoHanh() {
+        String prefix = "WB";
+        String dateStr = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String sequence = String.format("%03d", (int) (Math.random() * 1000));
+        return prefix + "-" + dateStr + "-" + sequence;
+    }
+
+    @Transactional
+    public PhieuBaoHanhResponse tiepNhanSanPham(UUID idBaoHanh, TiepNhanRequest request) {
+        PhieuBaoHanh phieuBaoHanh = phieuBaoHanhRepository.findById(idBaoHanh)
+                .orElseThrow(() -> new ApiException("Không tìm thấy phiếu bảo hành", "NOT_FOUND"));
+
+        NhanVien nhanVien = nhanVienRepository.findById(request.getIdNhanVienTiepNhan())
+                .orElseThrow(() -> new ApiException("Không tìm thấy nhân viên", "NOT_FOUND"));
+
+        // Tạo lịch sử bảo hành mới
+        LichSuBaoHanh lichSu = new LichSuBaoHanh();
+        lichSu.setId(UUID.randomUUID());
+        lichSu.setIdBaoHanh(phieuBaoHanh);
+        lichSu.setIdNhanVienTiepNhan(nhanVien);
+        lichSu.setNgayTiepNhan(Instant.now());
+        lichSu.setNgayNhanHang(Instant.now());
+        lichSu.setTrangThai(TrangThaiBaoHanh.DA_TIEP_NHAN.getValue());
+        lichSu.setMoTaLoi(request.getGhiChu());
+
+        // Upload ảnh tình trạng
+        if (request.getHinhAnhTinhTrang() != null && !request.getHinhAnhTinhTrang().isEmpty()) {
+            try {
+                List<String> imageUrls = uploadImages(request.getHinhAnhTinhTrang());
+                lichSu.setHinhAnhTruoc(objectMapper.writeValueAsString(imageUrls));
+            } catch (Exception e) {
+                throw new ApiException("Lỗi khi upload ảnh: " + e.getMessage(), "UPLOAD_ERROR");
+            }
+        }
+
+        lichSu = lichSuBaoHanhRepository.save(lichSu);
+
+        // Cập nhật trạng thái phiếu bảo hành
+        phieuBaoHanh.setTrangThaiBaoHanh(TrangThaiBaoHanh.DA_TIEP_NHAN.getValue());
+        phieuBaoHanh.setNgayCapNhat(Instant.now());
+        phieuBaoHanhRepository.save(phieuBaoHanh);
+
+        return new PhieuBaoHanhResponse(phieuBaoHanh);
+    }
+
+    @Transactional
+    public LichSuBaoHanh themChiPhiPhatSinh(UUID idLichSuBaoHanh, ChiPhiPhatSinhRequest request) {
+        LichSuBaoHanh lichSu = lichSuBaoHanhRepository.findById(idLichSuBaoHanh)
+                .orElseThrow(() -> new ApiException("Không tìm thấy lịch sử bảo hành", "NOT_FOUND"));
+
+        lichSu.setChiPhiPhatSinh(request.getChiPhiPhatSinh());
+        if (lichSu.getMoTaLoi() != null && !lichSu.getMoTaLoi().isEmpty()) {
+            lichSu.setMoTaLoi(lichSu.getMoTaLoi() + "\nLý do chi phí: " + request.getLyDo());
+        } else {
+            lichSu.setMoTaLoi("Lý do chi phí: " + request.getLyDo());
+        }
+
+        lichSu = lichSuBaoHanhRepository.save(lichSu);
+
+        // Gửi email thông báo chi phí
+        try {
+            String emailKhachHang = lichSu.getIdBaoHanh().getIdKhachHang().getEmail();
+            String tenKhachHang = lichSu.getIdBaoHanh().getIdKhachHang().getHoTen();
+            if (emailKhachHang != null && !emailKhachHang.isBlank()) {
+                emailService.guiEmailChiPhi(idLichSuBaoHanh, emailKhachHang, tenKhachHang,
+                    request.getChiPhiPhatSinh(), request.getLyDo());
+            }
+        } catch (Exception e) {
+            System.err.println("Lỗi khi gửi email chi phí: " + e.getMessage());
+        }
+
+        return lichSu;
+    }
+
+    @Transactional
+    public PhieuBaoHanhResponse banGiaoSanPham(UUID idBaoHanh, BanGiaoRequest request) {
+        PhieuBaoHanh phieuBaoHanh = phieuBaoHanhRepository.findById(idBaoHanh)
+                .orElseThrow(() -> new ApiException("Không tìm thấy phiếu bảo hành", "NOT_FOUND"));
+
+        // Tìm lịch sử bảo hành gần nhất
+        List<LichSuBaoHanh> lichSuList = lichSuBaoHanhRepository.findByIdBaoHanh_IdOrderByNgayTiepNhanDesc(idBaoHanh);
+        if (lichSuList.isEmpty()) {
+            throw new ApiException("Không tìm thấy lịch sử bảo hành", "NOT_FOUND");
+        }
+
+        LichSuBaoHanh lichSu = lichSuList.get(0);
+
+        if (request.getIdNhanVienBanGiao() != null) {
+            NhanVien nhanVien = nhanVienRepository.findById(request.getIdNhanVienBanGiao())
+                    .orElseThrow(() -> new ApiException("Không tìm thấy nhân viên", "NOT_FOUND"));
+            lichSu.setIdNhanVienSuaChua(nhanVien);
+        }
+
+        lichSu.setNgayBanGiao(Instant.now());
+        lichSu.setNgayHoanThanh(Instant.now());
+        lichSu.setTrangThai(TrangThaiBaoHanh.HOAN_THANH.getValue());
+        lichSu.setXacNhanKhachHang(request.getXacNhanKhachHang() != null ? request.getXacNhanKhachHang() : false);
+
+        if (request.getGhiChu() != null) {
+            lichSu.setMoTaLoi(lichSu.getMoTaLoi() != null ? 
+                lichSu.getMoTaLoi() + "\nGhi chú bàn giao: " + request.getGhiChu() : 
+                "Ghi chú bàn giao: " + request.getGhiChu());
+        }
+
+        // Upload ảnh sau sửa
+        if (request.getHinhAnhSauSua() != null && !request.getHinhAnhSauSua().isEmpty()) {
+            try {
+                List<String> imageUrls = uploadImages(request.getHinhAnhSauSua());
+                lichSu.setHinhAnhSau(objectMapper.writeValueAsString(imageUrls));
+            } catch (Exception e) {
+                throw new ApiException("Lỗi khi upload ảnh: " + e.getMessage(), "UPLOAD_ERROR");
+            }
+        }
+
+        lichSuBaoHanhRepository.save(lichSu);
+
+        // Cập nhật trạng thái phiếu bảo hành
+        phieuBaoHanh.setTrangThaiBaoHanh(TrangThaiBaoHanh.HOAN_THANH.getValue());
+        phieuBaoHanh.setNgayCapNhat(Instant.now());
+        phieuBaoHanh = phieuBaoHanhRepository.save(phieuBaoHanh);
+
+        // Gửi email hoàn thành
+        try {
+            String emailKhachHang = phieuBaoHanh.getIdKhachHang().getEmail();
+            String tenKhachHang = phieuBaoHanh.getIdKhachHang().getHoTen();
+            if (emailKhachHang != null && !emailKhachHang.isBlank()) {
+                emailService.guiEmailHoanThanh(idBaoHanh, emailKhachHang, tenKhachHang,
+                    phieuBaoHanh.getMaPhieuBaoHanh());
+            }
+        } catch (Exception e) {
+            System.err.println("Lỗi khi gửi email hoàn thành: " + e.getMessage());
+        }
+
+        return new PhieuBaoHanhResponse(phieuBaoHanh);
     }
 }

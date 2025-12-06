@@ -85,6 +85,9 @@ public class ThanhToanService {
 
     @Autowired
     private DotGiamGiaChiTietRepository dotGiamGiaChiTietRepository;
+    
+    @Autowired
+    private com.example.backendlaptop.service.diem.TichDiemService tichDiemService;
 
     /**
      * Xác Thực Serial Number
@@ -444,10 +447,27 @@ public class ThanhToanService {
             System.out.println("✅ [ThanhToanService] Đã trừ " + soLuongTrongDon + " sản phẩm, tồn kho còn: " + soLuongTonMoi + ", tạm giữ còn: " + soLuongTamGiuMoi);
         }
 
-        // 5. Cập nhật trạng thái hóa đơn
-        hoaDon.setTrangThai(TrangThaiHoaDon.DA_THANH_TOAN);
-        hoaDon.setTrangThaiThanhToan(1); // 1: Đã thanh toán
-        hoaDon.setNgayThanhToan(Instant.now());
+        // 5. Cập nhật trạng thái hóa đơn dựa trên canGiaoHang và isCOD
+        boolean isCOD = Boolean.TRUE.equals(request.getCanGiaoHang()) && Boolean.TRUE.equals(request.getIsCOD());
+        
+        if (isCOD) {
+            // COD: Thanh toán khi nhận hàng
+            hoaDon.setTrangThai(TrangThaiHoaDon.DANG_GIAO);
+            hoaDon.setTrangThaiThanhToan(0); // Chưa thanh toán
+            hoaDon.setNgayThanhToan(null); // Chưa thanh toán nên không có ngày thanh toán
+        } else {
+            // Đã thanh toán (tại quầy hoặc không cần giao hàng)
+            hoaDon.setTrangThaiThanhToan(1); // Đã thanh toán
+            hoaDon.setNgayThanhToan(Instant.now());
+            
+            if (Boolean.TRUE.equals(request.getCanGiaoHang())) {
+                // Đã thanh toán tại quầy + cần giao hàng → trạng thái: ĐANG_GIAO
+                hoaDon.setTrangThai(TrangThaiHoaDon.DANG_GIAO);
+            } else {
+                // Không cần giao hàng → trạng thái: HOAN_THANH
+                hoaDon.setTrangThai(TrangThaiHoaDon.HOAN_THANH);
+            }
+        }
         
         // 5.1. Cập nhật thông tin giao hàng (nếu có)
         if (Boolean.TRUE.equals(request.getCanGiaoHang())) {
@@ -469,25 +489,136 @@ public class ThanhToanService {
                     : ghiChuHienTai + "\nGiao hàng: " + request.getGhiChuGiaoHang();
                 hoaDon.setGhiChu(ghiChuMoi);
             }
+            
+            // Thêm ghi chú COD nếu có
+            if (isCOD) {
+                String ghiChuHienTai = hoaDon.getGhiChu() != null ? hoaDon.getGhiChu() : "";
+                String ghiChuCOD = ghiChuHienTai.isEmpty() 
+                    ? "COD: Thanh toán khi nhận hàng"
+                    : ghiChuHienTai + "\nCOD: Thanh toán khi nhận hàng";
+                hoaDon.setGhiChu(ghiChuCOD);
+            }
         }
 
-        // 6. Ghi nhận chi tiết thanh toán
-        PhuongThucThanhToan pttt = phuongThucThanhToanRepository.findById(request.getIdPhuongThucThanhToan())
-                .orElseThrow(() -> new ApiException("Không tìm thấy phương thức thanh toán với ID: " + request.getIdPhuongThucThanhToan(), "NOT_FOUND"));
+        // 6. Ghi nhận chi tiết thanh toán (chỉ khi đã thanh toán, không phải COD)
+        if (!isCOD) {
+            PhuongThucThanhToan pttt = phuongThucThanhToanRepository.findById(request.getIdPhuongThucThanhToan())
+                    .orElseThrow(() -> new ApiException("Không tìm thấy phương thức thanh toán với ID: " + request.getIdPhuongThucThanhToan(), "NOT_FOUND"));
 
+            ChiTietThanhToan cttt = new ChiTietThanhToan();
+            cttt.setId(UUID.randomUUID());
+            cttt.setIdHoaDon(hoaDon);
+            cttt.setPhuongThucThanhToan(pttt);
+            cttt.setSoTienThanhToan(request.getSoTienThanhToan());
+            cttt.setTienKhachDua(request.getTienKhachDua()); // Số tiền khách đưa (cho thanh toán tiền mặt)
+            cttt.setTienTraLai(request.getTienTraLai()); // Số tiền trả lại khách (cho thanh toán tiền mặt)
+            cttt.setMaGiaoDich(request.getMaGiaoDich());
+            cttt.setGhiChu(request.getGhiChu());
+            chiTietThanhToanRepository.save(cttt);
+        }
+
+        // 7. Lưu hóa đơn
+        hoaDonService.save(hoaDon);
+        
+        // 8. Trừ điểm nếu có sử dụng điểm (chỉ khi đã thanh toán, không phải COD)
+        if (!isCOD && hoaDon.getSoDiemSuDung() != null && hoaDon.getSoDiemSuDung() > 0) {
+            try {
+                tichDiemService.truDiemKhiThanhToan(idHoaDon, hoaDon.getSoDiemSuDung());
+            } catch (Exception e) {
+                // Log error nhưng không rollback transaction vì đã thanh toán thành công
+                System.err.println("⚠️ [ThanhToanService] Lỗi khi trừ điểm: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+        
+        // 9. Tích điểm sau thanh toán thành công (chỉ khi đã thanh toán, không phải COD)
+        if (!isCOD && hoaDon.getIdKhachHang() != null) {
+            try {
+                tichDiemService.tichDiemSauThanhToan(idHoaDon);
+            } catch (Exception e) {
+                // Log error nhưng không rollback transaction vì đã thanh toán thành công
+                System.err.println("⚠️ [ThanhToanService] Lỗi khi tích điểm: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+        
+        return new HoaDonResponse(hoaDonService.findById(idHoaDon));
+    }
+
+    /**
+     * Xử lý thanh toán COD (Cash on Delivery) khi giao hàng thành công
+     * @param idHoaDon ID hóa đơn
+     * @param tienKhachDua Số tiền khách đưa khi nhận hàng
+     * @return HoaDonResponse
+     */
+    @Transactional
+    public HoaDonResponse thanhToanCOD(UUID idHoaDon, BigDecimal tienKhachDua) {
+        // 1. Tìm hóa đơn
+        HoaDon hoaDon = hoaDonService.findById(idHoaDon);
+        
+        // 2. Kiểm tra trạng thái hóa đơn (phải là DANG_GIAO và chưa thanh toán)
+        if (hoaDon.getTrangThai() != TrangThaiHoaDon.DANG_GIAO) {
+            throw new ApiException("Hóa đơn không ở trạng thái đang giao hàng!", "INVALID_STATUS");
+        }
+        
+        if (hoaDon.getTrangThaiThanhToan() != null && hoaDon.getTrangThaiThanhToan() == 1) {
+            throw new ApiException("Hóa đơn đã được thanh toán rồi!", "ALREADY_PAID");
+        }
+        
+        // 3. Validate số tiền khách đưa
+        BigDecimal tongTien = hoaDon.getTongTienSauGiam() != null ? hoaDon.getTongTienSauGiam() : hoaDon.getTongTien();
+        if (tienKhachDua == null || tienKhachDua.compareTo(tongTien) < 0) {
+            throw new ApiException("Số tiền khách đưa không đủ! Cần: " + tongTien, "INSUFFICIENT_AMOUNT");
+        }
+        
+        // 4. Tính tiền trả lại
+        BigDecimal tienTraLai = tienKhachDua.subtract(tongTien);
+        
+        // 5. Tìm phương thức thanh toán "Tiền mặt"
+        PhuongThucThanhToan pttt = phuongThucThanhToanRepository.findAll().stream()
+                .filter(pt -> "Tien mat".equalsIgnoreCase(pt.getTenPhuongThuc()) || "Cash".equalsIgnoreCase(pt.getLoaiPhuongThuc()))
+                .findFirst()
+                .orElseThrow(() -> new ApiException("Không tìm thấy phương thức thanh toán Tiền mặt!", "NOT_FOUND"));
+        
+        // 6. Tạo chi tiết thanh toán
         ChiTietThanhToan cttt = new ChiTietThanhToan();
         cttt.setId(UUID.randomUUID());
         cttt.setIdHoaDon(hoaDon);
         cttt.setPhuongThucThanhToan(pttt);
-        cttt.setSoTienThanhToan(request.getSoTienThanhToan());
-        cttt.setTienKhachDua(request.getTienKhachDua()); // Số tiền khách đưa (cho thanh toán tiền mặt)
-        cttt.setTienTraLai(request.getTienTraLai()); // Số tiền trả lại khách (cho thanh toán tiền mặt)
-        cttt.setMaGiaoDich(request.getMaGiaoDich());
-        cttt.setGhiChu(request.getGhiChu());
+        cttt.setSoTienThanhToan(tongTien);
+        cttt.setTienKhachDua(tienKhachDua);
+        cttt.setTienTraLai(tienTraLai);
+        cttt.setMaGiaoDich(null); // COD không có mã giao dịch
+        cttt.setGhiChu("Thanh toán COD khi giao hàng");
         chiTietThanhToanRepository.save(cttt);
-
-        // 7. Lưu hóa đơn
+        
+        // 7. Cập nhật trạng thái hóa đơn
+        hoaDon.setTrangThaiThanhToan(1); // Đã thanh toán
+        hoaDon.setTrangThai(TrangThaiHoaDon.HOAN_THANH); // Hoàn thành
+        hoaDon.setNgayThanhToan(Instant.now());
+        
+        // 8. Lưu hóa đơn
         hoaDonService.save(hoaDon);
+        
+        // 9. Trừ điểm nếu có sử dụng điểm
+        if (hoaDon.getSoDiemSuDung() != null && hoaDon.getSoDiemSuDung() > 0) {
+            try {
+                tichDiemService.truDiemKhiThanhToan(idHoaDon, hoaDon.getSoDiemSuDung());
+            } catch (Exception e) {
+                System.err.println("⚠️ [ThanhToanService] Lỗi khi trừ điểm (COD): " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+        
+        // 10. Tích điểm sau thanh toán COD thành công
+        if (hoaDon.getIdKhachHang() != null) {
+            try {
+                tichDiemService.tichDiemSauThanhToan(idHoaDon);
+            } catch (Exception e) {
+                System.err.println("⚠️ [ThanhToanService] Lỗi khi tích điểm (COD): " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
         
         return new HoaDonResponse(hoaDonService.findById(idHoaDon));
     }

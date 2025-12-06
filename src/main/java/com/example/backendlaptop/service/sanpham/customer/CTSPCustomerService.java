@@ -26,6 +26,16 @@ public class CTSPCustomerService {
         Optional<ChiTietSanPham> chiTietSanPham = chiTietSanPhamRepository.findById(id);
         if(chiTietSanPham.isPresent()){
             List<HinhAnh> hinhAnhs = hinhAnhRepository.findByIdSpctId(id);
+            // Sắp xếp để hình ảnh chính ở đầu
+            hinhAnhs.sort((ha1, ha2) -> {
+                if (ha1.getAnhChinhDaiDien() && !ha2.getAnhChinhDaiDien()) {
+                    return -1;
+                }
+                if (!ha1.getAnhChinhDaiDien() && ha2.getAnhChinhDaiDien()) {
+                    return 1;
+                }
+                return 0;
+            });
             return new CTSPResponseCustomer(chiTietSanPham.get(), hinhAnhs);
         }
         return null;
@@ -44,6 +54,16 @@ public class CTSPCustomerService {
         return chiTietSanPhams.stream()
                 .map(ctsp -> {
                     List<HinhAnh> hinhAnhs = hinhAnhRepository.findByIdSpctId(ctsp.getId());
+                    // Sắp xếp để hình ảnh chính ở đầu
+                    hinhAnhs.sort((ha1, ha2) -> {
+                        if (ha1.getAnhChinhDaiDien() && !ha2.getAnhChinhDaiDien()) {
+                            return -1;
+                        }
+                        if (!ha1.getAnhChinhDaiDien() && ha2.getAnhChinhDaiDien()) {
+                            return 1;
+                        }
+                        return 0;
+                    });
                     return new CTSPResponseCustomer(ctsp, hinhAnhs);
                 })
                 .collect(Collectors.toList());

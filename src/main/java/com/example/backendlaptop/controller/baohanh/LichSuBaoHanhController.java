@@ -41,4 +41,24 @@ public class LichSuBaoHanhController {
         return new ResponseObject<>(null, "Update thanh cong");
     }
 
+    @PostMapping("/cap-nhat-hinh-anh/{id}")
+    public ResponseObject<LichSuBaoHanhResponse> capNhatHinhAnh(
+            @PathVariable UUID id,
+            @RequestParam(value = "hinhAnhTruoc", required = false) java.util.List<org.springframework.web.multipart.MultipartFile> hinhAnhTruoc,
+            @RequestParam(value = "hinhAnhSau", required = false) java.util.List<org.springframework.web.multipart.MultipartFile> hinhAnhSau
+    ) {
+        LichSuBaoHanhResponse response = service.capNhatHinhAnh(id, hinhAnhTruoc, hinhAnhSau);
+        return new ResponseObject<>(response, "Cập nhật hình ảnh thành công");
+    }
+
+    @PutMapping("/cap-nhat-chi-phi/{id}")
+    public ResponseObject<LichSuBaoHanhResponse> capNhatChiPhi(
+            @PathVariable UUID id,
+            @RequestParam(value = "chiPhiPhatSinh", required = false) java.math.BigDecimal chiPhiPhatSinh,
+            @RequestParam(value = "daThanhToan", required = false) Boolean daThanhToan
+    ) {
+        LichSuBaoHanhResponse response = service.capNhatChiPhi(id, chiPhiPhatSinh, daThanhToan);
+        return new ResponseObject<>(response, "Cập nhật chi phí thành công");
+    }
+
 }

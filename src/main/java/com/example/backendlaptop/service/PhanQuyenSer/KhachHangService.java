@@ -8,6 +8,7 @@ import com.example.backendlaptop.entity.VaiTro;
 import com.example.backendlaptop.repository.KhachHangRepository;
 import com.example.backendlaptop.repository.TaiKhoanRepository;
 import com.example.backendlaptop.repository.VaiTroRepository;
+import com.example.backendlaptop.service.diem.TichDiemService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -33,6 +34,9 @@ public class KhachHangService {
     
     @Autowired
     private VaiTroRepository vaiTroRepository;
+    
+    @Autowired
+    private TichDiemService tichDiemService;
 
     //    tìm full danh sach
     public List<KhachHangDto> findAllKH() {
@@ -150,7 +154,16 @@ public String generateMaKhachHang() {
 
         khachHangRepository.save(khachHang);
         
-        // 3. Trả về thông tin đăng nhập nếu có tạo tài khoản
+        // 3. Tạo ví điểm cho khách hàng mới
+        try {
+            tichDiemService.taoViDiemChoKhachHang(khachHang.getId());
+        } catch (Exception e) {
+            // Log error nhưng không rollback transaction
+            System.err.println("⚠️ [KhachHangService] Lỗi khi tạo ví điểm: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        // 4. Trả về thông tin đăng nhập nếu có tạo tài khoản
         Map<String, String> loginInfo = new HashMap<>();
         if (taiKhoan != null && tenDangNhap != null && matKhau != null) {
             loginInfo.put("tenDangNhap", tenDangNhap);

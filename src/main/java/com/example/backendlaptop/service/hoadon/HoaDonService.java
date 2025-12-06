@@ -13,6 +13,7 @@ import com.example.backendlaptop.repository.banhang.HoaDonChiTietRepository;
 import com.example.backendlaptop.repository.ChiTietSanPhamRepository;
 import com.example.backendlaptop.repository.SerialRepository;
 import com.example.backendlaptop.repository.SerialDaBanRepository;
+import com.example.backendlaptop.repository.NhanVienRepository;
 import com.example.backendlaptop.service.WebSocketNotificationService;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,7 @@ public class HoaDonService {
     private final ChiTietSanPhamRepository chiTietSanPhamRepository;
     private final SerialRepository serialRepository;
     private final SerialDaBanRepository serialDaBanRepository;
+    private final NhanVienRepository nhanVienRepository;
     private final WebSocketNotificationService webSocketNotificationService;
 
     /**
@@ -527,9 +529,15 @@ public class HoaDonService {
             
             // 7. Gán nhân viên xác nhận (nếu có)
             if (nhanVienId != null) {
-                // TODO: Inject NhanVienRepository và set nhân viên
-                // NhanVien nhanVien = nhanVienRepository.findById(nhanVienId).orElse(null);
-                // hoaDon.setIdNhanVien(nhanVien);
+                try {
+                    NhanVien nhanVien = nhanVienRepository.findById(nhanVienId)
+                        .orElseThrow(() -> new ApiException("Không tìm thấy nhân viên với ID: " + nhanVienId, "NOT_FOUND"));
+                    hoaDon.setIdNhanVien(nhanVien);
+                    System.out.println("✅ [HoaDonService] Đã gán nhân viên xác nhận: " + nhanVien.getHoTen() + " (ID: " + nhanVienId + ")");
+                } catch (ApiException e) {
+                    System.err.println("⚠️ [HoaDonService] Không tìm thấy nhân viên với ID: " + nhanVienId);
+                    // Không throw exception, chỉ log warning để không block việc xác nhận đơn hàng
+                }
             }
 
             hoaDon = hoaDonRepository.save(hoaDon);

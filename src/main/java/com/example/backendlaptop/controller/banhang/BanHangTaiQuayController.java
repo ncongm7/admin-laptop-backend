@@ -61,6 +61,38 @@ public class BanHangTaiQuayController {
     }
 
     /**
+     * API: Thanh toán COD (Cash on Delivery) khi giao hàng thành công
+     */
+    @PostMapping("/hoa-don/{idHoaDon}/thanh-toan-cod")
+    public ResponseEntity<ResponseObject<HoaDonResponse>> thanhToanCOD(
+            @PathVariable String idHoaDon,
+            @RequestBody java.util.Map<String, Object> request) {
+        UUID hoaDonUUID = parseHoaDonId(idHoaDon);
+        
+        // Lấy số tiền khách đưa từ request
+        Object tienKhachDuaObj = request.get("tienKhachDua");
+        if (tienKhachDuaObj == null) {
+            return ResponseEntity.badRequest()
+                    .body(new ResponseObject<>(null, "Số tiền khách đưa không được để trống!"));
+        }
+        
+        java.math.BigDecimal tienKhachDua;
+        try {
+            if (tienKhachDuaObj instanceof Number) {
+                tienKhachDua = java.math.BigDecimal.valueOf(((Number) tienKhachDuaObj).doubleValue());
+            } else {
+                tienKhachDua = new java.math.BigDecimal(tienKhachDuaObj.toString());
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(new ResponseObject<>(null, "Số tiền khách đưa không hợp lệ!"));
+        }
+        
+        HoaDonResponse response = banHangTaiQuayFacade.thanhToanCOD(hoaDonUUID, tienKhachDua);
+        return ResponseEntity.ok(new ResponseObject<>(response, "Thanh toán COD thành công!"));
+    }
+
+    /**
      * API 5: Lấy Danh Sách Hóa Đơn Chờ
      * Endpoint: GET /api/v1/ban-hang/hoa-don/cho
      */

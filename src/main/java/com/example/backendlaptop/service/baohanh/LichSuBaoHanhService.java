@@ -12,9 +12,16 @@ import com.example.backendlaptop.model.response.phieugiamgia.PhieuGiamGiaRespons
 import com.example.backendlaptop.repository.LichSuBaoHanhRepository;
 import com.example.backendlaptop.repository.PhieuBaoHanhRepository;
 import com.example.backendlaptop.until.MapperUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -29,6 +36,8 @@ public class LichSuBaoHanhService {
     LichSuBaoHanhRepository repository;
     @Autowired
     PhieuBaoHanhRepository phieuBaoHanhRepository;
+    
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public List<LichSuBaoHanhResponse> listByPhieuBaoHanhId(UUID phieuBaoHanhId) {
         if (phieuBaoHanhId == null) {
@@ -83,6 +92,73 @@ public class LichSuBaoHanhService {
         MapperUtils.mapToExisting(request,lichSuBaoHanhexist);
         lichSuBaoHanhexist.setId(id);
         repository.save(lichSuBaoHanhexist);
+    }
+
+    public LichSuBaoHanhResponse capNhatHinhAnh(UUID id, List<MultipartFile> hinhAnhTruoc, List<MultipartFile> hinhAnhSau) {
+        LichSuBaoHanh lichSu = repository.findById(id)
+                .orElseThrow(() -> new ApiException("Không tìm thấy lịch sử bảo hành", "NOT_FOUND"));
+
+        if (hinhAnhTruoc != null && !hinhAnhTruoc.isEmpty()) {
+            try {
+                List<String> urls = uploadImages(hinhAnhTruoc);
+                lichSu.setHinhAnhTruoc(objectMapper.writeValueAsString(urls));
+            } catch (Exception e) {
+                throw new ApiException("Lỗi khi upload ảnh trước: " + e.getMessage(), "UPLOAD_ERROR");
+            }
+        }
+
+        if (hinhAnhSau != null && !hinhAnhSau.isEmpty()) {
+            try {
+                List<String> urls = uploadImages(hinhAnhSau);
+                lichSu.setHinhAnhSau(objectMapper.writeValueAsString(urls));
+            } catch (Exception e) {
+                throw new ApiException("Lỗi khi upload ảnh sau: " + e.getMessage(), "UPLOAD_ERROR");
+            }
+        }
+
+        lichSu = repository.save(lichSu);
+        return new LichSuBaoHanhResponse(lichSu);
+    }
+
+    public LichSuBaoHanhResponse capNhatChiPhi(UUID id, java.math.BigDecimal chiPhiPhatSinh, Boolean daThanhToan) {
+        LichSuBaoHanh lichSu = repository.findById(id)
+                .orElseThrow(() -> new ApiException("Không tìm thấy lịch sử bảo hành", "NOT_FOUND"));
+
+        if (chiPhiPhatSinh != null) {
+            lichSu.setChiPhiPhatSinh(chiPhiPhatSinh);
+        }
+        if (daThanhToan != null) {
+            lichSu.setDaThanhToan(daThanhToan);
+        }
+
+        lichSu = repository.save(lichSu);
+        return new LichSuBaoHanhResponse(lichSu);
+    }
+
+    private List<String> uploadImages(List<MultipartFile> files) throws IOException {
+        List<String> urls = new ArrayList<>();
+        if (files == null || files.isEmpty()) {
+            return urls;
+        }
+
+        String uploadDir = "uploads/bao-hanh/";
+        File directory = new File(uploadDir);
+        if (!directory.exists()) {
+            directory.mkdirs();
+        }
+
+        for (MultipartFile file : files) {
+            if (file.isEmpty()) continue;
+            String originalFilename = file.getOriginalFilename();
+            String extension = originalFilename != null && originalFilename.contains(".")
+                    ? originalFilename.substring(originalFilename.lastIndexOf("."))
+                    : ".jpg";
+            String filename = java.util.UUID.randomUUID() + extension;
+            String filePath = uploadDir + filename;
+            file.transferTo(new File(filePath));
+            urls.add("/" + filePath);
+        }
+        return urls;
     }
 
 }

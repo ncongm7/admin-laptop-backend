@@ -14,9 +14,13 @@ import java.util.UUID;
 @Repository
 public interface ChatRepository extends JpaRepository<Chat, UUID> {
     
-    // Lấy tất cả tin nhắn trong một conversation, sắp xếp theo thời gian
-    @Query("SELECT c FROM Chat c WHERE c.conversationId = :conversationId ORDER BY c.ngayPhanHoi ASC")
-    List<Chat> findByConversationIdOrderByNgayPhanHoiAsc(@Param("conversationId") UUID conversationId);
+    // Lấy tất cả tin nhắn trong một conversation, sắp xếp theo thời gian (với pagination)
+    @Query("SELECT c FROM Chat c LEFT JOIN FETCH c.khachHang LEFT JOIN FETCH c.nhanVien WHERE c.conversationId = :conversationId ORDER BY c.ngayPhanHoi ASC")
+    Page<Chat> findByConversationIdOrderByNgayPhanHoiAsc(@Param("conversationId") UUID conversationId, Pageable pageable);
+    
+    // Lấy tất cả tin nhắn trong một conversation (không pagination - cho backward compatibility)
+    @Query("SELECT c FROM Chat c LEFT JOIN FETCH c.khachHang LEFT JOIN FETCH c.nhanVien WHERE c.conversationId = :conversationId ORDER BY c.ngayPhanHoi ASC")
+    List<Chat> findByConversationIdOrderByCreatedAtAsc(@Param("conversationId") UUID conversationId);
 
     // Lấy tin nhắn giữa khách hàng và nhân viên (không có conversation_id)
     @Query("SELECT c FROM Chat c WHERE " +
@@ -28,19 +32,19 @@ public interface ChatRepository extends JpaRepository<Chat, UUID> {
         @Param("nhanVienId") UUID nhanVienId
     );
 
-    // Lấy danh sách conversation của một khách hàng (lấy tin nhắn cuối cùng của mỗi conversation)
-    @Query("SELECT c FROM Chat c WHERE c.id IN (" +
+    // Lấy danh sách conversation của một khách hàng (lấy tin nhắn cuối cùng của mỗi conversation) - với pagination
+    @Query("SELECT c FROM Chat c LEFT JOIN FETCH c.khachHang LEFT JOIN FETCH c.nhanVien WHERE c.id IN (" +
            "SELECT MAX(c2.id) FROM Chat c2 WHERE c2.khachHang.id = :khachHangId " +
            "GROUP BY COALESCE(c2.conversationId, c2.id)" +
            ") ORDER BY c.ngayPhanHoi DESC")
-    List<Chat> findLastMessagesByKhachHang(@Param("khachHangId") UUID khachHangId);
+    Page<Chat> findLastMessagesByKhachHang(@Param("khachHangId") UUID khachHangId, Pageable pageable);
 
-    // Lấy danh sách conversation của một nhân viên
-    @Query("SELECT c FROM Chat c WHERE c.id IN (" +
+    // Lấy danh sách conversation của một nhân viên - với pagination
+    @Query("SELECT c FROM Chat c LEFT JOIN FETCH c.khachHang LEFT JOIN FETCH c.nhanVien WHERE c.id IN (" +
            "SELECT MAX(c2.id) FROM Chat c2 WHERE c2.nhanVien.id = :nhanVienId " +
            "GROUP BY COALESCE(c2.conversationId, c2.id)" +
            ") ORDER BY c.ngayPhanHoi DESC")
-    List<Chat> findLastMessagesByNhanVien(@Param("nhanVienId") UUID nhanVienId);
+    Page<Chat> findLastMessagesByNhanVien(@Param("nhanVienId") UUID nhanVienId, Pageable pageable);
 
     // Đếm số tin nhắn chưa đọc của một khách hàng
     @Query("SELECT COUNT(c) FROM Chat c WHERE c.khachHang.id = :khachHangId AND c.isRead = false AND c.isFromCustomer = false")

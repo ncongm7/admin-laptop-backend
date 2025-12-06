@@ -45,4 +45,8 @@ public interface PhieuBaoHanhRepository extends JpaRepository<PhieuBaoHanh, UUID
            "JOIN hdct.hoaDon hd " +
            "WHERE hd.id = :idHoaDon")
     List<PhieuBaoHanh> findByHoaDonId(UUID idHoaDon);
+
+    Optional<PhieuBaoHanh> findByMaPhieuBaoHanh(String maPhieuBaoHanh);
+
+    List<PhieuBaoHanh> findByIdHoaDonChiTiet_Id(UUID idHoaDonChiTiet);
 }

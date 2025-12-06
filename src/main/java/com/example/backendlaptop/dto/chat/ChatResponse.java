@@ -2,7 +2,9 @@ package com.example.backendlaptop.dto.chat;
 
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -25,5 +27,13 @@ public class ChatResponse {
     private ChatResponse replyTo; // Thông tin tin nhắn được reply
     private Instant createdAt;
     private Instant updatedAt;
+    
+    // NEW: Chatbot AI fields
+    private Boolean isBotMessage; // Tin nhắn từ bot
+    private BigDecimal botConfidence; // Độ tin cậy intent detection
+    private String intentDetected; // Intent được phát hiện
+    private Boolean requiresHumanReview; // Cần review
+    private List<QuickReplyDTO> quickReplies; // Quick reply buttons
 }
+
 

@@ -24,6 +24,13 @@ public class PhieuBaoHanhResponse {
     private Instant ngayKetThuc;
     private Integer trangThai;
     private List<String> hinhAnh; // Danh sách URLs hình ảnh
+    private String maPhieuBaoHanh;
+    private UUID idHoaDonChiTiet;
+    private String moTa;
+    private java.math.BigDecimal chiPhi;
+    private Integer soLanSuaChua;
+    private java.time.Instant ngayTao;
+    private java.time.Instant ngayCapNhat;
 
     public PhieuBaoHanhResponse(PhieuBaoHanh entity){
         this.id = entity.getId();
@@ -75,6 +82,14 @@ public class PhieuBaoHanhResponse {
         } else {
             this.hinhAnh = null;
         }
+
+        this.maPhieuBaoHanh = entity.getMaPhieuBaoHanh();
+        this.idHoaDonChiTiet = entity.getIdHoaDonChiTiet() != null ? entity.getIdHoaDonChiTiet().getId() : null;
+        this.moTa = entity.getMoTa();
+        this.chiPhi = entity.getChiPhi();
+        this.soLanSuaChua = entity.getSoLanSuaChua();
+        this.ngayTao = entity.getNgayTao();
+        this.ngayCapNhat = entity.getNgayCapNhat();
     }
 
 }

@@ -58,6 +58,19 @@ public class Chat {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+    // NEW: Chatbot AI fields
+    @Column(name = "is_bot_message")
+    private Boolean isBotMessage = false; // true = tin nhắn từ bot tự động
+    
+    @Column(name = "bot_confidence", precision = 3, scale = 2)
+    private java.math.BigDecimal botConfidence; // Độ tin cậy của intent detection
+    
+    @Column(name = "intent_detected", length = 50)
+    private String intentDetected; // Intent được phát hiện
+    
+    @Column(name = "requires_human_review")
+    private Boolean requiresHumanReview = false; // Cần nhân viên xem xét
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {
@@ -74,5 +87,31 @@ public class Chat {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = Instant.now();
+    }
+
+    /**
+     * Generate hash from message content and timestamp for duplicate detection
+     */
+    public String generateMessageHash() {
+        if (noiDung == null || conversationId == null || ngayPhanHoi == null) {
+            return null;
+        }
+        
+        // Create hash from: conversationId + noiDung + timestamp (rounded to seconds)
+        String content = conversationId.toString() + "|" + noiDung.trim() + "|" + 
+                        (ngayPhanHoi.getEpochSecond() / 60); // Round to minute to allow same message within 1 minute
+        
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("MD5");
+            byte[] hashBytes = md.digest(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hashBytes) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            // Fallback to simple hash
+            return String.valueOf(content.hashCode());
+        }
     }
 }

@@ -173,10 +173,12 @@ public class ThongKeService {
     // ==================== Helper methods using EntityManager ====================
     
     private Long countHoaDonHoanThanh(Instant startDate, Instant endDate) {
+        // Đếm đơn đã thanh toán (DA_THANH_TOAN = 1) hoặc hoàn thành (HOAN_THANH = 4)
+        // Vì cả 2 đều là đơn đã được thanh toán và xử lý thành công
         Query query = entityManager.createNativeQuery("""
             SELECT COUNT(*) 
             FROM hoa_don 
-            WHERE trang_thai = 1 
+            WHERE (trang_thai = 1 OR trang_thai = 4)
               AND ngay_tao >= ?1 
               AND ngay_tao <= ?2
             """);
@@ -187,10 +189,12 @@ public class ThongKeService {
     }
     
     private BigDecimal tinhTongDoanhThu(Instant startDate, Instant endDate) {
+        // Tính doanh thu từ đơn đã thanh toán (DA_THANH_TOAN = 1) hoặc hoàn thành (HOAN_THANH = 4)
+        // Vì cả 2 đều là đơn đã được thanh toán thành công
         Query query = entityManager.createNativeQuery("""
             SELECT COALESCE(SUM(tong_tien_sau_giam), 0) 
             FROM hoa_don 
-            WHERE trang_thai = 1 
+            WHERE (trang_thai = 1 OR trang_thai = 4)
               AND ngay_tao >= ?1 
               AND ngay_tao <= ?2
             """);
@@ -201,12 +205,13 @@ public class ThongKeService {
     }
     
     private BigDecimal tinhLoiNhuan(Instant startDate, Instant endDate) {
+        // Tính lợi nhuận từ đơn đã thanh toán (DA_THANH_TOAN = 1) hoặc hoàn thành (HOAN_THANH = 4)
         Query query = entityManager.createNativeQuery("""
             SELECT COALESCE(SUM((hdct.don_gia - ctsp.gia_nhap) * hdct.so_luong), 0)
             FROM hoa_don hd
             JOIN hoa_don_chi_tiet hdct ON hd.id = hdct.id_don_hang
             JOIN chi_tiet_san_pham ctsp ON hdct.id_ctsp = ctsp.id
-            WHERE hd.trang_thai = 1
+            WHERE (hd.trang_thai = 1 OR hd.trang_thai = 4)
               AND hd.ngay_tao >= ?1
               AND hd.ngay_tao <= ?2
             """);
@@ -217,16 +222,17 @@ public class ThongKeService {
     }
     
     private Long countKhachHangMoi(Instant startDate, Instant endDate) {
+        // Đếm khách hàng mới từ đơn đã thanh toán (DA_THANH_TOAN = 1) hoặc hoàn thành (HOAN_THANH = 4)
         Query query = entityManager.createNativeQuery("""
             SELECT COUNT(DISTINCT id_khach_hang) 
             FROM hoa_don 
-            WHERE trang_thai = 1 
+            WHERE (trang_thai = 1 OR trang_thai = 4)
               AND ngay_tao >= ?1 
               AND ngay_tao <= ?2
               AND id_khach_hang NOT IN (
                   SELECT DISTINCT id_khach_hang 
                   FROM hoa_don 
-                  WHERE trang_thai = 1 
+                  WHERE (trang_thai = 1 OR trang_thai = 4)
                     AND ngay_tao < ?3
               )
             """);
@@ -238,10 +244,11 @@ public class ThongKeService {
     }
     
     private Long countKhachHangHoatDong(Instant startDate, Instant endDate) {
+        // Đếm khách hàng hoạt động từ đơn đã thanh toán (DA_THANH_TOAN = 1) hoặc hoàn thành (HOAN_THANH = 4)
         Query query = entityManager.createNativeQuery("""
             SELECT COUNT(DISTINCT id_khach_hang) 
             FROM hoa_don 
-            WHERE trang_thai = 1 
+            WHERE (trang_thai = 1 OR trang_thai = 4)
               AND ngay_tao >= ?1 
               AND ngay_tao <= ?2
             """);
@@ -272,13 +279,14 @@ public class ThongKeService {
     }
     
     private List<Object[]> getBieuDoDoanhSoTheoNgay(Instant startDate, Instant endDate) {
+        // Tính doanh thu từ đơn đã thanh toán (DA_THANH_TOAN = 1) hoặc hoàn thành (HOAN_THANH = 4)
         Query query = entityManager.createNativeQuery("""
             SELECT 
                 CONVERT(VARCHAR(10), hd.ngay_tao, 120) AS thoiGian,
                 COALESCE(SUM(hd.tong_tien_sau_giam), 0) AS doanhThu,
                 COUNT(*) AS soHoaDon
             FROM hoa_don hd
-            WHERE hd.trang_thai = 1
+            WHERE (hd.trang_thai = 1 OR hd.trang_thai = 4)
               AND hd.ngay_tao >= ?1
               AND hd.ngay_tao <= ?2
             GROUP BY CONVERT(VARCHAR(10), hd.ngay_tao, 120)
@@ -292,13 +300,14 @@ public class ThongKeService {
     }
     
     private List<Object[]> getBieuDoDoanhSoTheoThang(Instant startDate, Instant endDate) {
+        // Tính doanh thu từ đơn đã thanh toán (DA_THANH_TOAN = 1) hoặc hoàn thành (HOAN_THANH = 4)
         Query query = entityManager.createNativeQuery("""
             SELECT 
                 FORMAT(hd.ngay_tao, 'yyyy-MM') AS thoiGian,
                 COALESCE(SUM(hd.tong_tien_sau_giam), 0) AS doanhThu,
                 COUNT(*) AS soHoaDon
             FROM hoa_don hd
-            WHERE hd.trang_thai = 1
+            WHERE (hd.trang_thai = 1 OR hd.trang_thai = 4)
               AND hd.ngay_tao >= ?1
               AND hd.ngay_tao <= ?2
             GROUP BY FORMAT(hd.ngay_tao, 'yyyy-MM')
@@ -312,13 +321,14 @@ public class ThongKeService {
     }
     
     private List<Object[]> getBieuDoDoanhSoTheoNam(Instant startDate, Instant endDate) {
+        // Tính doanh thu từ đơn đã thanh toán (DA_THANH_TOAN = 1) hoặc hoàn thành (HOAN_THANH = 4)
         Query query = entityManager.createNativeQuery("""
             SELECT 
                 FORMAT(hd.ngay_tao, 'yyyy') AS thoiGian,
                 COALESCE(SUM(hd.tong_tien_sau_giam), 0) AS doanhThu,
                 COUNT(*) AS soHoaDon
             FROM hoa_don hd
-            WHERE hd.trang_thai = 1
+            WHERE (hd.trang_thai = 1 OR hd.trang_thai = 4)
               AND hd.ngay_tao >= ?1
               AND hd.ngay_tao <= ?2
             GROUP BY FORMAT(hd.ngay_tao, 'yyyy')
@@ -349,7 +359,7 @@ public class ThongKeService {
                        ROW_NUMBER() OVER (PARTITION BY id_spct ORDER BY anh_chinh_dai_dien DESC, ngay_tao DESC) AS rn
                 FROM hinh_anh
             ) hi ON ctsp.id = hi.id_spct AND hi.rn = 1
-            WHERE hd.trang_thai = 1
+            WHERE (hd.trang_thai = 1 OR hd.trang_thai = 4)
               AND hd.ngay_tao >= ?1
               AND hd.ngay_tao <= ?2
             GROUP BY ctsp.id, sp.ten_san_pham, ctsp.ma_ctsp, hi.url

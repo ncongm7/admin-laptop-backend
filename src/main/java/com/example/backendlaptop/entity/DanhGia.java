@@ -6,6 +6,7 @@ import lombok.Setter;
 import org.hibernate.annotations.Nationalized;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -43,4 +44,44 @@ public class DanhGia {
     @Column(name = "trang_thai_danh_gia")
     private Integer trangThaiDanhGia;
 
+    // Các cột mới cho hệ thống đánh giá nâng cao
+    @Column(name = "is_verified_purchase")
+    private Boolean isVerifiedPurchase;
+
+    @Column(name = "helpful_count")
+    private Integer helpfulCount;
+
+    @Nationalized
+    @Column(name = "review_title", length = 255)
+    private String reviewTitle;
+
+    @Nationalized
+    @Lob
+    @Column(name = "pros")
+    private String pros; // JSON array: ["Hiệu năng tốt", "Pin trâu"]
+
+    @Nationalized
+    @Lob
+    @Column(name = "cons")
+    private String cons; // JSON array: ["Hơi nặng", "Giá cao"]
+
+    // Relationships
+    @OneToMany(mappedBy = "danhGia", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<MediaDanhGia> mediaList;
+
+    @OneToMany(mappedBy = "danhGia", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PhanHoiDanhGia> phanHoiList;
+
+    @OneToMany(mappedBy = "danhGia", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<HelpfulVote> helpfulVotes;
+
+    @PrePersist
+    public void prePersist() {
+        if (helpfulCount == null) {
+            helpfulCount = 0;
+        }
+        if (isVerifiedPurchase == null) {
+            isVerifiedPurchase = false;
+        }
+    }
 }
