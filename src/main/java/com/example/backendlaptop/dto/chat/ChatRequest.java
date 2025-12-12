@@ -26,5 +26,8 @@ public class ChatRequest {
 
     @NotNull(message = "isFromCustomer không được để trống")
     private Boolean isFromCustomer; // true = từ khách hàng, false = từ nhân viên
+    
+    // Consultation data for Gemini AI (optional)
+    private java.util.Map<String, Object> consultationData;
 }
 
