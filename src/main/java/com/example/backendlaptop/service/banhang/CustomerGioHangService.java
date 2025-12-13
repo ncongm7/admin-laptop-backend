@@ -137,14 +137,19 @@ public class CustomerGioHangService {
             throw new ApiException("Unauthorized", "UNAUTHORIZED");
         }
 
-        // Kiểm tra tồn kho
-        int availableQuantity = getAvailableQuantity(chiTiet.getChiTietSanPham());
-        if (request.getQuantity() > availableQuantity) {
-            throw new ApiException("Số lượng sản phẩm không đủ. Còn lại: " + availableQuantity, "INSUFFICIENT_STOCK");
+        int currentQuantity = chiTiet.getSoLuong();
+        int newQuantity = request.getQuantity();
+
+        // Chỉ kiểm tra tồn kho khi TĂNG số lượng
+        if (newQuantity > currentQuantity) {
+            int availableQuantity = getAvailableQuantity(chiTiet.getChiTietSanPham());
+            if (newQuantity > availableQuantity) {
+                throw new ApiException("Số lượng sản phẩm không đủ. Còn lại: " + availableQuantity, "INSUFFICIENT_STOCK");
+            }
         }
 
         // Cập nhật số lượng
-        chiTiet.setSoLuong(request.getQuantity());
+        chiTiet.setSoLuong(newQuantity);
         gioHangChiTietRepository.save(chiTiet);
 
         // Cập nhật thời gian giỏ hàng

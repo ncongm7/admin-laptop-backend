@@ -1,5 +1,6 @@
 package com.example.backendlaptop.entity;
 
+import com.example.backendlaptop.model.ConversationState;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -51,6 +52,19 @@ public class ChatIntent {
     
     @Column(name = "priority")
     private Integer priority;
+    
+    @Column(name = "business_role", length = 50)
+    private String businessRole; // SALES, ORDER, WARRANTY, ACCOUNT, SUPPORT
+    
+    @Column(name = "triggers_state_change")
+    private Boolean triggersStateChange;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(name = "next_state", length = 50)
+    private ConversationState nextState;
+    
+    @Column(name = "requires_auth")
+    private Boolean requiresAuth;
     
     @Column(name = "created_at")
     private Instant createdAt;

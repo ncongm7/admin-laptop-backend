@@ -99,6 +99,34 @@ public class WebSocketNotificationService {
             System.err.println("❌ [WebSocketNotificationService] Lỗi khi gửi thông báo thanh toán: " + e.getMessage());
             e.printStackTrace();
         }
+
+    }
+
+    /**
+     * Gửi thông báo khi đơn hàng bị hủy
+     */
+    public void notifyOrderCancelled(UUID orderId, String reason) {
+        try {
+            System.out.println("🚫 [WebSocketNotificationService] Gửi thông báo hủy đơn: " + orderId);
+            
+            OrderCancelledMessage message = new OrderCancelledMessage();
+            message.setType("order_cancelled");
+            message.setEventType("order_cancelled");
+            message.setOrderId(orderId);
+            message.setReason(reason);
+            message.setTimestamp(Instant.now().toString());
+            
+            // Gửi đến topic chung (để admin biết)
+            messagingTemplate.convertAndSend("/topic/orders", message);
+            
+            // Gửi đến topic riêng (cho khách hàng)
+            messagingTemplate.convertAndSend("/topic/order-cancelled/" + orderId, message);
+            
+            System.out.println("✅ [WebSocketNotificationService] Đã gửi thông báo hủy đơn");
+        } catch (Exception e) {
+            System.err.println("❌ [WebSocketNotificationService] Lỗi khi gửi thông báo hủy đơn: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -175,6 +203,29 @@ public class WebSocketNotificationService {
         public void setOldStatus(Integer oldStatus) { this.oldStatus = oldStatus; }
         public Integer getNewStatus() { return newStatus; }
         public void setNewStatus(Integer newStatus) { this.newStatus = newStatus; }
+        public String getTimestamp() { return timestamp; }
+        public void setTimestamp(String timestamp) { this.timestamp = timestamp; }
+    }
+
+    /**
+     * DTO cho message hủy đơn hàng
+     */
+    public static class OrderCancelledMessage {
+        private String type;
+        private String eventType;
+        private UUID orderId;
+        private String reason;
+        private String timestamp;
+
+        // Getters and Setters
+        public String getType() { return type; }
+        public void setType(String type) { this.type = type; }
+        public String getEventType() { return eventType; }
+        public void setEventType(String eventType) { this.eventType = eventType; }
+        public UUID getOrderId() { return orderId; }
+        public void setOrderId(UUID orderId) { this.orderId = orderId; }
+        public String getReason() { return reason; }
+        public void setReason(String reason) { this.reason = reason; }
         public String getTimestamp() { return timestamp; }
         public void setTimestamp(String timestamp) { this.timestamp = timestamp; }
     }

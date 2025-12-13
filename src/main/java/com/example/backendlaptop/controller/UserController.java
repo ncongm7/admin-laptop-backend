@@ -251,6 +251,102 @@ public class UserController {
     }
 
     /**
+     * Cập nhật thông tin profile cá nhân (User tự cập nhật)
+     * Endpoint: PUT /api/users/me/profile
+     */
+    @PutMapping("/me/profile")
+    public ResponseEntity<ResponseObject<UserDTO>> updateMyProfile(
+            @RequestBody UpdateProfileRequest request,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        try {
+            LoginResponse.UserInfo currentUser = getCurrentUserFromToken(authHeader);
+            TaiKhoan taiKhoan = taiKhoanRepository.findByTenDangNhap(currentUser.getTenDangNhap())
+                    .orElseThrow(() -> new RuntimeException("Tài khoản không tồn tại"));
+
+            // 1. Cập nhật thông tin TaiKhoan
+            if (request.getEmail() != null) {
+                taiKhoan.setEmail(request.getEmail());
+                // TODO: Verify email uniqueness if needed
+                taiKhoanRepository.save(taiKhoan);
+            }
+
+            // 2. Cập nhật thông tin KhachHang hoặc NhanVien
+            Optional<KhachHang> khachHangOpt = khachHangRepository.findByMaTaiKhoanId(taiKhoan.getId());
+            if (khachHangOpt.isPresent()) {
+                KhachHang kh = khachHangOpt.get();
+                if (request.getName() != null) kh.setHoTen(request.getName());
+                if (request.getPhone() != null) kh.setSoDienThoai(request.getPhone());
+                if (request.getGender() != null) kh.setGioiTinh(request.getGender());
+                if (request.getBirthday() != null) {
+                    try {
+                         // Parse string to Date or Instant? Assuming request sends compatible format or Long
+                         // For now assume it's just a string or handled elsewhere, but KhachHang usually needs Date/LocalDate
+                         // Let's assume request.getBirthday() returns java.sql.Date compatible Long/String
+                         // If KhachHang.ngaySinh is java.sql.Date:
+                         if (request.getBirthday() != null) {
+                            kh.setNgaySinh(request.getBirthday());
+                         }
+                    } catch (Exception e) {
+                        System.err.println("Invalid date format: " + e.getMessage());
+                    }
+                }
+                khachHangRepository.save(kh);
+            } else {
+                 Optional<NhanVien> nhanVienOpt = nhanVienRepository.findByTaiKhoanId(taiKhoan.getId());
+                 if (nhanVienOpt.isPresent()) {
+                    NhanVien nv = nhanVienOpt.get();
+                    if (request.getName() != null) nv.setHoTen(request.getName());
+                    if (request.getPhone() != null) nv.setSoDienThoai(request.getPhone());
+                    if (request.getAddress() != null) nv.setDiaChi(request.getAddress());
+                    nhanVienRepository.save(nv);
+                 }
+            }
+            
+            // Reload and return
+            UserDTO userDTO = mapToUserDTO(taiKhoan, true);
+            return ResponseEntity.ok(new ResponseObject<>(userDTO, "Cập nhật hồ sơ thành công"));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body(new ResponseObject<>(false, null, "Lỗi khi cập nhật hồ sơ: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Đổi mật khẩu
+     * Endpoint: POST /api/users/me/password
+     */
+    @PostMapping("/me/password")
+    public ResponseEntity<ResponseObject<Void>> changePassword(
+            @RequestBody ChangePasswordRequest request,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        try {
+            LoginResponse.UserInfo currentUser = getCurrentUserFromToken(authHeader);
+            TaiKhoan taiKhoan = taiKhoanRepository.findByTenDangNhap(currentUser.getTenDangNhap())
+                    .orElseThrow(() -> new RuntimeException("Tài khoản không tồn tại"));
+
+            // Verify old password (simple check, ideally use PasswordEncoder)
+            if (!taiKhoan.getMatKhau().equals(request.getOldPassword())) {
+                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(new ResponseObject<>(false, null, "Mật khẩu cũ không chính xác"));
+            }
+            
+            if (request.getNewPassword() == null || request.getNewPassword().length() < 6) {
+                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(new ResponseObject<>(false, null, "Mật khẩu mới phải có ít nhất 6 ký tự"));
+            }
+
+            taiKhoan.setMatKhau(request.getNewPassword());
+            taiKhoanRepository.save(taiKhoan);
+
+            return ResponseEntity.ok(new ResponseObject<>(null, "Đổi mật khẩu thành công"));
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body(new ResponseObject<>(false, null, "Lỗi khi đổi mật khẩu: " + e.getMessage()));
+        }
+    }
+
+    /**
      * Helper: Lấy current user từ token
      */
     private LoginResponse.UserInfo getCurrentUserFromToken(String authHeader) {
@@ -321,10 +417,15 @@ public class UserController {
                 dto.setPosition(nv.getChucVu());
                 dto.setAddress(nv.getDiaChi());
                 dto.setIsStaff(true);
+                // Map gender/dob if NhanVien has them
+                dto.setGender(nv.getGioiTinh()); 
+                dto.setBirthday(nv.getNgaySinh());
             } else if (khachHang.isPresent()) {
                 KhachHang kh = khachHang.get();
                 dto.setName(kh.getHoTen() != null ? kh.getHoTen() : dto.getName());
                 dto.setPhone(kh.getSoDienThoai());
+                dto.setGender(kh.getGioiTinh());
+                dto.setBirthday(kh.getNgaySinh());
                 dto.setAvatar(null); // KhachHang có thể không có avatar
                 dto.setIsStaff(false);
             }
@@ -353,6 +454,8 @@ public class UserController {
         private String position; // Chức vụ (cho nhân viên)
         private String address; // Địa chỉ
         private Boolean isStaff; // Có phải nhân viên không
+        private Boolean gender;
+        private java.sql.Date birthday;
 
         // Getters and Setters
         public java.util.UUID getId() { return id; }
@@ -393,6 +496,12 @@ public class UserController {
         
         public Boolean getIsStaff() { return isStaff; }
         public void setIsStaff(Boolean isStaff) { this.isStaff = isStaff; }
+
+        public Boolean getGender() { return gender; }
+        public void setGender(Boolean gender) { this.gender = gender; }
+
+        public java.sql.Date getBirthday() { return birthday; }
+        public void setBirthday(java.sql.Date birthday) { this.birthday = birthday; }
     }
 
     /**
@@ -424,6 +533,44 @@ public class UserController {
 
         public Integer getTrangThai() { return trangThai; }
         public void setTrangThai(Integer trangThai) { this.trangThai = trangThai; }
+    }
+
+    /**
+     * UpdateProfileRequest
+     */
+    public static class UpdateProfileRequest {
+        private String name;
+        private String email;
+        private String phone;
+        private Boolean gender; // true: Male, false: Female
+        private java.sql.Date birthday; // Use sql.Date for simplicity if entity uses it
+        private String address;
+
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public String getEmail() { return email; }
+        public void setEmail(String email) { this.email = email; }
+        public String getPhone() { return phone; }
+        public void setPhone(String phone) { this.phone = phone; }
+        public Boolean getGender() { return gender; }
+        public void setGender(Boolean gender) { this.gender = gender; }
+        public java.sql.Date getBirthday() { return birthday; }
+        public void setBirthday(java.sql.Date birthday) { this.birthday = birthday; }
+        public String getAddress() { return address; }
+        public void setAddress(String address) { this.address = address; }
+    }
+
+    /**
+     * ChangePasswordRequest
+     */
+    public static class ChangePasswordRequest {
+        private String oldPassword;
+        private String newPassword;
+
+        public String getOldPassword() { return oldPassword; }
+        public void setOldPassword(String oldPassword) { this.oldPassword = oldPassword; }
+        public String getNewPassword() { return newPassword; }
+        public void setNewPassword(String newPassword) { this.newPassword = newPassword; }
     }
 }
 

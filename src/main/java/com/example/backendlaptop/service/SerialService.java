@@ -3,6 +3,7 @@ package com.example.backendlaptop.service;
 import com.example.backendlaptop.dto.serial.SerialRequest;
 import com.example.backendlaptop.dto.serial.SerialResponse;
 import com.example.backendlaptop.entity.ChiTietSanPham;
+import com.example.backendlaptop.entity.HoaDon;
 import com.example.backendlaptop.entity.Serial;
 import com.example.backendlaptop.repository.ChiTietSanPhamRepository;
 import com.example.backendlaptop.repository.SerialRepository;
@@ -134,6 +135,11 @@ public class SerialService {
         return createSerialsBatch(requests);
     }
     
+    public List<SerialResponse> getSerialsByUserId(UUID userId) {
+        List<Serial> serials = serialRepository.findByUserId(userId);
+        return serials.stream().map(this::mapToResponse).toList();
+    }
+
     public List<SerialResponse> getAllSerial() {
         System.out.println("SerialService: getAllSerial called");
         List<Serial> serials = serialRepository.findAll();
@@ -156,6 +162,14 @@ public class SerialService {
         List<SerialResponse> responses = serials.stream().map(this::mapToResponse).toList();
         System.out.println("Returning " + responses.size() + " serial responses");
         return responses;
+    }
+    
+    /**
+     * Get serials (warranties) by user/customer ID
+     */
+    public List<SerialResponse> getSerialsByUserId(UUID userId) {
+        List<Serial> serials = serialRepository.findByUserId(userId);
+        return serials.stream().map(this::mapToResponse).toList();
     }
     
     public SerialResponse getSerialById(UUID id) {
@@ -235,5 +249,95 @@ public class SerialService {
         }
         
         return response;
+    }
+    /**
+     * Tìm và giữ serial cho đơn hàng Online
+     * Chỉ lấy serial "sạch" (chưa bán và chưa ai giữ)
+     */
+    public Serial findAndReserveSerial(UUID ctspId, HoaDon order, Instant expiry) {
+        List<Serial> availableSerials = serialRepository.findAvailableAndNotReserved(ctspId);
+        
+        if (availableSerials.isEmpty()) {
+            return null; // Không còn hàng sạch
+        }
+        
+        // Lấy cái đầu tiên
+        Serial serial = availableSerials.get(0);
+        serial.setReservedInOrder(order);
+        serial.setReservedExpiredAt(expiry);
+        return serialRepository.save(serial);
+    }
+    
+    /**
+     * Tìm serial cho POS (ưu tiên sạch, nếu hết thì CƯỚP của Online COD)
+     */
+    public Serial findSerialForPOS(UUID ctspId, HoaDon posOrder) {
+        // 1. Tìm hàng sạch trước
+        List<Serial> availableSerials = serialRepository.findAvailableAndNotReserved(ctspId);
+        if (!availableSerials.isEmpty()) {
+            Serial serial = availableSerials.get(0);
+            serial.setReservedInOrder(posOrder); // POS giữ luôn (hoặc bán luôn nếu thanh toán xong)
+            serial.setReservedExpiredAt(Instant.now().plusSeconds(600)); // POS giữ 10 phút nếu chưa thanh toán
+            return serialRepository.save(serial);
+        }
+        
+        // 2. Nếu hết hàng sạch, đi CƯỚP của đơn Online COD
+        List<Serial> stealableSerials = serialRepository.findStealableSerials(ctspId);
+        if (!stealableSerials.isEmpty()) {
+            Serial serialToSteal = stealableSerials.get(0);
+            
+            // Log hành động cướp
+            System.out.println("⚠️ [SerialService] POS Order " + posOrder.getMa() + " đang CƯỚP serial " + serialToSteal.getSerialNo() + 
+                               " từ Online Order " + serialToSteal.getReservedInOrder().getMa());
+            
+            // TODO: Bắn WebSocket thông báo cho user Online bị mất hàng (Future Phase)
+            
+            // Cập nhật chủ sở hữu mới
+            serialToSteal.setReservedInOrder(posOrder);
+            serialToSteal.setReservedExpiredAt(Instant.now().plusSeconds(600));
+            return serialRepository.save(serialToSteal);
+        }
+        
+        return null; // Hết sạch hàng
+    }
+    
+    /**
+     * Hủy giữ serial (khi hủy đơn hoặc hết hạn)
+     */
+    public void cancelReservation(HoaDon order) {
+        List<Serial> reservedSerials = serialRepository.findAll().stream() // TODO: Optimize query later
+                .filter(s -> s.getReservedInOrder() != null && s.getReservedInOrder().getId().equals(order.getId()))
+                .toList();
+                
+        for (Serial serial : reservedSerials) {
+            serial.setReservedInOrder(null);
+            serial.setReservedExpiredAt(null);
+            serialRepository.save(serial);
+        }
+    }
+    
+    /**
+     * Đếm số lượng khả dụng (chỉ tính hàng sạch)
+     */
+    public int countAvailableClean(UUID ctspId) {
+        return serialRepository.findAvailableAndNotReserved(ctspId).size();
+    }
+    /**
+     * Giải phóng một số lượng serial cụ thể (khi xóa sản phẩm khỏi giỏ/hóa đơn)
+     */
+    public void releaseSerials(HoaDon order, UUID ctspId, int quantity) {
+        // TODO: Optimize with custom query to fetch limit
+        List<Serial> reservedSerials = serialRepository.findAll().stream() 
+                .filter(s -> s.getReservedInOrder() != null 
+                        && s.getReservedInOrder().getId().equals(order.getId())
+                        && s.getCtsp().getId().equals(ctspId))
+                .limit(quantity)
+                .toList();
+        
+        for (Serial serial : reservedSerials) {
+            serial.setReservedInOrder(null);
+            serial.setReservedExpiredAt(null);
+            serialRepository.save(serial);
+        }
     }
 }

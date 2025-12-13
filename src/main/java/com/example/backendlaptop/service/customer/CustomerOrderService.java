@@ -41,6 +41,7 @@ public class CustomerOrderService {
     private final PhieuGiamGiaRepository phieuGiamGiaRepository;
     private final SerialRepository serialRepository;
     private final WebSocketNotificationService webSocketNotificationService;
+    private final com.example.backendlaptop.service.SerialService serialService;
 
     /**
      * Tạo đơn hàng từ customer
@@ -68,6 +69,13 @@ public class CustomerOrderService {
             String maHoaDon = "HD" + System.currentTimeMillis();
             hoaDon.setMa(maHoaDon);
 
+            // 3.5. Lưu hóa đơn SỚM (để có ID cho serial reservation)
+            // Tổng tiền sẽ được cập nhật sau
+            hoaDon.setTongTien(BigDecimal.ZERO);
+            hoaDon.setTienDuocGiam(BigDecimal.ZERO);
+            hoaDon.setTongTienSauGiam(BigDecimal.ZERO);
+            hoaDon = hoaDonRepository.save(hoaDon);
+
             // 4. Xử lý chi tiết sản phẩm
             BigDecimal tongTien = BigDecimal.ZERO;
             List<HoaDonChiTiet> chiTietList = new ArrayList<>();
@@ -94,14 +102,13 @@ public class CustomerOrderService {
                     throw new ApiException(
                         "Sản phẩm " + tenSanPham + " không đủ số lượng. " +
                         "Cần: " + sp.getSoLuong() + ", " +
-                        "Có sẵn: " + soLuongKhaDungThucTe + 
-                        " (Tồn kho: " + soLuongTon + ", Tạm giữ: " + soLuongTamGiu + ", Serial: " + soLuongSerialKhaDung + ")",
+                        "Có sẵn: " + soLuongKhaDungThucTe,
                         "INSUFFICIENT_STOCK"
                     );
                 }
 
                 HoaDonChiTiet chiTiet = new HoaDonChiTiet();
-                chiTiet.setHoaDon(hoaDon);
+                chiTiet.setHoaDon(hoaDon); // hoaDon đã có ID rồi
                 chiTiet.setChiTietSanPham(ctsp);
                 chiTiet.setSoLuong(sp.getSoLuong());
 
@@ -112,8 +119,21 @@ public class CustomerOrderService {
                 BigDecimal thanhTien = donGia.multiply(BigDecimal.valueOf(sp.getSoLuong()));
                 tongTien = tongTien.add(thanhTien);
                 chiTietList.add(chiTiet);
+
+                // === RESERVATION LOGIC ===
+                // Reserve serials for this item (hoaDon đã có ID)
+                Instant expiry = Instant.now().plusSeconds(1800); // Default 30 mins for COD
+                
+                for (int i = 0; i < sp.getSoLuong(); i++) {
+                    Serial reservedSerial = serialService.findAndReserveSerial(ctsp.getId(), hoaDon, expiry);
+                    if (reservedSerial == null) {
+                        // Double check failure (should be caught by count check above, but racing could cause this)
+                        throw new ApiException("Sản phẩm " + tenSanPham + " vừa hết hàng trong khi bạn đang thao tác.", "OUT_OF_STOCK_RACE");
+                    }
+                }
             }
 
+            // 4.5. Cập nhật tổng tiền
             hoaDon.setTongTien(tongTien);
 
             // 5. Xử lý phiếu giảm giá (nếu có)
@@ -149,13 +169,15 @@ public class CustomerOrderService {
                 hoaDon.setTongTienSauGiam(hoaDon.getTongTienSauGiam().subtract(soTienQuyDoi));
             }
 
-            // 7. Lưu hóa đơn và chi tiết
+            // 7. Cập nhật lại hóa đơn với totals cuối cùng
             hoaDon = hoaDonRepository.save(hoaDon);
+            
+            // 8. Lưu chi tiết (hoaDon đã có ID từ trước)
             for (HoaDonChiTiet chiTiet : chiTietList) {
                 hoaDonChiTietRepository.save(chiTiet);
             }
 
-            // 8. Gửi WebSocket notification cho đơn hàng mới
+            // 9. Gửi WebSocket notification cho đơn hàng mới
             try {
                 webSocketNotificationService.notifyNewOnlineOrder(
                     hoaDon.getId(),
@@ -249,8 +271,12 @@ public class CustomerOrderService {
                 throw new ApiException("Chỉ có thể hủy đơn hàng ở trạng thái 'Chờ thanh toán'. Trạng thái hiện tại: " + hoaDon.getTrangThai(), "INVALID_STATUS");
             }
 
-            // 4. Cập nhật trạng thái thành DA_HUY
+            // 4. Giải phóng serials đã giữ
+            serialService.cancelReservation(hoaDon);
+
+            // 5. Cập nhật trạng thái thành DA_HUY
             hoaDon.setTrangThai(TrangThaiHoaDon.DA_HUY);
+            hoaDon.setGhiChu(hoaDon.getGhiChu() + " [Đã hủy bởi Khách hàng]");
             hoaDon = hoaDonRepository.save(hoaDon);
 
             System.out.println("✅ [CustomerOrderService] Đã hủy đơn hàng: " + idHoaDon);
@@ -262,6 +288,43 @@ public class CustomerOrderService {
             System.err.println("Lỗi khi hủy đơn hàng: " + e.getMessage());
             e.printStackTrace();
             throw new ApiException("Lỗi khi hủy đơn hàng: " + e.getMessage(), "CANCEL_ORDER_ERROR");
+        }
+    }
+
+    /**
+     * Hủy đơn hàng bởi Hệ thống (Scheduler) khi hết hạn giữ hàng
+     */
+    @Transactional
+    public void cancelOrderSystem(UUID idHoaDon, String reason) {
+        try {
+            HoaDon hoaDon = hoaDonRepository.findById(idHoaDon)
+                    .orElse(null);
+            
+            if (hoaDon == null) return;
+            
+            // Chỉ hủy nếu chưa thanh toán
+            if (hoaDon.getTrangThaiThanhToan() == 1) return; // Đã thanh toán thì không hủy
+            
+            // Giải phóng serials
+            serialService.cancelReservation(hoaDon);
+            
+            // Cập nhật trạng thái
+            hoaDon.setTrangThai(TrangThaiHoaDon.DA_HUY);
+            hoaDon.setGhiChu((hoaDon.getGhiChu() != null ? hoaDon.getGhiChu() : "") + " [" + reason + "]");
+            hoaDonRepository.save(hoaDon);
+            
+            System.out.println("SYSTEM CANCELLED ORDER: " + idHoaDon + " Reason: " + reason);
+            
+            // Notify via WebSocket
+            try {
+                webSocketNotificationService.notifyOrderCancelled(hoaDon.getId(), "Hệ thống hủy đơn hàng do hết hạn giữ hàng.");
+            } catch (Exception e) {
+                // Ignore socket error
+            }
+            
+        } catch (Exception e) {
+            System.err.println("Lỗi khi hủy đơn hệ thống: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 }

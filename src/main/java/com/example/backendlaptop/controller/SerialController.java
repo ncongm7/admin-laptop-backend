@@ -3,6 +3,10 @@ package com.example.backendlaptop.controller;
 import com.example.backendlaptop.dto.serial.SerialRequest;
 import com.example.backendlaptop.dto.serial.SerialResponse;
 import com.example.backendlaptop.service.SerialService;
+import com.example.backendlaptop.service.auth.AuthService;
+import com.example.backendlaptop.dto.auth.LoginResponse;
+import com.example.backendlaptop.repository.TaiKhoanRepository;
+import com.example.backendlaptop.entity.TaiKhoan;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -18,8 +22,35 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class SerialController {
-    
     private final SerialService serialService;
+    private final AuthService authService;
+    private final TaiKhoanRepository taiKhoanRepository;
+    
+    @GetMapping("/my-warranties")
+    public ResponseEntity<List<SerialResponse>> getMyWarranties(@RequestHeader("Authorization") String authHeader) {
+        try {
+            LoginResponse.UserInfo user = getCurrentUserFromToken(authHeader);
+            
+            // User ID from JWT is actually the TaiKhoan ID
+            // We need to get customer from KhachHang table using this TaiKhoan ID
+            UUID userId = user.getUserId();
+            
+            List<SerialResponse> serials = serialService.getSerialsByUserId(userId);
+            return ResponseEntity.ok(serials);
+        } catch (Exception e) {
+            System.err.println("Error in getMyWarranties: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+    }
+
+    private LoginResponse.UserInfo getCurrentUserFromToken(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new RuntimeException("Token không hợp lệ");
+        }
+        String token = authHeader.substring(7);
+        return authService.getCurrentUser(token);
+    }
     
     @PostMapping
     public ResponseEntity<SerialResponse> createSerial(@Valid @RequestBody SerialRequest request) {

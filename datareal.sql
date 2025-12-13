@@ -212,7 +212,9 @@ CREATE TABLE serial (
     ctsp_id UNIQUEIDENTIFIER,
     serial_no VARCHAR(100) UNIQUE,
     trang_thai INT, -- 0: Trong kho, 1: Da ban
-    ngay_nhap DATETIME2
+    ngay_nhap DATETIME2,
+    reserved_in_order_id UNIQUEIDENTIFIER,
+    reserved_expired_at DATETIME2
 );
 
 -- Sales
@@ -707,6 +709,7 @@ ALTER TABLE chi_tiet_san_pham ADD CONSTRAINT FK_CTSP_PIN FOREIGN KEY (pin_id) RE
 ALTER TABLE chi_tiet_san_pham ADD CONSTRAINT FK_CTSP_MAU_SAC FOREIGN KEY (mau_sac_id) REFERENCES mau_sac(id);
 ALTER TABLE hinh_anh ADD CONSTRAINT FK_HinhAnh_CTSP FOREIGN KEY (id_spct) REFERENCES chi_tiet_san_pham(id);
 ALTER TABLE serial ADD CONSTRAINT FK_Serial_CTSP FOREIGN KEY (ctsp_id) REFERENCES chi_tiet_san_pham(id);
+ALTER TABLE serial ADD CONSTRAINT FK_Serial_ReservedOrder FOREIGN KEY (reserved_in_order_id) REFERENCES hoa_don(id);
 
 -- Sales
 ALTER TABLE gio_hang ADD CONSTRAINT FK_GioHang_KhachHang FOREIGN KEY (khach_hang_id) REFERENCES khach_hang(user_id);

@@ -46,6 +46,9 @@ public class SanPhamTrongHoaDonService {
     @Autowired
     private PhieuGiamGiaRepository phieuGiamGiaRepository;
 
+    @Autowired
+    private com.example.backendlaptop.service.SerialService serialService;
+
     /**
      * Thêm sản phẩm vào hóa đơn chờ
      * Bao gồm:
@@ -82,8 +85,6 @@ public class SanPhamTrongHoaDonService {
         
         System.out.println("✅ [SanPhamTrongHoaDonService] Tìm thấy chi tiết sản phẩm: " + ctsp.getMaCtsp());
         System.out.println("  - Giá bán: " + ctsp.getGiaBan());
-        System.out.println("  - Số lượng tồn: " + ctsp.getSoLuongTon());
-        System.out.println("  - Số lượng tạm giữ: " + ctsp.getSoLuongTamGiu());
 
         // 4. Kiểm tra giá bán
         if (ctsp.getGiaBan() == null) {
@@ -91,30 +92,23 @@ public class SanPhamTrongHoaDonService {
             throw new ApiException("Sản phẩm " + ctsp.getMaCtsp() + " chưa có giá bán. Vui lòng cập nhật giá bán trước khi thêm vào hóa đơn.", "MISSING_PRICE");
         }
 
-        // 5. Kiểm tra tồn kho
-        int soLuongTon = ctsp.getSoLuongTon() != null ? ctsp.getSoLuongTon() : 0;
-        int soLuongTamGiu = ctsp.getSoLuongTamGiu() != null ? ctsp.getSoLuongTamGiu() : 0;
-        int soLuongKhaDung = soLuongTon - soLuongTamGiu;
-
-        System.out.println("  - Số lượng khả dụng: " + soLuongKhaDung);
-        System.out.println("  - Số lượng yêu cầu: " + request.getSoLuong());
-
-        if (request.getSoLuong() > soLuongKhaDung) {
-            System.err.println("❌ [SanPhamTrongHoaDonService] Không đủ hàng!");
-            throw new ApiException("Không đủ hàng. Số lượng khả dụng: " + soLuongKhaDung, "INSUFFICIENT_STOCK");
+        // 5. Reserve Serials (POS Logic: Steal if necessary)
+        // We do strict Serial reservation. 
+        for (int i = 0; i < request.getSoLuong(); i++) {
+            com.example.backendlaptop.entity.Serial serial = serialService.findSerialForPOS(ctsp.getId(), hoaDon);
+            if (serial == null) {
+                // Rollback is handled by Transactional
+                throw new ApiException("Không đủ hàng (đã hết hàng sạch và không thể lấy từ đơn Online khác)", "INSUFFICIENT_STOCK");
+            }
         }
+        
+        System.out.println("✅ [SanPhamTrongHoaDonService] Đã giữ " + request.getSoLuong() + " serials cho POS");
 
-        // 6. Tạm giữ tồn kho
-        ctsp.setSoLuongTamGiu(soLuongTamGiu + request.getSoLuong());
-        ensureVersionNotNull(ctsp);
-        chiTietSanPhamRepository.save(ctsp);
-        System.out.println("✅ [SanPhamTrongHoaDonService] Đã tạm giữ " + request.getSoLuong() + " sản phẩm");
-
-        // 7. Lấy giá từ dot_giam_gia_chi_tiet (nếu có) hoặc giá gốc
+        // 6. Lấy giá từ dot_giam_gia_chi_tiet (nếu có) hoặc giá gốc
         BigDecimal donGia = getGiaBanHienTai(ctsp);
         System.out.println("  - Giá bán hiện tại (đã tính giảm giá): " + donGia);
 
-        // 8. Kiểm tra sản phẩm đã có trong hóa đơn chưa (và cập nhật giá)
+        // 7. Kiểm tra sản phẩm đã có trong hóa đơn chưa (và cập nhật giá)
         Optional<HoaDonChiTiet> existingHdct = hoaDon.getHoaDonChiTiets().stream()
                 .filter(hdct -> hdct.getChiTietSanPham().getId().equals(ctsp.getId()))
                 .findFirst();
@@ -139,10 +133,10 @@ public class SanPhamTrongHoaDonService {
             hoaDonChiTietRepository.save(hdct);
         }
 
-        // 9. Tính lại tổng tiền
+        // 8. Tính lại tổng tiền
         hoaDonService.capNhatTongTien(hoaDon);
         
-        // 10. Tính lại voucher nếu có (vì giá trị hóa đơn đã thay đổi)
+        // 9. Tính lại voucher nếu có (vì giá trị hóa đơn đã thay đổi)
         recalculateVoucherIfNeeded(hoaDon);
         
         System.out.println("✅ [SanPhamTrongHoaDonService] Hoàn tất thêm sản phẩm vào hóa đơn!");
@@ -207,11 +201,8 @@ public class SanPhamTrongHoaDonService {
             throw new ApiException("Chỉ có thể xóa sản phẩm khỏi hóa đơn đang chờ thanh toán", "BAD_REQUEST");
         }
 
-        // 4. Hoàn trả tồn kho tạm giữ
-        int soLuongTamGiu = ctsp.getSoLuongTamGiu() != null ? ctsp.getSoLuongTamGiu() : 0;
-        ctsp.setSoLuongTamGiu(Math.max(0, soLuongTamGiu - soLuong));
-        ensureVersionNotNull(ctsp);
-        chiTietSanPhamRepository.save(ctsp);
+        // 4. Release Serials
+        serialService.releaseSerials(hoaDon, ctsp.getId(), soLuong);
 
         // 5. Xóa chi tiết hóa đơn
         hoaDon.getHoaDonChiTiets().remove(hdct);
@@ -263,28 +254,25 @@ public class SanPhamTrongHoaDonService {
             return new HoaDonResponse(hoaDonService.findById(hoaDon.getId()));
         }
 
-        // 6. Kiểm tra tồn kho nếu tăng số lượng
+        // 6. Xử lý tồn kho
         if (soLuongThayDoi > 0) {
-            int soLuongTon = ctsp.getSoLuongTon() != null ? ctsp.getSoLuongTon() : 0;
-            int soLuongTamGiu = ctsp.getSoLuongTamGiu() != null ? ctsp.getSoLuongTamGiu() : 0;
-            int soLuongKhaDung = soLuongTon - soLuongTamGiu;
-
-            if (soLuongThayDoi > soLuongKhaDung) {
-                throw new ApiException("Không đủ hàng. Số lượng khả dụng: " + soLuongKhaDung, "INSUFFICIENT_STOCK");
+            // Tăng số lượng -> Reserve/Steal thêm
+            for (int i = 0; i < soLuongThayDoi; i++) {
+                com.example.backendlaptop.entity.Serial serial = serialService.findSerialForPOS(ctsp.getId(), hoaDon);
+                if (serial == null) throw new ApiException("Không đủ hàng để tăng số lượng", "INSUFFICIENT_STOCK");
             }
-
-            // Tăng số lượng tạm giữ
-            ctsp.setSoLuongTamGiu(soLuongTamGiu + soLuongThayDoi);
         } else {
-            // Giảm số lượng, giải phóng tồn kho tạm giữ
-            int soLuongTamGiu = ctsp.getSoLuongTamGiu() != null ? ctsp.getSoLuongTamGiu() : 0;
-            ctsp.setSoLuongTamGiu(Math.max(0, soLuongTamGiu + soLuongThayDoi)); // soLuongThayDoi là số âm
+            // Giảm số lượng -> Release bớt
+            serialService.releaseSerials(hoaDon, ctsp.getId(), Math.abs(soLuongThayDoi));
         }
 
         // 7. Cập nhật số lượng trong hóa đơn chi tiết
         hdct.setSoLuong(soLuongMoi);
-        ensureVersionNotNull(ctsp);
-        chiTietSanPhamRepository.save(ctsp);
+        
+        // Ensure version logic is irrelevant if we don't update CTSP fields, but we should make sure we don't accidentally revert.
+        // We are NOT updating CTSP.soLuongTamGiu anymore.
+        // But if CTSP was loaded, Hibernate might try to sync. 
+        // Just saving HDCT is enough since we only changed that.
         hoaDonChiTietRepository.save(hdct);
 
         // 8. Tính lại tổng tiền
@@ -431,20 +419,14 @@ public class SanPhamTrongHoaDonService {
      * Giải phóng tồn kho tạm giữ cho tất cả sản phẩm trong hóa đơn
      * Được gọi khi xóa hóa đơn chờ
      */
+    /**
+     * Giải phóng tồn kho tạm giữ cho tất cả sản phẩm trong hóa đơn
+     * Được gọi khi xóa hóa đơn chờ
+     */
     @Transactional
     public void giaiPhongTonKhoTamGiu(HoaDon hoaDon) {
-        if (hoaDon.getHoaDonChiTiets() != null && !hoaDon.getHoaDonChiTiets().isEmpty()) {
-            for (HoaDonChiTiet hdct : hoaDon.getHoaDonChiTiets()) {
-                ChiTietSanPham ctsp = hdct.getChiTietSanPham();
-                int soLuongTamGiu = ctsp.getSoLuongTamGiu() != null ? ctsp.getSoLuongTamGiu() : 0;
-                int soLuongGiaiPhong = hdct.getSoLuong();
-
-                // Giải phóng số lượng tạm giữ
-                ctsp.setSoLuongTamGiu(Math.max(0, soLuongTamGiu - soLuongGiaiPhong));
-                ensureVersionNotNull(ctsp);
-                chiTietSanPhamRepository.save(ctsp);
-            }
-        }
+        // Release ALL serials reserved by this order
+        serialService.cancelReservation(hoaDon);
     }
 
     /**

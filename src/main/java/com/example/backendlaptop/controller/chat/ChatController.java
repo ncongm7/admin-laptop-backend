@@ -104,6 +104,15 @@ public class ChatController {
         chatService.markAsRead(conversationId, isFromCustomer);
         return ResponseEntity.ok(new ResponseObject<>(null, "Đã đánh dấu đọc"));
     }
+    
+    /**
+     * Yêu cầu hỗ trợ từ nhân viên (Escalate)
+     */
+    @PostMapping("/escalate/{conversationId}")
+    public ResponseEntity<ResponseObject<Void>> escalateConversation(@PathVariable UUID conversationId) {
+        chatbotService.escalateConversation(conversationId);
+        return ResponseEntity.ok(new ResponseObject<>(null, "Đã chuyển cuộc trò chuyện cho nhân viên"));
+    }
 
     /**
      * Đếm số tin nhắn chưa đọc của khách hàng

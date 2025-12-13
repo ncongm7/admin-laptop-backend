@@ -1,5 +1,6 @@
 package com.example.backendlaptop.entity;
 
+import com.example.backendlaptop.model.ConversationState;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -26,6 +27,22 @@ public class ChatSession {
     
     @Column(name = "current_intent", length = 50)
     private String currentIntent;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(name = "current_state", length = 50)
+    private ConversationState currentState;
+    
+    @Column(name = "goal", length = 50)
+    private String goal; // SALES, ORDER, WARRANTY, ACCOUNT
+    
+    @Column(name = "progress_data", columnDefinition = "NVARCHAR(MAX)")
+    private String progressData; // JSON: collected data in current flow
+    
+    @Column(name = "step_count")
+    private Integer stepCount;
+    
+    @Column(name = "is_stuck")
+    private Boolean isStuck;
     
     @Column(name = "context_data", columnDefinition = "NVARCHAR(MAX)")
     private String contextData; // JSON

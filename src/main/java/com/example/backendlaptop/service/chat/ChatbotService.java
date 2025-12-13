@@ -30,12 +30,13 @@ public class ChatbotService {
     private final ChatAnalyticsRepository analyticsRepo;
     private final ObjectMapper objectMapper;
     
+    // NEW: Conversation Flow Service
+    private final ConversationFlowService conversationFlowService;
+    
     // Repositories for requires_data logic
     private final SanPhamRepository sanPhamRepo;
     private final ChiTietSanPhamRepository chiTietSanPhamRepo;
     private final com.example.backendlaptop.repository.banhang.HoaDonRepository hoaDonRepo;
-    // TODO: Fix import - PhieuBaoHanhRepository may need to be in a different package
-    // private final PhieuBaoHanhRepository phieuBaoHanhRepo;
     
     // Configuration
     private static final double DEFAULT_CONFIDENCE_THRESHOLD = 0.7;
@@ -62,11 +63,10 @@ public class ChatbotService {
                 return null;
             }
             
-            // 3. Check for contextual response first
-            ChatbotResponse contextualResponse = getContextualResponse(customerMessage.getNoiDung(), session);
-            if (contextualResponse != null) {
-                log.info("🎯 [Chatbot] Using contextual response");
-                return contextualResponse;
+            // 3. Check if stuck (too many steps)
+            if (Boolean.TRUE.equals(session.getIsStuck())) {
+                log.warn("⚠️ [Chatbot] Session is stuck, escalating");
+                return handleLowConfidence(session, customerMessage);
             }
             
             // 4. Detect intent with context awareness
@@ -77,18 +77,24 @@ public class ChatbotService {
             // 5. Save analytics
             saveAnalytics(customerMessage, match, responseTime);
             
-            // 6. Handle based on confidence
+            // 6. Handle based on confidence and business role
             if (match == null || match.getConfidence().doubleValue() < DEFAULT_CONFIDENCE_THRESHOLD) {
                 return handleLowConfidence(session, customerMessage);
             }
             
-            // 7. Update session with context
-            updateSessionContext(session, match.getIntentCode(), customerMessage.getNoiDung());
-            session.setLastActivity(Instant.now());
-            sessionRepo.save(session);
+            // 7. Validate business role
+            if (match.getIntent().getBusinessRole() == null) {
+                log.warn("⚠️ [Chatbot] Intent {} has no business role", match.getIntentCode());
+                return handleLowConfidence(session, customerMessage);
+            }
             
-            // 8. Generate response
-            return generateResponse(match, session, customerMessage);
+            // 8. 🔥 NEW: Use Flow-based Processing
+            return conversationFlowService.processFlow(
+                session,
+                match,
+                customerMessage.getNoiDung(),
+                customerMessage.getKhachHangId()
+            );
             
         } catch (Exception e) {
             log.error("❌ [Chatbot] Error processing message", e);
@@ -528,6 +534,17 @@ public class ChatbotService {
         chatRepo.save(systemMsg);
     }
     
+    
+    /**
+     * Escalate conversation explicitly via API
+     */
+    @Transactional
+    public void escalateConversation(UUID conversationId) {
+        sessionRepo.findByConversationId(conversationId).ifPresent(session -> 
+            escalateToHuman(session, "User requested support via API")
+        );
+    }
+
     /**
      * Staff takes over conversation from bot
      */

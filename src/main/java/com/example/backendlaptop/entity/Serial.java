@@ -31,4 +31,10 @@ public class Serial {
     @Column(name = "ngay_nhap")
     private Instant ngayNhap;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reserved_in_order_id")
+    private HoaDon reservedInOrder;
+
+    @Column(name = "reserved_expired_at")
+    private Instant reservedExpiredAt;
 }

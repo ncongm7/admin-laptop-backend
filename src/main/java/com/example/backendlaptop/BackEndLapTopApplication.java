@@ -3,8 +3,10 @@ package com.example.backendlaptop;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.http.client.HttpClientAutoConfiguration;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication(exclude = {HttpClientAutoConfiguration.class})
+@EnableScheduling
 public class BackEndLapTopApplication {
 
     public static void main(String[] args) {
