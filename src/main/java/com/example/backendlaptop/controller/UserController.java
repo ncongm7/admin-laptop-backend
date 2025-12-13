@@ -276,7 +276,7 @@ public class UserController {
                 KhachHang kh = khachHangOpt.get();
                 if (request.getName() != null) kh.setHoTen(request.getName());
                 if (request.getPhone() != null) kh.setSoDienThoai(request.getPhone());
-                if (request.getGender() != null) kh.setGioiTinh(request.getGender());
+                if (request.getGender() != null) kh.setGioiTinh(request.getGender() ? 1 : 0);
                 if (request.getBirthday() != null) {
                     try {
                          // Parse string to Date or Instant? Assuming request sends compatible format or Long
@@ -284,7 +284,7 @@ public class UserController {
                          // Let's assume request.getBirthday() returns java.sql.Date compatible Long/String
                          // If KhachHang.ngaySinh is java.sql.Date:
                          if (request.getBirthday() != null) {
-                            kh.setNgaySinh(request.getBirthday());
+                            kh.setNgaySinh(request.getBirthday().toLocalDate());
                          }
                     } catch (Exception e) {
                         System.err.println("Invalid date format: " + e.getMessage());
@@ -418,14 +418,14 @@ public class UserController {
                 dto.setAddress(nv.getDiaChi());
                 dto.setIsStaff(true);
                 // Map gender/dob if NhanVien has them
-                dto.setGender(nv.getGioiTinh()); 
-                dto.setBirthday(nv.getNgaySinh());
+                dto.setGender(nv.getGioiTinh() != null ? nv.getGioiTinh() == 1 : null); 
+                dto.setBirthday(null); // NhanVien entity does not have birthday field yet
             } else if (khachHang.isPresent()) {
                 KhachHang kh = khachHang.get();
                 dto.setName(kh.getHoTen() != null ? kh.getHoTen() : dto.getName());
                 dto.setPhone(kh.getSoDienThoai());
-                dto.setGender(kh.getGioiTinh());
-                dto.setBirthday(kh.getNgaySinh());
+                dto.setGender(kh.getGioiTinh() != null ? kh.getGioiTinh() == 1 : null);
+                dto.setBirthday(kh.getNgaySinh() != null ? java.sql.Date.valueOf(kh.getNgaySinh()) : null);
                 dto.setAvatar(null); // KhachHang có thể không có avatar
                 dto.setIsStaff(false);
             }

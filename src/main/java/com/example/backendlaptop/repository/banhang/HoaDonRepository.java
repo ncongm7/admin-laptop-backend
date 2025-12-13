@@ -19,4 +19,7 @@ public interface HoaDonRepository extends JpaRepository<HoaDon, UUID>, JpaSpecif
     
     // Tìm hóa đơn theo mã
     java.util.Optional<HoaDon> findByMa(String ma);
+
+    // Tìm đơn hàng theo khách hàng
+    org.springframework.data.domain.Page<HoaDon> findByIdKhachHang_IdOrderByNgayTaoDesc(UUID khachHangId, org.springframework.data.domain.Pageable pageable);
 }

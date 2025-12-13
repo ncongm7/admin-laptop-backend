@@ -164,13 +164,7 @@ public class SerialService {
         return responses;
     }
     
-    /**
-     * Get serials (warranties) by user/customer ID
-     */
-    public List<SerialResponse> getSerialsByUserId(UUID userId) {
-        List<Serial> serials = serialRepository.findByUserId(userId);
-        return serials.stream().map(this::mapToResponse).toList();
-    }
+
     
     public SerialResponse getSerialById(UUID id) {
         Serial serial = serialRepository.findById(id)
