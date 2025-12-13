@@ -15,27 +15,43 @@ public class PhieuBaoHanhController {
     PhieuBaoHanhService service;
 
     @GetMapping("/danh-sach")
-    public ResponseObject<?> danhSach(){
+    public ResponseObject<?> danhSach() {
         return new ResponseObject<>(service.getAll());
     }
 
     @DeleteMapping("/delete/{id1}")
-    public ResponseObject<?> delete(@PathVariable("id1") UUID id1){
+    public ResponseObject<?> delete(@PathVariable("id1") UUID id1) {
         service.delete(id1);
         return new ResponseObject<>(null, "Xoa thanh cong");
     }
+
     @GetMapping("/detail/{id1}")
     public ResponseObject<?> detail(@PathVariable("id1") UUID id1) {
         return new ResponseObject<>(service.detail(id1));
     }
-    
+
     @PutMapping("/update-trang-thai/{id}")
     public ResponseObject<?> updateTrangThai(
             @PathVariable("id") UUID id,
             @RequestParam("trangThai") Integer trangThai) {
         return new ResponseObject<>(service.updateTrangThai(id, trangThai), "Cập nhật trạng thái thành công");
     }
+
+    @GetMapping("/statistics")
+    public ResponseObject<?> getStatistics() {
+        return new ResponseObject<>(service.getStatistics(), "Lấy thống kê thành công");
+    }
+
+    @GetMapping("/search")
+    public ResponseObject<?> searchWarranties(
+            @RequestParam(required = false) Integer trangThai,
+            @RequestParam(required = false) String fromDate,
+            @RequestParam(required = false) String toDate,
+            @RequestParam(required = false) String keyword) {
+
+        java.time.Instant from = fromDate != null ? java.time.Instant.parse(fromDate) : null;
+        java.time.Instant to = toDate != null ? java.time.Instant.parse(toDate) : null;
+
+        return new ResponseObject<>(service.searchWarranties(trangThai, from, to, keyword), "Tìm kiếm thành công");
+    }
 }
-
-
-

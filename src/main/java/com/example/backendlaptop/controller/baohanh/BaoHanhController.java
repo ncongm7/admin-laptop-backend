@@ -23,16 +23,14 @@ public class BaoHanhController {
 
     @GetMapping("/kiem-tra/{idHoaDon}")
     public ResponseEntity<ResponseObject<KiemTraDieuKienResponse>> kiemTraDieuKien(
-            @PathVariable UUID idHoaDon
-    ) {
+            @PathVariable UUID idHoaDon) {
         KiemTraDieuKienResponse response = baoHanhService.kiemTraDieuKien(idHoaDon);
         return ResponseEntity.ok(new ResponseObject<>(response, "Kiểm tra điều kiện thành công"));
     }
 
     @GetMapping("/hoa-don/{idHoaDon}")
     public ResponseEntity<ResponseObject<List<PhieuBaoHanhResponse>>> getWarrantiesByInvoice(
-            @PathVariable UUID idHoaDon
-    ) {
+            @PathVariable UUID idHoaDon) {
         List<PhieuBaoHanhResponse> warranties = baoHanhService.getWarrantiesByInvoice(idHoaDon);
         return ResponseEntity.ok(new ResponseObject<>(warranties, "Lấy danh sách bảo hành thành công"));
     }
@@ -47,8 +45,7 @@ public class BaoHanhController {
             @RequestParam("tinhTrangLucTra") String tinhTrangLucTra,
             @RequestParam(value = "moTaTinhTrang", required = false) String moTaTinhTrang,
             @RequestParam("soLuong") Integer soLuong,
-            @RequestParam(value = "hinhAnh", required = false) List<MultipartFile> hinhAnh
-    ) {
+            @RequestParam(value = "hinhAnh", required = false) List<MultipartFile> hinhAnh) {
         TaoYeuCauBaoHanhRequest request = new TaoYeuCauBaoHanhRequest();
         request.setIdHoaDon(idHoaDon);
         request.setIdKhachHang(idKhachHang);
@@ -66,8 +63,7 @@ public class BaoHanhController {
     @PostMapping("/tiep-nhan/{idBaoHanh}")
     public ResponseEntity<ResponseObject<PhieuBaoHanhResponse>> tiepNhanSanPham(
             @PathVariable UUID idBaoHanh,
-            @ModelAttribute com.example.backendlaptop.model.request.baohanh.TiepNhanRequest request
-    ) {
+            @ModelAttribute com.example.backendlaptop.model.request.baohanh.TiepNhanRequest request) {
         PhieuBaoHanhResponse response = baoHanhService.tiepNhanSanPham(idBaoHanh, request);
         return ResponseEntity.ok(new ResponseObject<>(response, "Tiếp nhận sản phẩm thành công"));
     }
@@ -75,19 +71,35 @@ public class BaoHanhController {
     @PostMapping("/chi-phi/{idLichSuBaoHanh}")
     public ResponseEntity<ResponseObject<com.example.backendlaptop.entity.LichSuBaoHanh>> themChiPhiPhatSinh(
             @PathVariable UUID idLichSuBaoHanh,
-            @RequestBody com.example.backendlaptop.model.request.baohanh.ChiPhiPhatSinhRequest request
-    ) {
-        com.example.backendlaptop.entity.LichSuBaoHanh response = baoHanhService.themChiPhiPhatSinh(idLichSuBaoHanh, request);
+            @RequestBody com.example.backendlaptop.model.request.baohanh.ChiPhiPhatSinhRequest request) {
+        com.example.backendlaptop.entity.LichSuBaoHanh response = baoHanhService.themChiPhiPhatSinh(idLichSuBaoHanh,
+                request);
         return ResponseEntity.ok(new ResponseObject<>(response, "Thêm chi phí phát sinh thành công"));
     }
 
     @PostMapping("/ban-giao/{idBaoHanh}")
     public ResponseEntity<ResponseObject<PhieuBaoHanhResponse>> banGiaoSanPham(
             @PathVariable UUID idBaoHanh,
-            @ModelAttribute com.example.backendlaptop.model.request.baohanh.BanGiaoRequest request
-    ) {
+            @RequestParam("idNhanVienBanGiao") UUID idNhanVienBanGiao,
+            @RequestParam(value = "ghiChu", required = false) String ghiChu,
+            @RequestParam(value = "hinhAnhSauSua", required = false) List<MultipartFile> hinhAnhSauSua,
+            @RequestParam(value = "xacNhanKhachHang", required = false, defaultValue = "false") Boolean xacNhanKhachHang) {
+        System.out.println("🔍 [BaoHanhController] banGiaoSanPham called");
+        System.out.println("  - idBaoHanh: " + idBaoHanh);
+        System.out.println("  - idNhanVienBanGiao: " + idNhanVienBanGiao);
+        System.out.println("  - ghiChu: " + ghiChu);
+        System.out.println("  - xacNhanKhachHang: " + xacNhanKhachHang);
+        System.out.println("  - hinhAnhSauSua: "
+                + (hinhAnhSauSua != null ? hinhAnhSauSua.size() : "null"));
+
+        // Create request object manually
+        com.example.backendlaptop.model.request.baohanh.BanGiaoRequest request = new com.example.backendlaptop.model.request.baohanh.BanGiaoRequest();
+        request.setIdNhanVienBanGiao(idNhanVienBanGiao);
+        request.setGhiChu(ghiChu);
+        request.setHinhAnhSauSua(hinhAnhSauSua);
+        request.setXacNhanKhachHang(xacNhanKhachHang);
+
         PhieuBaoHanhResponse response = baoHanhService.banGiaoSanPham(idBaoHanh, request);
         return ResponseEntity.ok(new ResponseObject<>(response, "Bàn giao sản phẩm thành công"));
     }
 }
-

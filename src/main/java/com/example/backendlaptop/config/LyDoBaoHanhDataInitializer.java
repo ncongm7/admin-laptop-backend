@@ -1,0 +1,119 @@
+package com.example.backendlaptop.config;
+
+import com.example.backendlaptop.entity.LyDoBaoHanh;
+import com.example.backendlaptop.repository.LyDoBaoHanhRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+@Component
+@RequiredArgsConstructor
+public class LyDoBaoHanhDataInitializer implements CommandLineRunner {
+
+    private final LyDoBaoHanhRepository lyDoBaoHanhRepository;
+
+    @Override
+    @Transactional
+    public void run(String... args) throws Exception {
+        initializeData();
+    }
+
+    private void initializeData() {
+        if (lyDoBaoHanhRepository.count() > 0) {
+            // Check if we need to update/repair existing data
+            // For now, we'll try to update specific known codes if they exist, or just log
+            System.out.println("Kiểm tra và cập nhật dữ liệu lý do bảo hành...");
+        }
+
+        List<LyDoBaoHanh> reasons = getStandardReasons();
+
+        for (LyDoBaoHanh reason : reasons) {
+            lyDoBaoHanhRepository.findByMaLyDo(reason.getMaLyDo())
+                    .ifPresentOrElse(existing -> {
+                        // Update existing to ensure correct text
+                        existing.setTenLyDo(reason.getTenLyDo());
+                        existing.setMoTa(reason.getMoTa());
+                        existing.setLoaiLyDo(reason.getLoaiLyDo());
+                        existing.setIsActive(true);
+                        existing.setThuTu(reason.getThuTu());
+                        lyDoBaoHanhRepository.save(existing);
+                    }, () -> {
+                        // Insert new
+                        lyDoBaoHanhRepository.save(reason);
+                    });
+        }
+        System.out.println("Đã cập nhật chuẩn hóa dữ liệu lý do bảo hành.");
+    }
+
+    private List<LyDoBaoHanh> getStandardReasons() {
+        List<LyDoBaoHanh> list = new ArrayList<>();
+        int order = 1;
+
+        // PHẦN CỨNG
+        list.add(createReason("PC001", "Màn hình đen/không lên",
+                "Màn hình không hiển thị dù máy vẫn chạy, hoặc tối đen", "PHAN_CUNG", order++));
+        list.add(createReason("PC002", "Màn hình bị sọc/ám màu",
+                "Xuất hiện các đường kẻ sọc hoặc vùng màu lạ trên màn hình", "PHAN_CUNG", order++));
+        list.add(createReason("PC003", "Bàn phím không gõ được/Liệt phím", "Một số hoặc tất cả phím không phản hồi",
+                "PHAN_CUNG", order++));
+        list.add(createReason("PC004", "Pin phồng/Chai pin", "Pin bị biến dạng hoặc thời lượng sử dụng quá ngắn",
+                "PHAN_CUNG", order++));
+        list.add(createReason("PC005", "Loa bị rè/Không có tiếng", "Âm thanh bị méo hoặc không nghe thấy gì",
+                "PHAN_CUNG", order++));
+        list.add(createReason("PC006", "Máy quá nóng/Quạt kêu to", "Nhiệt độ máy cao bất thường, quạt ồn", "PHAN_CUNG",
+                order++));
+        list.add(createReason("PC007", "Không lên nguồn", "Bấm nút nguồn nhưng máy không phản ứng", "PHAN_CUNG",
+                order++));
+        list.add(createReason("PC008", "Cổng kết nối chập chờn", "USB, HDMI hoặc các cổng khác lúc nhận lúc không",
+                "PHAN_CUNG", order++));
+        list.add(createReason("PC009", "Touchpad không hoạt động", "Bàn di chuột bị liệt hoặc nhảy loạn", "PHAN_CUNG",
+                order++));
+
+        // PHẦN MỀM
+        list.add(createReason("PM001", "Lỗi Windows/Màn hình xanh",
+                "Máy thường xuyên bị crash, hiện màn hình xanh (BSOD)", "PHAN_MEM", order++));
+        list.add(createReason("PM002", "Driver không tương thích", "Lỗi driver các thiết bị, không nhận diện phần cứng",
+                "PHAN_MEM", order++));
+        list.add(createReason("PM003", "Máy u chạy chậm/Treo logo",
+                "Hệ thống phản hồi rất chậm hoặc treo ở logo khởi động", "PHAN_MEM", order++));
+        list.add(createReason("PM004", "Lỗi không kết nối được Wifi/Mạng",
+                "Không thể truy cập internet dù mạng vẫn ổn định", "PHAN_MEM", order++));
+
+        // PHỤ KIỆN
+        list.add(createReason("PK001", "Sạc không vào điện", "Cắm sạc nhưng máy không báo nhận điện", "PHU_KIEN",
+                order++));
+        list.add(createReason("PK002", "Adapter sạc quá nóng/kêu", "Củ sạc nóng bất thường hoặc phát ra tiếng kêu",
+                "PHU_KIEN", order++));
+        list.add(createReason("PK003", "Dây cáp bị đứt/hở", "Dây sạc bị bong tróc hoặc đứt ngầm", "PHU_KIEN", order++));
+
+        // KHÁC
+        list.add(createReason("OT001", "Khác (Mô tả chi tiết)", "Các lỗi không nằm trong danh mục trên", "KHAC", 99));
+
+        return list;
+    }
+
+    private LyDoBaoHanh createReason(String code, String name, String desc, String type, int sortOrder) {
+        LyDoBaoHanh reason = new LyDoBaoHanh();
+        // ID generated by DB/Repo if null for save?
+        // Since we use UUID generator in entity, we let it handle if new.
+        // But for update check we rely on code.
+        // Actually entity says @UuidGenerator, so we should ensure we set it if we want
+        // manual control or leave null for auto.
+        // For 'new' items, leaving null is correct for @UuidGenerator
+
+        reason.setMaLyDo(code);
+        reason.setTenLyDo(name);
+        reason.setMoTa(desc);
+        reason.setLoaiLyDo(type);
+        reason.setThuTu(sortOrder);
+        reason.setIsActive(true);
+        reason.setNgayTao(Instant.now());
+        return reason;
+    }
+}

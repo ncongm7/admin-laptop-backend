@@ -80,7 +80,8 @@ public class AuthService {
 
         // 7. Tạo response
         LoginResponse.UserInfo userInfo = new LoginResponse.UserInfo();
-        // Nếu là nhân viên, dùng nhanVien.getId(), nếu là khách hàng, dùng khachHang.getId()
+        // Nếu là nhân viên, dùng nhanVien.getId(), nếu là khách hàng, dùng
+        // khachHang.getId()
         if (nhanVien != null) {
             userInfo.setUserId(nhanVien.getId());
             userInfo.setHoTen(nhanVien.getHoTen());
@@ -91,11 +92,11 @@ public class AuthService {
             // Fallback: dùng taiKhoan ID nếu không tìm thấy cả nhân viên và khách hàng
             userInfo.setUserId(taiKhoan.getId());
         }
-        
+
         userInfo.setTenDangNhap(taiKhoan.getTenDangNhap());
         userInfo.setEmail(taiKhoan.getEmail());
         userInfo.setTrangThai(taiKhoan.getTrangThai());
-        
+
         if (taiKhoan.getMaVaiTro() != null) {
             // Trả về ma_vai_tro (code) thay vì ten_vai_tro để nhất quán với frontend
             userInfo.setVaiTro(taiKhoan.getMaVaiTro().getMaVaiTro());
@@ -163,7 +164,16 @@ public class AuthService {
         taiKhoan.setId(UUID.randomUUID());
         taiKhoan.setTenDangNhap(request.getSoDienThoai()); // Dùng SĐT làm username
         taiKhoan.setMatKhau(request.getMatKhau()); // TODO: Hash password
-        taiKhoan.setEmail(request.getEmail());
+
+        // Fix UNIQUE constraint: Generate unique email if not provided
+        if (request.getEmail() != null && !request.getEmail().isEmpty()) {
+            taiKhoan.setEmail(request.getEmail());
+        } else {
+            // Generate unique email using phone number to avoid NULL UNIQUE constraint
+            // violation
+            taiKhoan.setEmail(request.getSoDienThoai() + "@customer.dellviet.local");
+        }
+
         taiKhoan.setTrangThai(1); // Active
         taiKhoan.setNgayTao(Instant.now());
         taiKhoan.setMaVaiTro(null); // Khách hàng không có vai trò
@@ -197,7 +207,9 @@ public class AuthService {
         // 8. Tạo token
         String token = "Bearer-" + UUID.randomUUID().toString();
 
+        // 9. Lưu token vào tokenStore
+        tokenStore.put(token, userInfo);
+
         return new LoginResponse(token, userInfo);
     }
 }
-

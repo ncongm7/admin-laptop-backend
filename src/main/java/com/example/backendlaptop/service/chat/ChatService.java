@@ -31,6 +31,7 @@ public class ChatService {
     private final KhachHangRepository khachHangRepository;
     private final NhanVienRepository nhanVienRepository;
     private final RateLimitService rateLimitService;
+    private final com.example.backendlaptop.repository.ChatSessionRepository chatSessionRepo;
 
     /**
      * Gửi tin nhắn mới
@@ -49,9 +50,9 @@ public class ChatService {
         }
 
         // Check rate limit
-        UUID userId = request.getIsFromCustomer() ? request.getKhachHangId() : 
-                     (request.getNhanVienId() != null ? request.getNhanVienId() : null);
-        
+        UUID userId = request.getIsFromCustomer() ? request.getKhachHangId()
+                : (request.getNhanVienId() != null ? request.getNhanVienId() : null);
+
         if (userId != null) {
             boolean isAllowed = rateLimitService.isAllowed(userId, request.getIsFromCustomer());
             if (!isAllowed) {
@@ -65,7 +66,8 @@ public class ChatService {
         KhachHang khachHang = khachHangRepository.findById(request.getKhachHangId())
                 .orElseThrow(() -> {
                     System.err.println("❌ Không tìm thấy khách hàng với ID: " + request.getKhachHangId());
-                    return new ApiException("Không tìm thấy khách hàng với ID: " + request.getKhachHangId(), "NOT_FOUND");
+                    return new ApiException("Không tìm thấy khách hàng với ID: " + request.getKhachHangId(),
+                            "NOT_FOUND");
                 });
         System.out.println("✅ Tìm thấy khách hàng: " + khachHang.getHoTen());
 
@@ -90,15 +92,24 @@ public class ChatService {
         // Xử lý conversation_id
         UUID conversationId = request.getConversationId();
         if (conversationId == null) {
-            // Nếu là tin nhắn đầu tiên, tạo conversation mới (dùng chính id của tin nhắn)
-            conversationId = chat.getId();
-            System.out.println("🆕 Tạo conversation mới với ID: " + conversationId);
+            // Cố gắng tìm conversation hiện có của khách hàng trước
+            UUID existingId = findOrCreateConversation(request.getKhachHangId(), request.getNhanVienId());
+            if (existingId != null) {
+                conversationId = existingId;
+                System.out.println("✅ Tự động gắn tin nhắn vào conversation cũ: " + conversationId);
+            } else {
+                // Nếu là tin nhắn đầu tiên, tạo conversation mới (dùng chính id của tin nhắn)
+                conversationId = chat.getId();
+                System.out.println("🆕 Tạo conversation mới với ID: " + conversationId);
+            }
         } else {
             // Kiểm tra xem conversation đã tồn tại chưa (tránh duplicate)
             Pageable pageable = PageRequest.of(0, 1);
-            List<Chat> existingChats = chatRepository.findByConversationIdOrderByNgayPhanHoiAsc(conversationId, pageable).getContent();
+            List<Chat> existingChats = chatRepository
+                    .findByConversationIdOrderByNgayPhanHoiAsc(conversationId, pageable).getContent();
             if (existingChats.isEmpty()) {
-                System.out.println("⚠️ Conversation ID được cung cấp nhưng không tìm thấy tin nhắn nào. Tạo conversation mới.");
+                System.out.println(
+                        "⚠️ Conversation ID được cung cấp nhưng không tìm thấy tin nhắn nào. Tạo conversation mới.");
                 conversationId = chat.getId();
             } else {
                 System.out.println("✅ Sử dụng conversation hiện có: " + conversationId);
@@ -113,21 +124,23 @@ public class ChatService {
             chat.setReplyTo(replyTo);
         }
 
-        // Check for duplicate message (same content, same conversation, within 1 minute)
+        // Check for duplicate message (same content, same conversation, within 1
+        // minute)
         String messageHash = chat.generateMessageHash();
         if (messageHash != null) {
             Pageable pageable = PageRequest.of(0, 100); // Get last 100 messages
-            List<Chat> recentMessages = chatRepository.findByConversationIdOrderByNgayPhanHoiAsc(conversationId, pageable).getContent();
+            List<Chat> recentMessages = chatRepository
+                    .findByConversationIdOrderByNgayPhanHoiAsc(conversationId, pageable).getContent();
             Instant oneMinuteAgo = Instant.now().minusSeconds(60);
-            
+
             for (Chat existingChat : recentMessages) {
                 // Check if same content, same sender, within 1 minute
-                if (existingChat.getNoiDung() != null && 
-                    existingChat.getNoiDung().trim().equals(chat.getNoiDung().trim()) &&
-                    existingChat.getIsFromCustomer().equals(chat.getIsFromCustomer()) &&
-                    existingChat.getNgayPhanHoi() != null &&
-                    existingChat.getNgayPhanHoi().isAfter(oneMinuteAgo)) {
-                    
+                if (existingChat.getNoiDung() != null &&
+                        existingChat.getNoiDung().trim().equals(chat.getNoiDung().trim()) &&
+                        existingChat.getIsFromCustomer().equals(chat.getIsFromCustomer()) &&
+                        existingChat.getNgayPhanHoi() != null &&
+                        existingChat.getNgayPhanHoi().isAfter(oneMinuteAgo)) {
+
                     System.out.println("⚠️ Duplicate message detected, returning existing message");
                     return mapToResponse(existingChat);
                 }
@@ -145,7 +158,8 @@ public class ChatService {
     public List<ChatResponse> getMessagesByConversationId(UUID conversationId) {
         // Use unpaged to get all messages
         Pageable pageable = Pageable.unpaged();
-        List<Chat> chats = chatRepository.findByConversationIdOrderByNgayPhanHoiAsc(conversationId, pageable).getContent();
+        List<Chat> chats = chatRepository.findByConversationIdOrderByNgayPhanHoiAsc(conversationId, pageable)
+                .getContent();
         return chats.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -180,7 +194,7 @@ public class ChatService {
     public List<ConversationResponse> getAllConversations() {
         // Lấy tất cả tin nhắn có conversationId
         List<Chat> allChats = chatRepository.findAll();
-        
+
         // Group by conversationId và lấy tin nhắn cuối cùng của mỗi conversation
         return allChats.stream()
                 .filter(chat -> chat.getConversationId() != null && chat.getKhachHang() != null)
@@ -190,8 +204,10 @@ public class ChatService {
                 .map(conversationChats -> {
                     Chat lastMessage = conversationChats.stream()
                             .max((c1, c2) -> {
-                                if (c1.getNgayPhanHoi() == null) return -1;
-                                if (c2.getNgayPhanHoi() == null) return 1;
+                                if (c1.getNgayPhanHoi() == null)
+                                    return -1;
+                                if (c2.getNgayPhanHoi() == null)
+                                    return 1;
                                 return c1.getNgayPhanHoi().compareTo(c2.getNgayPhanHoi());
                             })
                             .orElse(null);
@@ -202,8 +218,10 @@ public class ChatService {
                 })
                 .filter(conv -> conv != null)
                 .sorted((c1, c2) -> {
-                    if (c1.getLastMessageTime() == null) return 1;
-                    if (c2.getLastMessageTime() == null) return -1;
+                    if (c1.getLastMessageTime() == null)
+                        return 1;
+                    if (c2.getLastMessageTime() == null)
+                        return -1;
                     return c2.getLastMessageTime().compareTo(c1.getLastMessageTime());
                 })
                 .collect(Collectors.toList());
@@ -325,5 +343,53 @@ public class ChatService {
 
         return response;
     }
-}
 
+    /**
+     * Return conversation to bot handling (de-escalate)
+     */
+    @Transactional
+    public void returnToBot(UUID conversationId) {
+        chatSessionRepo.findByConversationId(conversationId).ifPresent(session -> {
+            session.setIsBotHandling(true);
+            session.setIsEscalated(false);
+            session.setEscalationReason(null);
+            chatSessionRepo.save(session);
+
+            System.out.println("🤖 [ChatService] Conversation " + conversationId + " returned to bot handling");
+
+            // Send system message
+            Chat systemMsg = new Chat();
+            systemMsg.setId(UUID.randomUUID());
+            systemMsg.setConversationId(conversationId);
+            systemMsg.setNoiDung("🤖 Đã quay lại chế độ tư vấn AI. Hãy hỏi mình bất cứ điều gì!");
+            systemMsg.setMessageType("system");
+            systemMsg.setIsBotMessage(true);
+            systemMsg.setIsFromCustomer(false);
+            systemMsg.setNgayPhanHoi(Instant.now());
+            chatRepository.save(systemMsg);
+        });
+    }
+
+    /**
+     * Get escalation status for a conversation
+     */
+    public java.util.Map<String, Object> getEscalationStatus(UUID conversationId) {
+        return chatSessionRepo.findByConversationId(conversationId)
+                .map(session -> {
+                    java.util.Map<String, Object> status = new java.util.HashMap<>();
+                    status.put("mode", Boolean.TRUE.equals(session.getIsBotHandling()) ? "BOT" : "HUMAN");
+                    status.put("isEscalated", session.getIsEscalated());
+                    status.put("canReturnToBot", Boolean.TRUE.equals(session.getIsEscalated()));
+                    status.put("escalationReason", session.getEscalationReason());
+                    status.put("escalatedAt", session.getEscalatedAt());
+
+                    // Get assigned staff name if available
+                    if (session.getNhanVienId() != null) {
+                        nhanVienRepository.findById(session.getNhanVienId())
+                                .ifPresent(staff -> status.put("assignedStaffName", staff.getHoTen()));
+                    }
+                    return status;
+                })
+                .orElse(java.util.Map.of("mode", "BOT", "isEscalated", false, "canReturnToBot", false));
+    }
+}
