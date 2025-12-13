@@ -9,6 +9,7 @@ import com.example.backendlaptop.expection.ApiException;
 import com.example.backendlaptop.model.TrangThaiHoaDon;
 import com.example.backendlaptop.repository.PhieuGiamGiaRepository;
 import com.example.backendlaptop.repository.PhieuGiamGiaKhachHangRepository;
+import com.example.backendlaptop.repository.banhang.HoaDonRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,9 @@ public class KhuyenMaiService {
 
     @Autowired
     private BanHangHoaDonService hoaDonService;
+
+    @Autowired
+    private HoaDonRepository hoaDonRepository;
 
     /**
      * Gợi ý Voucher/Khuyến mãi cho hóa đơn hiện tại
@@ -108,6 +112,15 @@ public class KhuyenMaiService {
                             System.out.println("    ❌ Bị loại: Khách hàng không có quyền sử dụng voucher riêng tư này");
                             return false; // Khách hàng không có trong danh sách được gán voucher
                         }
+
+                        // Kiểm tra xem khách hàng đã từng sử dụng voucher này chưa (trừ hóa đơn đã hủy)
+                        boolean daSuDung = hoaDonRepository.existsByIdKhachHang_IdAndIdPhieuGiamGia_IdAndTrangThaiNot(
+                            idKhachHang, pgg.getId(), TrangThaiHoaDon.DA_HUY);
+                        if (daSuDung) {
+                            System.out.println("    ❌ Bị loại: Khách hàng đã sử dụng voucher này rồi");
+                            return false;
+                        }
+
                         System.out.println("    ✅ Khách hàng có quyền sử dụng voucher riêng tư");
                     }
                     
@@ -323,4 +336,3 @@ public class KhuyenMaiService {
         return amount.toString();
     }
 }
-

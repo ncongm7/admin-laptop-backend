@@ -22,4 +22,6 @@ public interface HoaDonRepository extends JpaRepository<HoaDon, UUID>, JpaSpecif
 
     // Tìm đơn hàng theo khách hàng
     org.springframework.data.domain.Page<HoaDon> findByIdKhachHang_IdOrderByNgayTaoDesc(UUID khachHangId, org.springframework.data.domain.Pageable pageable);
+
+    boolean existsByIdKhachHang_IdAndIdPhieuGiamGia_IdAndTrangThaiNot(UUID khachHangId, UUID phieuGiamGiaId, TrangThaiHoaDon trangThai);
 }
