@@ -39,6 +39,9 @@ public class CustomerGioHangService {
     @Autowired
     private HinhAnhRepository hinhAnhRepository;
 
+    @Autowired
+    private DotGiamGiaChiTietRepository dotGiamGiaChiTietRepository;
+
     /**
      * Lấy giỏ hàng của khách hàng
      */
@@ -49,7 +52,7 @@ public class CustomerGioHangService {
 
         // Lấy danh sách items trong giỏ
         List<GioHangChiTiet> chiTietList = gioHangChiTietRepository.findByGioHangId(gioHang.getId());
-        
+
         List<CartItemResponse> items = new ArrayList<>();
         BigDecimal subtotal = BigDecimal.ZERO;
 
@@ -101,9 +104,12 @@ public class CustomerGioHangService {
             // Cập nhật số lượng
             int newQuantity = existingItem.getSoLuong() + request.getQuantity();
             if (newQuantity > availableQuantity) {
-                throw new ApiException("Số lượng sản phẩm không đủ. Còn lại: " + availableQuantity, "INSUFFICIENT_STOCK");
+                throw new ApiException("Số lượng sản phẩm không đủ. Còn lại: " + availableQuantity,
+                        "INSUFFICIENT_STOCK");
             }
             existingItem.setSoLuong(newQuantity);
+            // Cập nhật lại đơn giá theo giá hiện tại (khuyến mãi mới nhất)
+            existingItem.setDonGia(getGiaBanHienTai(ctsp));
             gioHangChiTietRepository.save(existingItem);
         } else {
             // Thêm mới
@@ -112,7 +118,7 @@ public class CustomerGioHangService {
             chiTiet.setGioHang(gioHang);
             chiTiet.setChiTietSanPham(ctsp);
             chiTiet.setSoLuong(request.getQuantity());
-            chiTiet.setDonGia(ctsp.getGiaBan());
+            chiTiet.setDonGia(getGiaBanHienTai(ctsp));
             chiTiet.setNgayThem(Instant.now());
             gioHangChiTietRepository.save(chiTiet);
         }
@@ -144,7 +150,8 @@ public class CustomerGioHangService {
         if (newQuantity > currentQuantity) {
             int availableQuantity = getAvailableQuantity(chiTiet.getChiTietSanPham());
             if (newQuantity > availableQuantity) {
-                throw new ApiException("Số lượng sản phẩm không đủ. Còn lại: " + availableQuantity, "INSUFFICIENT_STOCK");
+                throw new ApiException("Số lượng sản phẩm không đủ. Còn lại: " + availableQuantity,
+                        "INSUFFICIENT_STOCK");
             }
         }
 
@@ -229,7 +236,7 @@ public class CustomerGioHangService {
         item.setCtspId(ctsp.getId());
         item.setTenSanPham(sanPham.getTenSanPham());
         item.setMaSanPham(sanPham.getMaSanPham());
-        
+
         // Get main image from repository
         String imageUrl = hinhAnhRepository.findMainImageByCtspId(ctsp.getId())
                 .map(HinhAnh::getUrl)
@@ -241,26 +248,29 @@ public class CustomerGioHangService {
                             .orElse("https://via.placeholder.com/80");
                 });
         item.setImageUrl(imageUrl);
-        
+
         // Build variant name
         StringBuilder variantName = new StringBuilder();
         if (ctsp.getMauSac() != null) {
             variantName.append(ctsp.getMauSac().getTenMau());
         }
         if (ctsp.getCpu() != null) {
-            if (variantName.length() > 0) variantName.append(" - ");
+            if (variantName.length() > 0)
+                variantName.append(" - ");
             variantName.append(ctsp.getCpu().getTenCpu());
         }
         if (ctsp.getRam() != null) {
-            if (variantName.length() > 0) variantName.append("/");
+            if (variantName.length() > 0)
+                variantName.append("/");
             variantName.append(ctsp.getRam().getTenRam());
         }
         if (ctsp.getOCung() != null) {
-            if (variantName.length() > 0) variantName.append("/");
+            if (variantName.length() > 0)
+                variantName.append("/");
             variantName.append(ctsp.getOCung().getDungLuong());
         }
         item.setVariantName(variantName.toString());
-        
+
         item.setPrice(chiTiet.getDonGia());
         item.setQuantity(chiTiet.getSoLuong());
         item.setMaxQuantity(getAvailableQuantity(ctsp));
@@ -277,5 +287,36 @@ public class CustomerGioHangService {
         // Count available serials (trangThai = 1 means available)
         return serialRepository.countByCtspIdAndTrangThai(ctsp.getId(), 1);
     }
-}
 
+    /**
+     * Lấy giá bán hiện tại của sản phẩm
+     * Ưu tiên lấy giá từ dot_giam_gia_chi_tiet (nếu có và đang hiệu lực)
+     * Nếu không có, lấy giá gốc từ chi_tiet_san_pham
+     */
+    private BigDecimal getGiaBanHienTai(ChiTietSanPham ctsp) {
+        // Tìm thông tin giảm giá cho chi tiết sản phẩm này
+        List<DotGiamGiaChiTiet> discountList = dotGiamGiaChiTietRepository.findAll();
+        java.util.Optional<DotGiamGiaChiTiet> dotGiamGiaChiTiet = discountList.stream()
+                .filter(d -> d.getIdCtsp() != null && d.getIdCtsp().getId().equals(ctsp.getId()))
+                .filter(d -> d.getDotGiamGia() != null && d.getDotGiamGia().getTrangThai() == 1)
+                .filter(d -> {
+                    Instant now = Instant.now();
+                    return d.getDotGiamGia().getNgayBatDau() != null
+                            && d.getDotGiamGia().getNgayKetThuc() != null
+                            && !now.isBefore(d.getDotGiamGia().getNgayBatDau())
+                            && !now.isAfter(d.getDotGiamGia().getNgayKetThuc());
+                })
+                .findFirst();
+
+        if (dotGiamGiaChiTiet.isPresent()) {
+            DotGiamGiaChiTiet discount = dotGiamGiaChiTiet.get();
+            BigDecimal giaSauKhiGiam = discount.getGiaSauKhiGiam();
+            if (giaSauKhiGiam != null && giaSauKhiGiam.compareTo(BigDecimal.ZERO) > 0) {
+                return giaSauKhiGiam;
+            }
+        }
+
+        // Nếu không có giảm giá hoặc giá giảm không hợp lệ, trả về giá gốc
+        return ctsp.getGiaBan();
+    }
+}

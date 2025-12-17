@@ -49,9 +49,9 @@ public class ChatService {
         }
 
         // Check rate limit
-        UUID userId = request.getIsFromCustomer() ? request.getKhachHangId() : 
-                     (request.getNhanVienId() != null ? request.getNhanVienId() : null);
-        
+        UUID userId = request.getIsFromCustomer() ? request.getKhachHangId()
+                : (request.getNhanVienId() != null ? request.getNhanVienId() : null);
+
         if (userId != null) {
             boolean isAllowed = rateLimitService.isAllowed(userId, request.getIsFromCustomer());
             if (!isAllowed) {
@@ -65,7 +65,8 @@ public class ChatService {
         KhachHang khachHang = khachHangRepository.findById(request.getKhachHangId())
                 .orElseThrow(() -> {
                     System.err.println("❌ Không tìm thấy khách hàng với ID: " + request.getKhachHangId());
-                    return new ApiException("Không tìm thấy khách hàng với ID: " + request.getKhachHangId(), "NOT_FOUND");
+                    return new ApiException("Không tìm thấy khách hàng với ID: " + request.getKhachHangId(),
+                            "NOT_FOUND");
                 });
         System.out.println("✅ Tìm thấy khách hàng: " + khachHang.getHoTen());
 
@@ -96,9 +97,11 @@ public class ChatService {
         } else {
             // Kiểm tra xem conversation đã tồn tại chưa (tránh duplicate)
             Pageable pageable = PageRequest.of(0, 1);
-            List<Chat> existingChats = chatRepository.findByConversationIdOrderByNgayPhanHoiAsc(conversationId, pageable).getContent();
+            List<Chat> existingChats = chatRepository
+                    .findByConversationIdOrderByNgayPhanHoiAsc(conversationId, pageable).getContent();
             if (existingChats.isEmpty()) {
-                System.out.println("⚠️ Conversation ID được cung cấp nhưng không tìm thấy tin nhắn nào. Tạo conversation mới.");
+                System.out.println(
+                        "⚠️ Conversation ID được cung cấp nhưng không tìm thấy tin nhắn nào. Tạo conversation mới.");
                 conversationId = chat.getId();
             } else {
                 System.out.println("✅ Sử dụng conversation hiện có: " + conversationId);
@@ -113,21 +116,23 @@ public class ChatService {
             chat.setReplyTo(replyTo);
         }
 
-        // Check for duplicate message (same content, same conversation, within 1 minute)
+        // Check for duplicate message (same content, same conversation, within 1
+        // minute)
         String messageHash = chat.generateMessageHash();
         if (messageHash != null) {
             Pageable pageable = PageRequest.of(0, 100); // Get last 100 messages
-            List<Chat> recentMessages = chatRepository.findByConversationIdOrderByNgayPhanHoiAsc(conversationId, pageable).getContent();
+            List<Chat> recentMessages = chatRepository
+                    .findByConversationIdOrderByNgayPhanHoiAsc(conversationId, pageable).getContent();
             Instant oneMinuteAgo = Instant.now().minusSeconds(60);
-            
+
             for (Chat existingChat : recentMessages) {
                 // Check if same content, same sender, within 1 minute
-                if (existingChat.getNoiDung() != null && 
-                    existingChat.getNoiDung().trim().equals(chat.getNoiDung().trim()) &&
-                    existingChat.getIsFromCustomer().equals(chat.getIsFromCustomer()) &&
-                    existingChat.getNgayPhanHoi() != null &&
-                    existingChat.getNgayPhanHoi().isAfter(oneMinuteAgo)) {
-                    
+                if (existingChat.getNoiDung() != null &&
+                        existingChat.getNoiDung().trim().equals(chat.getNoiDung().trim()) &&
+                        existingChat.getIsFromCustomer().equals(chat.getIsFromCustomer()) &&
+                        existingChat.getNgayPhanHoi() != null &&
+                        existingChat.getNgayPhanHoi().isAfter(oneMinuteAgo)) {
+
                     System.out.println("⚠️ Duplicate message detected, returning existing message");
                     return mapToResponse(existingChat);
                 }
@@ -145,7 +150,8 @@ public class ChatService {
     public List<ChatResponse> getMessagesByConversationId(UUID conversationId) {
         // Use unpaged to get all messages
         Pageable pageable = Pageable.unpaged();
-        List<Chat> chats = chatRepository.findByConversationIdOrderByNgayPhanHoiAsc(conversationId, pageable).getContent();
+        List<Chat> chats = chatRepository.findByConversationIdOrderByNgayPhanHoiAsc(conversationId, pageable)
+                .getContent();
         return chats.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -180,7 +186,7 @@ public class ChatService {
     public List<ConversationResponse> getAllConversations() {
         // Lấy tất cả tin nhắn có conversationId
         List<Chat> allChats = chatRepository.findAll();
-        
+
         // Group by conversationId và lấy tin nhắn cuối cùng của mỗi conversation
         return allChats.stream()
                 .filter(chat -> chat.getConversationId() != null && chat.getKhachHang() != null)
@@ -190,8 +196,10 @@ public class ChatService {
                 .map(conversationChats -> {
                     Chat lastMessage = conversationChats.stream()
                             .max((c1, c2) -> {
-                                if (c1.getNgayPhanHoi() == null) return -1;
-                                if (c2.getNgayPhanHoi() == null) return 1;
+                                if (c1.getNgayPhanHoi() == null)
+                                    return -1;
+                                if (c2.getNgayPhanHoi() == null)
+                                    return 1;
                                 return c1.getNgayPhanHoi().compareTo(c2.getNgayPhanHoi());
                             })
                             .orElse(null);
@@ -202,8 +210,10 @@ public class ChatService {
                 })
                 .filter(conv -> conv != null)
                 .sorted((c1, c2) -> {
-                    if (c1.getLastMessageTime() == null) return 1;
-                    if (c2.getLastMessageTime() == null) return -1;
+                    if (c1.getLastMessageTime() == null)
+                        return 1;
+                    if (c2.getLastMessageTime() == null)
+                        return -1;
                     return c2.getLastMessageTime().compareTo(c1.getLastMessageTime());
                 })
                 .collect(Collectors.toList());
@@ -256,6 +266,15 @@ public class ChatService {
             e.printStackTrace();
             return null;
         }
+    }
+
+    /**
+     * Kiểm tra xem nhân viên đã tham gia cuộc hội thoại chưa
+     */
+    public boolean hasStaffJoined(UUID conversationId) {
+        if (conversationId == null)
+            return false;
+        return chatRepository.hasStaffJoined(conversationId);
     }
 
     /**
@@ -326,4 +345,3 @@ public class ChatService {
         return response;
     }
 }
-

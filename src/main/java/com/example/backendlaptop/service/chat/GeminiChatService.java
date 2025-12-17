@@ -41,15 +41,16 @@ public class GeminiChatService {
     @Value("${groq.api.enabled:true}")
     private boolean groqEnabled;
 
-    // Cache product context (refresh every 5 minutes)
-    private String cachedProductContext;
-    private long contextCacheTime = 0;
-    private static final long CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+    // Cache product list (refresh every 10 minutes)
+    private List<SanPham> cachedProducts;
+    private long productCacheTime = 0;
+    private static final long CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes
 
     /**
      * Main method: Tư vấn sản phẩm với Gemini API
      */
-    public ChatbotResponse consultWithGemini(String userMessage, UUID khachHangId, Map<String, Object> consultationData) {
+    public ChatbotResponse consultWithGemini(String userMessage, UUID khachHangId,
+            Map<String, Object> consultationData) {
         if (!groqEnabled || groqApiKey == null || groqApiKey.isEmpty()) {
             log.warn("Groq API is disabled or API key not configured. Falling back to ChatbotService.");
             return null; // Will trigger fallback
@@ -58,8 +59,8 @@ public class GeminiChatService {
         try {
             log.info("🤖 [Groq] Processing consultation request for customer: {}", khachHangId);
 
-            // 1. Build product context from database
-            String productContext = buildProductContext();
+            // 1. Build product context based on user message (Dynamic Context)
+            String productContext = buildProductContext(userMessage);
 
             // 2. Build consultation prompt
             String prompt = buildConsultationPrompt(userMessage, consultationData, productContext);
@@ -91,37 +92,98 @@ public class GeminiChatService {
     }
 
     /**
-     * Build product context string from database
+     * Get or refresh cached products
      */
-    public String buildProductContext() {
-        // Check cache
+    private List<SanPham> getCachedProducts() {
         long now = System.currentTimeMillis();
-        if (cachedProductContext != null && (now - contextCacheTime) < CACHE_DURATION_MS) {
-            log.debug("📦 [Groq] Using cached product context");
-            return cachedProductContext;
+        if (cachedProducts != null && !cachedProducts.isEmpty() && (now - productCacheTime) < CACHE_DURATION_MS) {
+            return cachedProducts;
         }
 
-        log.info("📦 [Groq] Building product context from database...");
-
+        log.info("📦 [Groq] Refreshing product cache from database...");
         try {
-            // Get all active products
-            List<SanPham> products = sanPhamRepo.findByTrangThai(1);
-            
-            // Limit to top 50 to avoid prompt too long
-            if (products.size() > 50) {
-                products = products.subList(0, 50);
+            List<SanPham> products = sanPhamRepo.findSanPhamConHang();
+            if (products == null || products.isEmpty()) {
+                products = sanPhamRepo.findByTrangThai(1);
+            }
+            cachedProducts = products;
+            productCacheTime = now;
+            return products;
+        } catch (Exception e) {
+            log.error("❌ [Groq] Error refreshing product cache: {}", e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Find relevant products based on keywords in user message
+     */
+    private List<SanPham> findRelevantProducts(List<SanPham> allProducts, String userMessage) {
+        if (userMessage == null || userMessage.trim().isEmpty()) {
+            return allProducts.stream()
+                    .sorted(Comparator.comparing(SanPham::getNgayTao).reversed())
+                    .limit(10)
+                    .toList();
+        }
+
+        String lowerMessage = userMessage.toLowerCase();
+        String[] keywords = lowerMessage.split("\\s+");
+
+        return allProducts.stream()
+                .map(product -> {
+                    int score = 0;
+                    String productName = product.getTenSanPham().toLowerCase();
+                    String productCode = product.getMaSanPham().toLowerCase();
+
+                    if (productName.contains(lowerMessage))
+                        score += 100;
+                    if (productCode.equals(lowerMessage))
+                        score += 200;
+
+                    for (String keyword : keywords) {
+                        if (keyword.length() > 2) {
+                            if (productName.contains(keyword))
+                                score += 10;
+                            if (productCode.contains(keyword))
+                                score += 20;
+                        }
+                    }
+
+                    return new AbstractMap.SimpleEntry<>(product, score);
+                })
+                .filter(entry -> entry.getValue() > 0)
+                .sorted((e1, e2) -> e2.getValue().compareTo(e1.getValue()))
+                .limit(15)
+                .map(AbstractMap.SimpleEntry::getKey)
+                .toList();
+    }
+
+    /**
+     * Build product context string dynamically
+     */
+    public String buildProductContext(String userMessage) {
+        try {
+            List<SanPham> allProducts = getCachedProducts();
+            List<SanPham> relevantProducts = findRelevantProducts(allProducts, userMessage);
+
+            // If no relevant products found (score 0), fallback to newest
+            if (relevantProducts.isEmpty() && !allProducts.isEmpty()) {
+                relevantProducts = allProducts.stream()
+                        .sorted(Comparator.comparing(SanPham::getNgayTao).reversed())
+                        .limit(10)
+                        .toList();
             }
 
             StringBuilder context = new StringBuilder();
-            context.append("Danh sách sản phẩm laptop hiện có trong cửa hàng:\n\n");
+            context.append("Danh sách sản phẩm laptop có sẵn (Top gợi ý):\n\n");
 
             int index = 1;
-            for (SanPham product : products) {
+            for (SanPham product : relevantProducts) {
                 // Get product variants
                 List<ChiTietSanPham> variants = chiTietSanPhamRepo.findBySanPham_Id(product.getId());
-                
+
                 if (variants.isEmpty()) {
-                    continue; // Skip products without variants
+                    continue;
                 }
 
                 // Get first variant for specs
@@ -129,55 +191,34 @@ public class GeminiChatService {
 
                 context.append(String.format("%d. %s (ID: %s)\n", index, product.getTenSanPham(), product.getId()));
 
-                // CPU
-                if (variant.getCpu() != null) {
+                // Specs
+                if (variant.getCpu() != null)
                     context.append(String.format("   - CPU: %s\n", variant.getCpu().getTenCpu()));
-                }
-
-                // RAM
-                if (variant.getRam() != null) {
+                if (variant.getRam() != null)
                     context.append(String.format("   - RAM: %s\n", variant.getRam().getTenRam()));
-                }
-
-                // Ổ cứng
-                if (variant.getOCung() != null) {
+                if (variant.getOCung() != null)
                     context.append(String.format("   - Ổ cứng: %s\n", variant.getOCung().getDungLuong()));
-                }
-
-                // GPU
-                if (variant.getGpu() != null) {
+                if (variant.getGpu() != null)
                     context.append(String.format("   - GPU: %s\n", variant.getGpu().getTenGpu()));
-                }
-
-                // Màn hình
-                if (variant.getLoaiManHinh() != null) {
+                if (variant.getLoaiManHinh() != null)
                     context.append(String.format("   - Màn hình: %s\n", variant.getLoaiManHinh().getKichThuoc()));
-                }
 
-                // Pin
-                if (variant.getPin() != null) {
-                    context.append(String.format("   - Pin: %s\n", variant.getPin().getDungLuongPin()));
-                }
-
-                // Giá (min và max từ all variants)
+                // Price
                 BigDecimal minPrice = variants.stream()
                         .map(ChiTietSanPham::getGiaBan)
                         .filter(Objects::nonNull)
-                        .min(BigDecimal::compareTo)
-                        .orElse(BigDecimal.ZERO);
+                        .min(BigDecimal::compareTo).orElse(BigDecimal.ZERO);
 
                 BigDecimal maxPrice = variants.stream()
                         .map(ChiTietSanPham::getGiaBan)
                         .filter(Objects::nonNull)
-                        .max(BigDecimal::compareTo)
-                        .orElse(BigDecimal.ZERO);
+                        .max(BigDecimal::compareTo).orElse(BigDecimal.ZERO);
 
-                if (minPrice.compareTo(BigDecimal.ZERO) > 0 || maxPrice.compareTo(BigDecimal.ZERO) > 0) {
+                if (minPrice.compareTo(BigDecimal.ZERO) > 0) {
                     if (minPrice.equals(maxPrice)) {
                         context.append(String.format("   - Giá: %s VNĐ\n", formatPrice(minPrice.longValue())));
                     } else {
-                        context.append(String.format("   - Giá: %s - %s VNĐ\n", 
-                                formatPrice(minPrice.longValue()), 
+                        context.append(String.format("   - Giá: %s - %s VNĐ\n", formatPrice(minPrice.longValue()),
                                 formatPrice(maxPrice.longValue())));
                     }
                 } else {
@@ -188,12 +229,7 @@ public class GeminiChatService {
                 index++;
             }
 
-            // Cache the context
-            cachedProductContext = context.toString();
-            contextCacheTime = now;
-
-            log.info("✅ [Groq] Built product context with {} products", products.size());
-            return cachedProductContext;
+            return context.toString();
 
         } catch (Exception e) {
             log.error("❌ [Groq] Error building product context: {}", e.getMessage(), e);
@@ -204,11 +240,13 @@ public class GeminiChatService {
     /**
      * Build consultation prompt for Gemini
      */
-    private String buildConsultationPrompt(String userMessage, Map<String, Object> consultationData, String productContext) {
+    private String buildConsultationPrompt(String userMessage, Map<String, Object> consultationData,
+            String productContext) {
         StringBuilder prompt = new StringBuilder();
 
         prompt.append("Bạn là nhân viên tư vấn laptop tại cửa hàng Dell. ");
-        prompt.append("Hãy trò chuyện với khách hàng một cách tự nhiên, thân thiện như đang nói chuyện trực tiếp, không cứng nhắc như chatbot. ");
+        prompt.append(
+                "Hãy trò chuyện với khách hàng một cách tự nhiên, thân thiện như đang nói chuyện trực tiếp, không cứng nhắc như chatbot. ");
         prompt.append("Sử dụng ngôn ngữ gần gũi, nhiệt tình, nhưng vẫn chuyên nghiệp. ");
         prompt.append("Trả lời ngắn gọn, dễ hiểu, không dùng format list hay menu trừ khi khách hàng yêu cầu.\n\n");
 
@@ -218,10 +256,13 @@ public class GeminiChatService {
         }
 
         // Check if this is a consultation request or normal chat
-        boolean isConsultation = consultationData != null && 
-                                 (consultationData.get("budget") != null || 
-                                  (consultationData.get("purposes") != null && !((List<?>) consultationData.get("purposes")).isEmpty()) ||
-                                  (consultationData.get("features") != null && !((List<?>) consultationData.get("features")).isEmpty()));
+        boolean isConsultation = consultationData != null &&
+                (consultationData.get("budget") != null ||
+                        (consultationData.get("purposes") != null
+                                && !((List<?>) consultationData.get("purposes")).isEmpty())
+                        ||
+                        (consultationData.get("features") != null
+                                && !((List<?>) consultationData.get("features")).isEmpty()));
 
         if (isConsultation) {
             // Consultation data
@@ -244,7 +285,8 @@ public class GeminiChatService {
             // Budget
             Object budgetObj = consultationData.get("budget");
             if (budgetObj != null) {
-                long budget = budgetObj instanceof Number ? ((Number) budgetObj).longValue() : Long.parseLong(budgetObj.toString());
+                long budget = budgetObj instanceof Number ? ((Number) budgetObj).longValue()
+                        : Long.parseLong(budgetObj.toString());
                 prompt.append("- Ngân sách: ").append(formatPrice(budget)).append(" VNĐ\n");
             }
 
@@ -272,19 +314,23 @@ public class GeminiChatService {
         // Instructions - khác nhau cho consultation và normal chat
         if (isConsultation) {
             prompt.append("Hãy tư vấn 3-5 sản phẩm phù hợp nhất dựa trên yêu cầu của khách hàng một cách tự nhiên. ");
-            prompt.append("Trong câu trả lời, hãy đề cập đến Product ID (ID: xxx) của từng sản phẩm được đề xuất một cách tự nhiên trong đoạn văn. ");
+            prompt.append(
+                    "Trong câu trả lời, hãy đề cập đến Product ID (ID: xxx) của từng sản phẩm được đề xuất một cách tự nhiên trong đoạn văn. ");
             prompt.append("Giải thích lý do tại sao sản phẩm đó phù hợp như đang nói chuyện với bạn bè. ");
             prompt.append("Đề xuất 1 sản phẩm tốt nhất và giải thích chi tiết. ");
             prompt.append("KHÔNG dùng format list hay bullet points, hãy viết như một đoạn văn tự nhiên.\n\n");
         } else {
             prompt.append("Hãy trả lời câu hỏi của khách hàng một cách tự nhiên, như đang nói chuyện với bạn bè. ");
             prompt.append("Nếu khách hàng chào hỏi, hãy chào lại một cách thân thiện và hỏi xem bạn có thể giúp gì. ");
-            prompt.append("Nếu khách hàng hỏi về sản phẩm, hãy đề xuất sản phẩm phù hợp từ danh sách trên một cách tự nhiên, không liệt kê như menu. ");
-            prompt.append("Nếu khách hàng hỏi về thông tin chung (giờ mở cửa, địa chỉ, chính sách, v.v.), hãy trả lời dựa trên kiến thức của bạn. ");
-            prompt.append("Luôn trò chuyện tự nhiên, không dùng format list hay bullet points trừ khi thực sự cần thiết. ");
+            prompt.append(
+                    "Nếu khách hàng hỏi về sản phẩm, hãy đề xuất sản phẩm phù hợp từ danh sách trên một cách tự nhiên, không liệt kê như menu. ");
+            prompt.append(
+                    "Nếu khách hàng hỏi về thông tin chung (giờ mở cửa, địa chỉ, chính sách, v.v.), hãy trả lời dựa trên kiến thức của bạn. ");
+            prompt.append(
+                    "Luôn trò chuyện tự nhiên, không dùng format list hay bullet points trừ khi thực sự cần thiết. ");
             prompt.append("Hãy như một người bạn đang tư vấn, không phải một chatbot cứng nhắc.\n\n");
         }
-        
+
         prompt.append("QUAN TRỌNG: Trả lời bằng tiếng Việt, tự nhiên như đang nói chuyện trực tiếp. ");
         prompt.append("KHÔNG dùng format list, menu, hay bullet points. ");
         prompt.append("Hãy viết như một đoạn văn tự nhiên, thân thiện.");
@@ -305,8 +351,7 @@ public class GeminiChatService {
                     .model(groqModel)
                     .messages(List.of(
                             GroqChatRequest.Message.builder().role("system").content(systemPrompt).build(),
-                            GroqChatRequest.Message.builder().role("user").content(prompt).build()
-                    ))
+                            GroqChatRequest.Message.builder().role("user").content(prompt).build()))
                     .temperature(0.6)
                     .maxTokens(800)
                     .build();
@@ -319,8 +364,7 @@ public class GeminiChatService {
 
             log.debug("📤 [Groq] Calling Groq API: {}", groqApiUrl);
             ResponseEntity<GroqChatResponse> response = restTemplate.postForEntity(
-                    groqApiUrl, httpEntity, GroqChatResponse.class
-            );
+                    groqApiUrl, httpEntity, GroqChatResponse.class);
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 log.info("✅ [Groq] API call successful");
@@ -398,4 +442,3 @@ public class GeminiChatService {
         return String.format("%,d", price).replace(",", ".");
     }
 }
-

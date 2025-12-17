@@ -43,14 +43,14 @@ public class ChatController {
      */
     @PostMapping("/send")
     public ResponseEntity<ResponseObject<ChatResponse>> sendMessage(@Valid @RequestBody ChatRequest request) {
-        log.info("📨 Nhận request gửi tin nhắn: khachHangId={}, nhanVienId={}, isFromCustomer={}", 
+        log.info("📨 Nhận request gửi tin nhắn: khachHangId={}, nhanVienId={}, isFromCustomer={}",
                 request.getKhachHangId(), request.getNhanVienId(), request.getIsFromCustomer());
-        
+
         // Validate message length
         if (request.getNoiDung() != null && request.getNoiDung().length() > 5000) {
             throw new ChatMessageTooLongException(5000, request.getNoiDung().length());
         }
-        
+
         ChatResponse response = chatService.sendMessage(request);
         return ResponseEntity.ok(new ResponseObject<>(response, "Gửi tin nhắn thành công"));
     }
@@ -104,7 +104,7 @@ public class ChatController {
         chatService.markAsRead(conversationId, isFromCustomer);
         return ResponseEntity.ok(new ResponseObject<>(null, "Đã đánh dấu đọc"));
     }
-    
+
     /**
      * Yêu cầu hỗ trợ từ nhân viên (Escalate)
      */
@@ -112,6 +112,15 @@ public class ChatController {
     public ResponseEntity<ResponseObject<Void>> escalateConversation(@PathVariable UUID conversationId) {
         chatbotService.escalateConversation(conversationId);
         return ResponseEntity.ok(new ResponseObject<>(null, "Đã chuyển cuộc trò chuyện cho nhân viên"));
+    }
+
+    /**
+     * Bật lại Chatbot (Handover back to AI)
+     */
+    @PostMapping("/turn-bot-on/{conversationId}")
+    public ResponseEntity<ResponseObject<Void>> turnBotOn(@PathVariable UUID conversationId) {
+        chatbotService.turnBotBackOn(conversationId);
+        return ResponseEntity.ok(new ResponseObject<>(null, "Đã bật lại trợ lý ảo cho cuộc trò chuyện này"));
     }
 
     /**
@@ -207,10 +216,10 @@ public class ChatController {
 
             // Call Gemini service
             ChatbotResponse response = geminiChatService.consultWithGemini(
-                    consultationData.getUserMessage() != null ? consultationData.getUserMessage() : "Tư vấn chọn laptop",
+                    consultationData.getUserMessage() != null ? consultationData.getUserMessage()
+                            : "Tư vấn chọn laptop",
                     null, // khachHangId can be null for anonymous consultation
-                    consultationMap
-            );
+                    consultationMap);
 
             // Fallback to database-based recommendations if Gemini fails
             if (response == null) {
@@ -238,23 +247,23 @@ public class ChatController {
     private ChatbotResponse buildFallbackResponseWithProducts(ConsultationDataDTO consultationData) {
         StringBuilder message = new StringBuilder();
         message.append("Xin chào! Dựa trên thông tin bạn đã cung cấp, tôi đã tìm được một số sản phẩm phù hợp:\n\n");
-        
+
         try {
             // Query products based on consultation data
             Long budget = consultationData.getBudget();
             List<String> features = consultationData.getFeatures();
-            
+
             // Get all active products
             List<SanPham> allProducts = sanPhamRepository.findByTrangThai(1);
-            
+
             // Filter products by budget and features
             List<SanPham> recommendedProducts = filterProductsByCriteria(allProducts, budget, features);
-            
+
             // Limit to top 5 products
             if (recommendedProducts.size() > 5) {
                 recommendedProducts = recommendedProducts.subList(0, 5);
             }
-            
+
             if (recommendedProducts.isEmpty()) {
                 message.append("Hiện tại không tìm thấy sản phẩm phù hợp với yêu cầu của bạn. ");
                 message.append("Vui lòng liên hệ nhân viên tư vấn để được hỗ trợ tốt nhất.\n\n");
@@ -262,18 +271,19 @@ public class ChatController {
                 int index = 1;
                 for (SanPham product : recommendedProducts) {
                     List<ChiTietSanPham> variants = chiTietSanPhamRepository.findBySanPham_Id(product.getId());
-                    if (variants.isEmpty()) continue;
-                    
+                    if (variants.isEmpty())
+                        continue;
+
                     ChiTietSanPham variant = variants.get(0);
                     BigDecimal minPrice = variants.stream()
                             .map(ChiTietSanPham::getGiaBan)
                             .filter(java.util.Objects::nonNull)
                             .min(BigDecimal::compareTo)
                             .orElse(BigDecimal.ZERO);
-                    
+
                     message.append(String.format("%d. %s\n", index, product.getTenSanPham()));
                     message.append(String.format("   - Giá từ: %s VNĐ\n", formatPrice(minPrice.longValue())));
-                    
+
                     if (variant.getCpu() != null) {
                         message.append(String.format("   - CPU: %s\n", variant.getCpu().getTenCpu()));
                     }
@@ -286,18 +296,19 @@ public class ChatController {
                     message.append("\n");
                     index++;
                 }
-                
+
                 message.append("Bạn có thể xem chi tiết và đặt hàng các sản phẩm trên trên website. ");
                 message.append("Nếu cần tư vấn thêm, vui lòng liên hệ nhân viên của chúng tôi.\n\n");
             }
-            
+
         } catch (Exception e) {
             log.error("❌ [Chat] Error building fallback response: {}", e.getMessage(), e);
-            message.append("Đã xảy ra lỗi khi tìm kiếm sản phẩm. Vui lòng thử lại sau hoặc liên hệ nhân viên tư vấn.\n\n");
+            message.append(
+                    "Đã xảy ra lỗi khi tìm kiếm sản phẩm. Vui lòng thử lại sau hoặc liên hệ nhân viên tư vấn.\n\n");
         }
-        
+
         message.append("Cảm ơn bạn đã quan tâm!");
-        
+
         return ChatbotResponse.builder()
                 .responseText(message.toString())
                 .intentCode("CONSULTATION_FALLBACK")
@@ -306,17 +317,18 @@ public class ChatController {
                 .shouldEscalate(false)
                 .build();
     }
-    
+
     /**
      * Filter products based on budget and features
      */
     private List<SanPham> filterProductsByCriteria(List<SanPham> products, Long budget, List<String> features) {
         List<SanPham> filtered = new java.util.ArrayList<>();
-        
+
         for (SanPham product : products) {
             List<ChiTietSanPham> variants = chiTietSanPhamRepository.findBySanPham_Id(product.getId());
-            if (variants.isEmpty()) continue;
-            
+            if (variants.isEmpty())
+                continue;
+
             // Check budget
             if (budget != null && budget > 0) {
                 BigDecimal minPrice = variants.stream()
@@ -324,7 +336,7 @@ public class ChatController {
                         .filter(java.util.Objects::nonNull)
                         .min(BigDecimal::compareTo)
                         .orElse(BigDecimal.ZERO);
-                
+
                 // Filter: price should be within budget (allow 20% over budget)
                 BigDecimal budgetBigDecimal = BigDecimal.valueOf(budget);
                 BigDecimal maxBudget = budgetBigDecimal.multiply(BigDecimal.valueOf(1.2));
@@ -332,7 +344,7 @@ public class ChatController {
                     continue;
                 }
             }
-            
+
             // Check features (if specified)
             if (features != null && !features.isEmpty()) {
                 boolean matchesFeature = false;
@@ -344,16 +356,17 @@ public class ChatController {
                             break;
                         }
                     }
-                    if (matchesFeature) break;
+                    if (matchesFeature)
+                        break;
                 }
                 if (!matchesFeature && !features.isEmpty()) {
                     continue; // Skip if no feature matches
                 }
             }
-            
+
             filtered.add(product);
         }
-        
+
         // Sort by price (ascending)
         filtered.sort((p1, p2) -> {
             List<ChiTietSanPham> v1 = chiTietSanPhamRepository.findBySanPham_Id(p1.getId());
@@ -370,16 +383,20 @@ public class ChatController {
                     .orElse(BigDecimal.ZERO);
             return price1.compareTo(price2);
         });
-        
+
         return filtered;
     }
-    
+
     private String buildVariantInfoString(ChiTietSanPham variant) {
         StringBuilder info = new StringBuilder();
-        if (variant.getCpu() != null) info.append(variant.getCpu().getTenCpu()).append(" ");
-        if (variant.getRam() != null) info.append(variant.getRam().getTenRam()).append(" ");
-        if (variant.getGpu() != null) info.append(variant.getGpu().getTenGpu()).append(" ");
-        if (variant.getOCung() != null) info.append(variant.getOCung().getDungLuong()).append(" ");
+        if (variant.getCpu() != null)
+            info.append(variant.getCpu().getTenCpu()).append(" ");
+        if (variant.getRam() != null)
+            info.append(variant.getRam().getTenRam()).append(" ");
+        if (variant.getGpu() != null)
+            info.append(variant.getGpu().getTenGpu()).append(" ");
+        if (variant.getOCung() != null)
+            info.append(variant.getOCung().getDungLuong()).append(" ");
         return info.toString();
     }
 
