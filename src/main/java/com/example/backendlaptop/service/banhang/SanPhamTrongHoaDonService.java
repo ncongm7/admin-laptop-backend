@@ -63,7 +63,7 @@ public class SanPhamTrongHoaDonService {
         System.out.println("  - ID Hóa đơn: " + idHoaDon);
         System.out.println("  - ID Chi tiết sản phẩm: " + request.getChiTietSanPhamId());
         System.out.println("  - Số lượng: " + request.getSoLuong());
-        
+
         // 1. Tìm hóa đơn
         HoaDon hoaDon = hoaDonService.findById(idHoaDon);
 
@@ -76,32 +76,38 @@ public class SanPhamTrongHoaDonService {
         // 3. Tìm chi tiết sản phẩm
         UUID chiTietSanPhamId = request.getChiTietSanPhamId();
         System.out.println("🔍 [SanPhamTrongHoaDonService] Tìm kiếm chi tiết sản phẩm với ID: " + chiTietSanPhamId);
-        
+
         ChiTietSanPham ctsp = chiTietSanPhamRepository.findById(chiTietSanPhamId)
                 .orElseThrow(() -> {
-                    System.err.println("❌ [SanPhamTrongHoaDonService] Không tìm thấy chi tiết sản phẩm với ID: " + chiTietSanPhamId);
-                    return new ApiException("Không tìm thấy chi tiết sản phẩm với ID: " + chiTietSanPhamId, "NOT_FOUND");
+                    System.err.println("❌ [SanPhamTrongHoaDonService] Không tìm thấy chi tiết sản phẩm với ID: "
+                            + chiTietSanPhamId);
+                    return new ApiException("Không tìm thấy chi tiết sản phẩm với ID: " + chiTietSanPhamId,
+                            "NOT_FOUND");
                 });
-        
+
         System.out.println("✅ [SanPhamTrongHoaDonService] Tìm thấy chi tiết sản phẩm: " + ctsp.getMaCtsp());
         System.out.println("  - Giá bán: " + ctsp.getGiaBan());
 
         // 4. Kiểm tra giá bán
         if (ctsp.getGiaBan() == null) {
             System.err.println("❌ [SanPhamTrongHoaDonService] Sản phẩm không có giá bán!");
-            throw new ApiException("Sản phẩm " + ctsp.getMaCtsp() + " chưa có giá bán. Vui lòng cập nhật giá bán trước khi thêm vào hóa đơn.", "MISSING_PRICE");
+            throw new ApiException(
+                    "Sản phẩm " + ctsp.getMaCtsp()
+                            + " chưa có giá bán. Vui lòng cập nhật giá bán trước khi thêm vào hóa đơn.",
+                    "MISSING_PRICE");
         }
 
         // 5. Reserve Serials (POS Logic: Steal if necessary)
-        // We do strict Serial reservation. 
+        // We do strict Serial reservation.
         for (int i = 0; i < request.getSoLuong(); i++) {
             com.example.backendlaptop.entity.Serial serial = serialService.findSerialForPOS(ctsp.getId(), hoaDon);
             if (serial == null) {
                 // Rollback is handled by Transactional
-                throw new ApiException("Không đủ hàng (đã hết hàng sạch và không thể lấy từ đơn Online khác)", "INSUFFICIENT_STOCK");
+                throw new ApiException("Không đủ hàng (đã hết hàng sạch và không thể lấy từ đơn Online khác)",
+                        "INSUFFICIENT_STOCK");
             }
         }
-        
+
         System.out.println("✅ [SanPhamTrongHoaDonService] Đã giữ " + request.getSoLuong() + " serials cho POS");
 
         // 6. Lấy giá từ dot_giam_gia_chi_tiet (nếu có) hoặc giá gốc
@@ -135,15 +141,15 @@ public class SanPhamTrongHoaDonService {
 
         // 8. Tính lại tổng tiền
         hoaDonService.capNhatTongTien(hoaDon);
-        
+
         // 9. Tính lại voucher nếu có (vì giá trị hóa đơn đã thay đổi)
         recalculateVoucherIfNeeded(hoaDon);
-        
+
         System.out.println("✅ [SanPhamTrongHoaDonService] Hoàn tất thêm sản phẩm vào hóa đơn!");
-        
+
         return new HoaDonResponse(hoaDonService.findById(idHoaDon));
     }
-    
+
     /**
      * Lấy giá bán hiện tại của sản phẩm
      * Ưu tiên lấy giá từ dot_giam_gia_chi_tiet (nếu có và đang hiệu lực)
@@ -157,22 +163,23 @@ public class SanPhamTrongHoaDonService {
                 .filter(d -> d.getDotGiamGia() != null && d.getDotGiamGia().getTrangThai() == 1)
                 .filter(d -> {
                     Instant now = Instant.now();
-                    return d.getDotGiamGia().getNgayBatDau() != null 
-                        && d.getDotGiamGia().getNgayKetThuc() != null
-                        && !now.isBefore(d.getDotGiamGia().getNgayBatDau())
-                        && !now.isAfter(d.getDotGiamGia().getNgayKetThuc());
+                    return d.getDotGiamGia().getNgayBatDau() != null
+                            && d.getDotGiamGia().getNgayKetThuc() != null
+                            && !now.isBefore(d.getDotGiamGia().getNgayBatDau())
+                            && !now.isAfter(d.getDotGiamGia().getNgayKetThuc());
                 })
                 .findFirst();
-        
+
         if (dotGiamGiaChiTiet.isPresent()) {
             DotGiamGiaChiTiet discount = dotGiamGiaChiTiet.get();
             BigDecimal giaSauKhiGiam = discount.getGiaSauKhiGiam();
             if (giaSauKhiGiam != null && giaSauKhiGiam.compareTo(BigDecimal.ZERO) > 0) {
-                System.out.println("  ✅ [SanPhamTrongHoaDonService] Tìm thấy giá giảm từ dot_giam_gia_chi_tiet: " + giaSauKhiGiam);
+                System.out.println(
+                        "  ✅ [SanPhamTrongHoaDonService] Tìm thấy giá giảm từ dot_giam_gia_chi_tiet: " + giaSauKhiGiam);
                 return giaSauKhiGiam;
             }
         }
-        
+
         // Nếu không có giảm giá hoặc giá giảm không hợp lệ, trả về giá gốc
         System.out.println("  ℹ️ [SanPhamTrongHoaDonService] Sử dụng giá gốc: " + ctsp.getGiaBan());
         return ctsp.getGiaBan();
@@ -189,7 +196,8 @@ public class SanPhamTrongHoaDonService {
     public HoaDonResponse xoaSanPhamKhoiHoaDon(UUID idHoaDonChiTiet) {
         // 1. Tìm hóa đơn chi tiết
         HoaDonChiTiet hdct = hoaDonChiTietRepository.findById(idHoaDonChiTiet)
-                .orElseThrow(() -> new ApiException("Không tìm thấy chi tiết hóa đơn với ID: " + idHoaDonChiTiet, "NOT_FOUND"));
+                .orElseThrow(() -> new ApiException("Không tìm thấy chi tiết hóa đơn với ID: " + idHoaDonChiTiet,
+                        "NOT_FOUND"));
 
         // 2. Lấy thông tin
         HoaDon hoaDon = hdct.getHoaDon();
@@ -197,8 +205,10 @@ public class SanPhamTrongHoaDonService {
         int soLuong = hdct.getSoLuong();
 
         // 3. Kiểm tra trạng thái hóa đơn
-        if (hoaDon.getTrangThai() != TrangThaiHoaDon.CHO_THANH_TOAN) {
-            throw new ApiException("Chỉ có thể xóa sản phẩm khỏi hóa đơn đang chờ thanh toán", "BAD_REQUEST");
+        if (hoaDon.getTrangThai() != null && hoaDon.getTrangThai() != TrangThaiHoaDon.CHO_THANH_TOAN) {
+            throw new ApiException(
+                    "Chỉ có thể xóa sản phẩm khỏi hóa đơn đang chờ thanh toán. Trạng thái: " + hoaDon.getTrangThai(),
+                    "BAD_REQUEST");
         }
 
         // 4. Release Serials
@@ -210,7 +220,7 @@ public class SanPhamTrongHoaDonService {
 
         // 6. Tính lại tổng tiền
         hoaDonService.capNhatTongTien(hoaDon);
-        
+
         // 7. Tính lại voucher nếu có (vì giá trị hóa đơn đã thay đổi)
         recalculateVoucherIfNeeded(hoaDon);
 
@@ -229,7 +239,8 @@ public class SanPhamTrongHoaDonService {
     public HoaDonResponse capNhatSoLuongSanPham(UUID idHoaDonChiTiet, Integer soLuongMoi) {
         // 1. Tìm hóa đơn chi tiết
         HoaDonChiTiet hdct = hoaDonChiTietRepository.findById(idHoaDonChiTiet)
-                .orElseThrow(() -> new ApiException("Không tìm thấy chi tiết hóa đơn với ID: " + idHoaDonChiTiet, "NOT_FOUND"));
+                .orElseThrow(() -> new ApiException("Không tìm thấy chi tiết hóa đơn với ID: " + idHoaDonChiTiet,
+                        "NOT_FOUND"));
 
         // 2. Lấy thông tin
         HoaDon hoaDon = hdct.getHoaDon();
@@ -238,7 +249,8 @@ public class SanPhamTrongHoaDonService {
 
         // 3. Kiểm tra trạng thái hóa đơn
         if (hoaDon.getTrangThai() != TrangThaiHoaDon.CHO_THANH_TOAN) {
-            throw new ApiException("Chỉ có thể cập nhật số lượng sản phẩm trong hóa đơn đang chờ thanh toán", "BAD_REQUEST");
+            throw new ApiException("Chỉ có thể cập nhật số lượng sản phẩm trong hóa đơn đang chờ thanh toán",
+                    "BAD_REQUEST");
         }
 
         // 4. Kiểm tra số lượng mới
@@ -259,7 +271,8 @@ public class SanPhamTrongHoaDonService {
             // Tăng số lượng -> Reserve/Steal thêm
             for (int i = 0; i < soLuongThayDoi; i++) {
                 com.example.backendlaptop.entity.Serial serial = serialService.findSerialForPOS(ctsp.getId(), hoaDon);
-                if (serial == null) throw new ApiException("Không đủ hàng để tăng số lượng", "INSUFFICIENT_STOCK");
+                if (serial == null)
+                    throw new ApiException("Không đủ hàng để tăng số lượng", "INSUFFICIENT_STOCK");
             }
         } else {
             // Giảm số lượng -> Release bớt
@@ -268,22 +281,23 @@ public class SanPhamTrongHoaDonService {
 
         // 7. Cập nhật số lượng trong hóa đơn chi tiết
         hdct.setSoLuong(soLuongMoi);
-        
-        // Ensure version logic is irrelevant if we don't update CTSP fields, but we should make sure we don't accidentally revert.
+
+        // Ensure version logic is irrelevant if we don't update CTSP fields, but we
+        // should make sure we don't accidentally revert.
         // We are NOT updating CTSP.soLuongTamGiu anymore.
-        // But if CTSP was loaded, Hibernate might try to sync. 
+        // But if CTSP was loaded, Hibernate might try to sync.
         // Just saving HDCT is enough since we only changed that.
         hoaDonChiTietRepository.save(hdct);
 
         // 8. Tính lại tổng tiền
         hoaDonService.capNhatTongTien(hoaDon);
-        
+
         // 9. Tính lại voucher nếu có (vì giá trị hóa đơn đã thay đổi)
         recalculateVoucherIfNeeded(hoaDon);
 
         return new HoaDonResponse(hoaDonService.findById(hoaDon.getId()));
     }
-    
+
     /**
      * Tính lại tiền giảm voucher nếu có voucher và voucher vẫn hợp lệ
      * Tự động xóa voucher nếu không hợp lệ
@@ -293,7 +307,7 @@ public class SanPhamTrongHoaDonService {
         if (hoaDon.getIdPhieuGiamGia() == null) {
             return; // Không có voucher, không cần tính lại
         }
-        
+
         UUID voucherId = hoaDon.getIdPhieuGiamGia().getId();
         PhieuGiamGia voucher = phieuGiamGiaRepository.findById(voucherId).orElse(null);
         if (voucher == null) {
@@ -305,13 +319,13 @@ public class SanPhamTrongHoaDonService {
             hoaDonService.save(hoaDon);
             return;
         }
-        
+
         // Kiểm tra voucher vẫn hợp lệ (trạng thái, ngày, số lượng, điều kiện)
         Instant now = Instant.now();
         BigDecimal tongTien = hoaDon.getTongTien() != null ? hoaDon.getTongTien() : BigDecimal.ZERO;
         boolean voucherHopLe = true;
         String lyDoKhongHopLe = null;
-        
+
         // Check trạng thái
         if (voucher.getTrangThai() == null || voucher.getTrangThai() != 1) {
             voucherHopLe = false;
@@ -321,8 +335,7 @@ public class SanPhamTrongHoaDonService {
         else if (voucher.getNgayBatDau() != null && voucher.getNgayBatDau().isAfter(now)) {
             voucherHopLe = false;
             lyDoKhongHopLe = "Voucher chưa đến thời gian hiệu lực";
-        }
-        else if (voucher.getNgayKetThuc() != null && voucher.getNgayKetThuc().isBefore(now)) {
+        } else if (voucher.getNgayKetThuc() != null && voucher.getNgayKetThuc().isBefore(now)) {
             voucherHopLe = false;
             lyDoKhongHopLe = "Voucher đã hết hạn";
         }
@@ -334,14 +347,15 @@ public class SanPhamTrongHoaDonService {
         // Check điều kiện hóa đơn tối thiểu
         else if (voucher.getHoaDonToiThieu() != null && tongTien.compareTo(voucher.getHoaDonToiThieu()) < 0) {
             voucherHopLe = false;
-            lyDoKhongHopLe = String.format("Hóa đơn không đủ điều kiện (tối thiểu: %s)", formatCurrency(voucher.getHoaDonToiThieu()));
+            lyDoKhongHopLe = String.format("Hóa đơn không đủ điều kiện (tối thiểu: %s)",
+                    formatCurrency(voucher.getHoaDonToiThieu()));
         }
-        
+
         if (voucherHopLe) {
             // Voucher hợp lệ, tính lại tiền giảm dựa trên tổng tiền mới
             BigDecimal tienDuocGiam = calculateTienGiam(voucher, tongTien);
             hoaDon.setTienDuocGiam(tienDuocGiam);
-            
+
             // Tính lại tổng tiền sau giảm
             BigDecimal soTienQuyDoi = hoaDon.getSoTienQuyDoi() != null ? hoaDon.getSoTienQuyDoi() : BigDecimal.ZERO;
             BigDecimal tongTienSauGiam = tongTien.subtract(tienDuocGiam).subtract(soTienQuyDoi);
@@ -350,7 +364,7 @@ public class SanPhamTrongHoaDonService {
             }
             hoaDon.setTongTienSauGiam(tongTienSauGiam);
             hoaDonService.save(hoaDon);
-            
+
             System.out.println("✅ [SanPhamTrongHoaDonService] Đã tính lại tiền giảm voucher: " + tienDuocGiam);
         } else {
             // Voucher không hợp lệ, xóa voucher
@@ -363,11 +377,11 @@ public class SanPhamTrongHoaDonService {
             }
             hoaDon.setTongTienSauGiam(tongTienSauGiam);
             hoaDonService.save(hoaDon);
-            
+
             System.out.println("⚠️ [SanPhamTrongHoaDonService] Voucher không hợp lệ, đã xóa: " + lyDoKhongHopLe);
         }
     }
-    
+
     /**
      * Tính toán số tiền giảm dựa trên voucher và tổng tiền hóa đơn
      * (Logic giống với KhuyenMaiService)
@@ -376,9 +390,9 @@ public class SanPhamTrongHoaDonService {
         if (tongTien == null || tongTien.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
-        
+
         BigDecimal tienGiam = BigDecimal.ZERO;
-        
+
         // LoaiPhieuGiamGia: 0 = Phần trăm, 1 = Tiền mặt
         if (pgg.getLoaiPhieuGiamGia() != null && pgg.getLoaiPhieuGiamGia() == 0) {
             // Giảm theo phần trăm
@@ -386,7 +400,7 @@ public class SanPhamTrongHoaDonService {
                 tienGiam = tongTien
                         .multiply(pgg.getGiaTriGiamGia())
                         .divide(new BigDecimal(100), 2, java.math.RoundingMode.HALF_UP);
-                
+
                 // Áp dụng giới hạn tối đa (nếu có)
                 if (pgg.getSoTienGiamToiDa() != null && tienGiam.compareTo(pgg.getSoTienGiamToiDa()) > 0) {
                     tienGiam = pgg.getSoTienGiamToiDa();
@@ -398,20 +412,21 @@ public class SanPhamTrongHoaDonService {
                 tienGiam = pgg.getGiaTriGiamGia();
             }
         }
-        
+
         // Không được giảm nhiều hơn tổng tiền hóa đơn
         if (tienGiam.compareTo(tongTien) > 0) {
             tienGiam = tongTien;
         }
-        
+
         return tienGiam;
     }
-    
+
     /**
      * Helper: Format currency (để hiển thị trong log/error message)
      */
     private String formatCurrency(BigDecimal amount) {
-        if (amount == null) return "0";
+        if (amount == null)
+            return "0";
         return amount.toString();
     }
 
@@ -436,8 +451,9 @@ public class SanPhamTrongHoaDonService {
     private void ensureVersionNotNull(ChiTietSanPham ctsp) {
         if (ctsp.getVersion() == null) {
             ctsp.setVersion(0L);
-            System.out.println("⚠️ [SanPhamTrongHoaDonService] Warning: ChiTietSanPham version was null, initialized to 0 for: " + ctsp.getMaCtsp());
+            System.out.println(
+                    "⚠️ [SanPhamTrongHoaDonService] Warning: ChiTietSanPham version was null, initialized to 0 for: "
+                            + ctsp.getMaCtsp());
         }
     }
 }
-

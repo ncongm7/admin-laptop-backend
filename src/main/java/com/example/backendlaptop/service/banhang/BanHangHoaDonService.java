@@ -44,7 +44,7 @@ public class BanHangHoaDonService {
     @Transactional
     public HoaDonResponse taoHoaDonChoMoi(TaoHoaDonRequest request) {
         HoaDon hoaDon = new HoaDon();
-        
+
         // Sinh mã hóa đơn tự động
         hoaDon.setMa("HD" + System.currentTimeMillis());
         hoaDon.setNgayTao(Instant.now());
@@ -65,8 +65,10 @@ public class BanHangHoaDonService {
                 if (nhanVien != null) {
                     hoaDon.setIdNhanVien(nhanVien);
                 } else {
-                    // Log warning nhưng không throw exception - cho phép tạo hóa đơn không có nhân viên
-                    System.err.println("Warning: Không tìm thấy nhân viên với ID: " + request.getNhanVienId() + ". Tạo hóa đơn không có nhân viên.");
+                    // Log warning nhưng không throw exception - cho phép tạo hóa đơn không có nhân
+                    // viên
+                    System.err.println("Warning: Không tìm thấy nhân viên với ID: " + request.getNhanVienId()
+                            + ". Tạo hóa đơn không có nhân viên.");
                 }
             } catch (Exception e) {
                 System.err.println("Lỗi khi tìm nhân viên: " + e.getMessage());
@@ -77,7 +79,8 @@ public class BanHangHoaDonService {
         // Gán khách hàng (có thể null nếu là khách vãng lai)
         if (request.getKhachHangId() != null) {
             KhachHang khachHang = khachHangRepository.findById(request.getKhachHangId())
-                    .orElseThrow(() -> new ApiException("Không tìm thấy khách hàng với ID: " + request.getKhachHangId(), "NOT_FOUND"));
+                    .orElseThrow(() -> new ApiException("Không tìm thấy khách hàng với ID: " + request.getKhachHangId(),
+                            "NOT_FOUND"));
             hoaDon.setIdKhachHang(khachHang);
             hoaDon.setTenKhachHang(khachHang.getHoTen());
             hoaDon.setSdt(khachHang.getSoDienThoai());
@@ -89,6 +92,12 @@ public class BanHangHoaDonService {
         return new HoaDonResponse(saved);
     }
 
+    @Autowired
+    private com.example.backendlaptop.repository.ChiTietThanhToanRepository chiTietThanhToanRepository;
+
+    @Autowired
+    private com.example.backendlaptop.repository.LichSuHoaDonRepository lichSuHoaDonRepository;
+
     /**
      * Xóa hóa đơn chờ
      * Lưu ý: Service này không giải phóng tồn kho tạm giữ
@@ -99,10 +108,19 @@ public class BanHangHoaDonService {
         HoaDon hoaDon = hoaDonRepository.findById(idHoaDon)
                 .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn với ID: " + idHoaDon, "NOT_FOUND"));
 
-        // Kiểm tra trạng thái (chỉ xóa được hóa đơn chờ)
-        if (hoaDon.getTrangThai() != TrangThaiHoaDon.CHO_THANH_TOAN) {
-            throw new ApiException("Chỉ có thể xóa hóa đơn đang chờ thanh toán", "INVALID_STATUS");
+        // Kiểm tra trạng thái (chỉ xóa được hóa đơn chờ hoặc đã hủy)
+        if (hoaDon.getTrangThai() != null
+                && hoaDon.getTrangThai() != TrangThaiHoaDon.CHO_THANH_TOAN
+                && hoaDon.getTrangThai() != TrangThaiHoaDon.DA_HUY) {
+            throw new ApiException("Chỉ có thể xóa hóa đơn đang chờ thanh toán hoặc đã hủy. Trạng thái hiện tại: "
+                    + hoaDon.getTrangThai(), "INVALID_STATUS");
         }
+
+        // Xóa lịch sử hóa đơn trước (để tránh lỗi FK constraint)
+        lichSuHoaDonRepository.deleteByIdHoaDon(hoaDon);
+
+        // Xóa chi tiết thanh toán trước (để tránh lỗi FK constraint)
+        chiTietThanhToanRepository.deleteByIdHoaDon(hoaDon);
 
         // Xóa hóa đơn (cascade sẽ tự động xóa chi tiết)
         hoaDonRepository.delete(hoaDon);
@@ -113,7 +131,7 @@ public class BanHangHoaDonService {
      */
     public List<HoaDonResponse> getDanhSachHoaDonCho() {
         List<HoaDon> danhSachHoaDon = hoaDonRepository.findByTrangThai(TrangThaiHoaDon.CHO_THANH_TOAN);
-        
+
         return danhSachHoaDon.stream()
                 .map(HoaDonResponse::new)
                 .collect(Collectors.toList());
@@ -128,7 +146,8 @@ public class BanHangHoaDonService {
     }
 
     /**
-     * Cập nhật khách hàng cho hóa đơn (thêm ID khách hàng hoặc set null để khách lẻ)
+     * Cập nhật khách hàng cho hóa đơn (thêm ID khách hàng hoặc set null để khách
+     * lẻ)
      */
     @Transactional
     public HoaDonResponse capNhatKhachHang(UUID idHoaDon, CapNhatKhachHangRequest request) {
@@ -136,7 +155,8 @@ public class BanHangHoaDonService {
 
         if (request.getKhachHangId() != null) {
             KhachHang khachHang = khachHangRepository.findById(request.getKhachHangId())
-                    .orElseThrow(() -> new ApiException("Không tìm thấy khách hàng với ID: " + request.getKhachHangId(), "NOT_FOUND"));
+                    .orElseThrow(() -> new ApiException("Không tìm thấy khách hàng với ID: " + request.getKhachHangId(),
+                            "NOT_FOUND"));
             hoaDon.setIdKhachHang(khachHang);
             hoaDon.setTenKhachHang(khachHang.getHoTen());
             hoaDon.setSdt(khachHang.getSoDienThoai());
@@ -183,16 +203,15 @@ public class BanHangHoaDonService {
     public void capNhatTongTien(HoaDon hoaDon) {
         BigDecimal tongTien = tinhLaiTongTien(hoaDon);
         hoaDon.setTongTien(tongTien);
-        
+
         BigDecimal tienDuocGiam = hoaDon.getTienDuocGiam() != null ? hoaDon.getTienDuocGiam() : BigDecimal.ZERO;
         BigDecimal tongTienSauGiam = tongTien.subtract(tienDuocGiam);
         if (tongTienSauGiam.compareTo(BigDecimal.ZERO) < 0) {
             tongTienSauGiam = BigDecimal.ZERO;
         }
         hoaDon.setTongTienSauGiam(tongTienSauGiam);
-        
+
         save(hoaDon);
     }
 
 }
-

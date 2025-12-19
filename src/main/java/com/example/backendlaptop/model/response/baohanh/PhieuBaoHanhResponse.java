@@ -18,6 +18,7 @@ public class PhieuBaoHanhResponse {
     private UUID id;
     private String soSerial;
     private String tenSP;
+    private String maSP;
     private String hoTenKhachHang;
     private String soDienThoai;
     private Instant ngayBatDau;
@@ -32,9 +33,8 @@ public class PhieuBaoHanhResponse {
     private java.time.Instant ngayTao;
     private java.time.Instant ngayCapNhat;
 
-    public PhieuBaoHanhResponse(PhieuBaoHanh entity){
+    public PhieuBaoHanhResponse(PhieuBaoHanh entity) {
         this.id = entity.getId();
-
 
         if (entity.getIdKhachHang() != null) {
             this.hoTenKhachHang = entity.getIdKhachHang().getHoTen();
@@ -44,7 +44,6 @@ public class PhieuBaoHanhResponse {
             this.hoTenKhachHang = "Khách hàng rông";
             this.soDienThoai = null;
         }
-
 
         // Sửa Serial
         SerialDaBan serialDaBan = entity.getIdSerialDaBan();
@@ -58,8 +57,10 @@ public class PhieuBaoHanhResponse {
                     hdct.getChiTietSanPham().getSanPham() != null) {
 
                 this.tenSP = hdct.getChiTietSanPham().getSanPham().getTenSanPham();
+                this.maSP = hdct.getChiTietSanPham().getSanPham().getMaSanPham();
             } else {
                 this.tenSP = "Sản phẩm không xác định";
+                this.maSP = null;
             }
         } else {
             this.soSerial = null;
@@ -69,12 +70,13 @@ public class PhieuBaoHanhResponse {
         this.ngayBatDau = entity.getNgayBatDau();
         this.ngayKetThuc = entity.getNgayKetThuc();
         this.trangThai = entity.getTrangThaiBaoHanh();
-        
+
         // Parse JSON array từ hinhAnh
         if (entity.getHinhAnh() != null && !entity.getHinhAnh().trim().isEmpty()) {
             try {
                 ObjectMapper mapper = new ObjectMapper();
-                this.hinhAnh = mapper.readValue(entity.getHinhAnh(), new TypeReference<List<String>>() {});
+                this.hinhAnh = mapper.readValue(entity.getHinhAnh(), new TypeReference<List<String>>() {
+                });
             } catch (Exception e) {
                 // Nếu parse lỗi, để null hoặc empty list
                 this.hinhAnh = null;

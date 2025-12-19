@@ -8,5 +8,7 @@ import java.util.UUID;
 
 @Repository
 public interface ChiTietThanhToanRepository extends JpaRepository<ChiTietThanhToan, UUID> {
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM ChiTietThanhToan c WHERE c.idHoaDon = :hoaDon")
+    void deleteByIdHoaDon(com.example.backendlaptop.entity.HoaDon hoaDon);
 }
-
