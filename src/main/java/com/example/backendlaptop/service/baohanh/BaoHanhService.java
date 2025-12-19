@@ -69,8 +69,7 @@ public class BaoHanhService {
     @Transactional
     public PhieuBaoHanhResponse taoYeuCau(
             TaoYeuCauBaoHanhRequest request,
-            List<MultipartFile> hinhAnhFiles
-    ) {
+            List<MultipartFile> hinhAnhFiles) {
         try {
             Instant now = Instant.now();
 
@@ -93,15 +92,17 @@ public class BaoHanhService {
 
             SerialDaBan serialDaBan = resolveSerialDaBan(request, hoaDonChiTiet.getId());
 
-            // Kiểm tra xem có bảo hành nào đang active (chưa hoàn thành) cho sản phẩm này không
+            // Kiểm tra xem có bảo hành nào đang active (chưa hoàn thành) cho sản phẩm này
+            // không
             // Kiểm tra theo idHoaDonChiTiet thông qua serial
-            List<PhieuBaoHanh> activeWarranties = phieuBaoHanhRepository.findByHoaDonChiTietAndNotCompleted(hoaDonChiTiet.getId());
+            List<PhieuBaoHanh> activeWarranties = phieuBaoHanhRepository
+                    .findByHoaDonChiTietAndNotCompleted(hoaDonChiTiet.getId());
             if (!activeWarranties.isEmpty()) {
                 throw new ApiException(
-                    "Sản phẩm này đang có bảo hành chưa hoàn thành (trạng thái: chờ xác nhận, xác nhận, hoặc từ chối). " +
-                    "Vui lòng đợi bảo hành hiện tại hoàn thành trước khi tạo bảo hành mới.",
-                    "WARRANTY_ALREADY_ACTIVE"
-                );
+                        "Sản phẩm này đang có bảo hành chưa hoàn thành (trạng thái: chờ xác nhận, xác nhận, hoặc từ chối). "
+                                +
+                                "Vui lòng đợi bảo hành hiện tại hoàn thành trước khi tạo bảo hành mới.",
+                        "WARRANTY_ALREADY_ACTIVE");
             }
 
             List<String> uploadedImages = uploadImages(hinhAnhFiles);
@@ -109,7 +110,7 @@ public class BaoHanhService {
             // Serial chỉ được thêm, không được xóa hay chuyển
             // Cho phép nhiều bảo hành cùng sử dụng một serial
             // Serial sẽ được lưu vào bảo hành mới bất kể đã được sử dụng hay chưa
-            
+
             // Đảm bảo serial được set vào entity trước khi lưu
             System.out.println("SerialDaBan before save: " + (serialDaBan != null ? serialDaBan.getId() : "null"));
 
@@ -119,17 +120,16 @@ public class BaoHanhService {
             phieuBaoHanh.setIdSerialDaBan(serialDaBan); // Set serial vào entity
             phieuBaoHanh.setNgayBatDau(now);
             phieuBaoHanh.setNgayKetThuc(now.plus(365, ChronoUnit.DAYS));
-            phieuBaoHanh.setTrangThaiBaoHanh(1);
+            phieuBaoHanh.setTrangThaiBaoHanh(0);
             phieuBaoHanh.setMoTa(
                     request.getMoTaTinhTrang() != null && !request.getMoTaTinhTrang().isBlank()
                             ? request.getMoTaTinhTrang()
-                            : request.getLyDoTraHang()
-            );
+                            : request.getLyDoTraHang());
             phieuBaoHanh.setChiPhi(BigDecimal.ZERO);
             phieuBaoHanh.setSoLanSuaChua(0);
             phieuBaoHanh.setIdHoaDonChiTiet(hoaDonChiTiet);
             phieuBaoHanh.setNgayTao(now);
-            
+
             // Generate mã phiếu bảo hành
             String maPhieuBaoHanh = generateMaPhieuBaoHanh();
             phieuBaoHanh.setMaPhieuBaoHanh(maPhieuBaoHanh);
@@ -143,34 +143,34 @@ public class BaoHanhService {
             }
 
             // Verify serial is set before saving
-            System.out.println("PhieuBaoHanh serial before save: " + 
-                (phieuBaoHanh.getIdSerialDaBan() != null ? phieuBaoHanh.getIdSerialDaBan().getId() : "null"));
-            
+            System.out.println("PhieuBaoHanh serial before save: " +
+                    (phieuBaoHanh.getIdSerialDaBan() != null ? phieuBaoHanh.getIdSerialDaBan().getId() : "null"));
+
             // Lưu entity với serial
             PhieuBaoHanh saved = phieuBaoHanhRepository.save(phieuBaoHanh);
-            
+
             // Flush để đảm bảo serial được lưu vào database ngay lập tức
             phieuBaoHanhRepository.flush();
-            
+
             // Reload entity với relations để đảm bảo serial được load từ database
             PhieuBaoHanh reloaded = phieuBaoHanhRepository.findByIdWithRelations(saved.getId())
                     .orElse(saved);
-            
-            System.out.println("PhieuBaoHanh serial after save: " + 
-                (reloaded.getIdSerialDaBan() != null ? reloaded.getIdSerialDaBan().getId() : "null"));
-            
+
+            System.out.println("PhieuBaoHanh serial after save: " +
+                    (reloaded.getIdSerialDaBan() != null ? reloaded.getIdSerialDaBan().getId() : "null"));
+
             // Tự động gửi email xác nhận
             try {
                 String emailKhachHang = khachHang.getEmail();
                 if (emailKhachHang != null && !emailKhachHang.isBlank()) {
-                    emailService.guiEmailXacNhan(reloaded.getId(), emailKhachHang, 
-                        khachHang.getHoTen(), maPhieuBaoHanh);
+                    emailService.guiEmailXacNhan(reloaded.getId(), emailKhachHang,
+                            khachHang.getHoTen(), maPhieuBaoHanh);
                 }
             } catch (Exception e) {
                 // Log lỗi nhưng không throw để không ảnh hưởng đến việc tạo phiếu
                 System.err.println("Lỗi khi gửi email xác nhận: " + e.getMessage());
             }
-            
+
             return new PhieuBaoHanhResponse(reloaded);
         } catch (ApiException e) {
             throw e;
@@ -181,15 +181,15 @@ public class BaoHanhService {
 
     private SerialDaBan resolveSerialDaBan(TaoYeuCauBaoHanhRequest request, UUID idHoaDonChiTiet) {
         SerialDaBan serialDaBan = null;
-        
+
         // Ưu tiên sử dụng serial được chỉ định trong request
         if (request.getIdSerialDaBan() != null) {
             serialDaBan = serialDaBanRepository.findById(request.getIdSerialDaBan())
                     .orElse(null);
-            System.out.println("Resolved serial from request: " + 
-                (serialDaBan != null ? serialDaBan.getId() : "null"));
+            System.out.println("Resolved serial from request: " +
+                    (serialDaBan != null ? serialDaBan.getId() : "null"));
         }
-        
+
         // Nếu không có serial được chỉ định, lấy serial đầu tiên của hóa đơn chi tiết
         if (serialDaBan == null) {
             List<SerialDaBan> serials = serialDaBanRepository.findByIdHoaDonChiTiet_Id(idHoaDonChiTiet);
@@ -200,7 +200,7 @@ public class BaoHanhService {
                 System.out.println("No serial found for hoaDonChiTiet: " + idHoaDonChiTiet);
             }
         }
-        
+
         return serialDaBan;
     }
 
@@ -217,7 +217,8 @@ public class BaoHanhService {
         }
 
         for (MultipartFile file : files) {
-            if (file.isEmpty()) continue;
+            if (file.isEmpty())
+                continue;
             String originalFilename = file.getOriginalFilename();
             String extension = originalFilename != null && originalFilename.contains(".")
                     ? originalFilename.substring(originalFilename.lastIndexOf("."))
@@ -295,7 +296,7 @@ public class BaoHanhService {
             String tenKhachHang = lichSu.getIdBaoHanh().getIdKhachHang().getHoTen();
             if (emailKhachHang != null && !emailKhachHang.isBlank()) {
                 emailService.guiEmailChiPhi(idLichSuBaoHanh, emailKhachHang, tenKhachHang,
-                    request.getChiPhiPhatSinh(), request.getLyDo());
+                        request.getChiPhiPhatSinh(), request.getLyDo());
             }
         } catch (Exception e) {
             System.err.println("Lỗi khi gửi email chi phí: " + e.getMessage());
@@ -329,9 +330,9 @@ public class BaoHanhService {
         lichSu.setXacNhanKhachHang(request.getXacNhanKhachHang() != null ? request.getXacNhanKhachHang() : false);
 
         if (request.getGhiChu() != null) {
-            lichSu.setMoTaLoi(lichSu.getMoTaLoi() != null ? 
-                lichSu.getMoTaLoi() + "\nGhi chú bàn giao: " + request.getGhiChu() : 
-                "Ghi chú bàn giao: " + request.getGhiChu());
+            lichSu.setMoTaLoi(
+                    lichSu.getMoTaLoi() != null ? lichSu.getMoTaLoi() + "\nGhi chú bàn giao: " + request.getGhiChu()
+                            : "Ghi chú bàn giao: " + request.getGhiChu());
         }
 
         // Upload ảnh sau sửa
@@ -357,7 +358,7 @@ public class BaoHanhService {
             String tenKhachHang = phieuBaoHanh.getIdKhachHang().getHoTen();
             if (emailKhachHang != null && !emailKhachHang.isBlank()) {
                 emailService.guiEmailHoanThanh(idBaoHanh, emailKhachHang, tenKhachHang,
-                    phieuBaoHanh.getMaPhieuBaoHanh());
+                        phieuBaoHanh.getMaPhieuBaoHanh());
             }
         } catch (Exception e) {
             System.err.println("Lỗi khi gửi email hoàn thành: " + e.getMessage());

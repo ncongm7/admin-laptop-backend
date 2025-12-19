@@ -16,35 +16,36 @@ public class PhieuBaoHanhService {
     private PhieuBaoHanhRepository repository;
 
     @Transactional(readOnly = true)
-    public List<PhieuBaoHanhResponse> getAll(){
+    public List<PhieuBaoHanhResponse> getAll() {
         return repository.findAllWithRelations().stream().map(PhieuBaoHanhResponse::new).toList();
     }
-    
+
     public void delete(UUID id) {
         repository.findById(id).orElseThrow(
-                () -> new ApiException("Not Found", "NF")
-        );
+                () -> new ApiException("Not Found", "NF"));
         repository.deleteById(id);
     }
-    
+
     @Transactional(readOnly = true)
-    public PhieuBaoHanhResponse detail(UUID id){
-        return new PhieuBaoHanhResponse(repository.findByIdWithRelations(id).orElseThrow(() -> new ApiException("Not Found","NF")));
+    public PhieuBaoHanhResponse detail(UUID id) {
+        return new PhieuBaoHanhResponse(
+                repository.findByIdWithRelations(id).orElseThrow(() -> new ApiException("Not Found", "NF")));
     }
-    
+
     @Transactional
     public PhieuBaoHanhResponse updateTrangThai(UUID id, Integer trangThai) {
         var entity = repository.findById(id)
                 .orElseThrow(() -> new ApiException("Not Found", "NF"));
-        
-        // Validate trạng thái hợp lệ: 0=Từ chối, 1=Chờ xác nhận, 2=Xác nhận, 3=Hoàn thành
-        if (trangThai < 0 || trangThai > 3) {
+
+        // Validate trạng thái hợp lệ: 0=Chờ xử lý, 1=Đã tiếp nhận, 2=Đang sửa chữa,
+        // 3=Chờ bàn giao, 4=Hoàn thành, 5=Đã hủy
+        if (trangThai < 0 || trangThai > 5) {
             throw new ApiException("Trạng thái không hợp lệ", "INVALID_STATUS");
         }
-        
+
         entity.setTrangThaiBaoHanh(trangThai);
         repository.save(entity);
-        
+
         return new PhieuBaoHanhResponse(repository.findByIdWithRelations(id).orElseThrow());
     }
 }
