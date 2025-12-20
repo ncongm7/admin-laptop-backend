@@ -198,6 +198,90 @@ public class CustomerGioHangService {
         }
     }
 
+    /**
+     * Validate stock availability for cart items before checkout
+     * Kiểm tra tồn kho cho các sản phẩm trong giỏ hàng trước khi thanh toán
+     * @param khachHangId ID khách hàng
+     * @param selectedItemIds Danh sách ID các sản phẩm được chọn để thanh toán (nếu null thì check tất cả)
+     */
+    public CartValidationResponse validateCartStock(UUID khachHangId, List<UUID> selectedItemIds) {
+        System.out.println("🔍 [CustomerGioHangService] Validating cart stock for customer: " + khachHangId);
+        System.out.println("  - Selected items: " + (selectedItemIds != null ? selectedItemIds.size() : "ALL"));
+        
+        // Lấy giỏ hàng
+        GioHang gioHang = gioHangRepository.findByKhachHangId(khachHangId)
+                .orElseThrow(() -> new ApiException("Giỏ hàng không tồn tại", "CART_NOT_FOUND"));
+
+        // Lấy danh sách items trong giỏ
+        List<GioHangChiTiet> chiTietList = gioHangChiTietRepository.findByGioHangId(gioHang.getId());
+        
+        // Filter only selected items if selectedItemIds is provided
+        if (selectedItemIds != null && !selectedItemIds.isEmpty()) {
+            chiTietList = chiTietList.stream()
+                    .filter(item -> selectedItemIds.contains(item.getId()))
+                    .collect(Collectors.toList());
+            System.out.println("  - Filtered to " + chiTietList.size() + " selected items");
+        }
+        
+        if (chiTietList.isEmpty()) {
+            return new CartValidationResponse(false, "Không có sản phẩm nào được chọn", new ArrayList<>());
+        }
+
+        // Kiểm tra từng sản phẩm
+        List<CartValidationResponse.OutOfStockItem> outOfStockItems = new ArrayList<>();
+        
+        for (GioHangChiTiet chiTiet : chiTietList) {
+            ChiTietSanPham ctsp = chiTiet.getChiTietSanPham();
+            int requestedQuantity = chiTiet.getSoLuong();
+            int availableStock = getAvailableQuantity(ctsp);
+            
+            System.out.println("  - Checking: " + ctsp.getSanPham().getTenSanPham() + 
+                             " | Requested: " + requestedQuantity + 
+                             " | Available: " + availableStock);
+            
+            if (availableStock < requestedQuantity) {
+                // Build variant name
+                StringBuilder variantName = new StringBuilder();
+                if (ctsp.getMauSac() != null) variantName.append(ctsp.getMauSac().getTenMau());
+                if (ctsp.getCpu() != null) {
+                    if (variantName.length() > 0) variantName.append(" - ");
+                    variantName.append(ctsp.getCpu().getTenCpu());
+                }
+                if (ctsp.getRam() != null) {
+                    if (variantName.length() > 0) variantName.append("/");
+                    variantName.append(ctsp.getRam().getTenRam());
+                }
+                if (ctsp.getOCung() != null) {
+                    if (variantName.length() > 0) variantName.append("/");
+                    variantName.append(ctsp.getOCung().getDungLuong());
+                }
+                
+                CartValidationResponse.OutOfStockItem outOfStockItem = 
+                    new CartValidationResponse.OutOfStockItem(
+                        ctsp.getId().toString(),
+                        ctsp.getSanPham().getTenSanPham(),
+                        variantName.toString(),
+                        requestedQuantity,
+                        availableStock
+                    );
+                outOfStockItems.add(outOfStockItem);
+                
+                System.out.println("    ❌ OUT OF STOCK!");
+            } else {
+                System.out.println("    ✅ Stock OK");
+            }
+        }
+        
+        if (!outOfStockItems.isEmpty()) {
+            String message = "Có " + outOfStockItems.size() + " sản phẩm không đủ hàng trong kho";
+            System.out.println("❌ [CustomerGioHangService] Validation FAILED: " + message);
+            return new CartValidationResponse(false, message, outOfStockItems);
+        }
+        
+        System.out.println("✅ [CustomerGioHangService] Validation PASSED");
+        return new CartValidationResponse(true, "Tất cả sản phẩm đều có sẵn", new ArrayList<>());
+    }
+
     // ========== HELPER METHODS ==========
 
     /**

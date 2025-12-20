@@ -7,6 +7,7 @@ import com.example.backendlaptop.dto.hoadon.PendingOrderResponse;
 import com.example.backendlaptop.dto.hoadon.StatusCountResponse;
 import com.example.backendlaptop.entity.*;
 import com.example.backendlaptop.expection.ApiException;
+import com.example.backendlaptop.model.PaymentMethod;
 import com.example.backendlaptop.model.TrangThaiHoaDon;
 import com.example.backendlaptop.repository.banhang.HoaDonRepository;
 import com.example.backendlaptop.repository.banhang.HoaDonChiTietRepository;
@@ -236,6 +237,16 @@ public class HoaDonService {
             if (newTrangThai == TrangThaiHoaDon.DA_THANH_TOAN && hoaDon.getNgayThanhToan() == null) {
                 hoaDon.setNgayThanhToan(Instant.now());
                 hoaDon.setTrangThaiThanhToan(1); // Đã thanh toán
+            }
+            
+            // Nếu là đơn COD và chuyển sang "Hoàn thành" → Đã thanh toán (khách đã nhận hàng và trả tiền)
+            if (newTrangThai == TrangThaiHoaDon.HOAN_THANH && hoaDon.getPaymentMethod() == PaymentMethod.COD) {
+                if (hoaDon.getTrangThaiThanhToan() != 1) {
+                    System.out.println("💵 [HoaDonService] Đơn COD hoàn thành → Set 'Đã thanh toán'");
+                    hoaDon.setTrangThaiThanhToan(1); // Đã thanh toán
+                    hoaDon.setNgayThanhToan(Instant.now());
+                    hoaDon.setPaymentConfirmedAt(Instant.now());
+                }
             }
 
             hoaDon = hoaDonRepository.save(hoaDon);
@@ -524,8 +535,27 @@ public class HoaDonService {
             // 6. Cập nhật trạng thái hóa đơn
             // Đơn hàng online sau khi xác nhận sẽ chuyển sang "Đang giao" (vì cần giao hàng)
             hoaDon.setTrangThai(TrangThaiHoaDon.DANG_GIAO);
-            hoaDon.setTrangThaiThanhToan(1); // Đã thanh toán
-            hoaDon.setNgayThanhToan(Instant.now());
+            
+            // 6.1. Xử lý trạng thái thanh toán dựa trên phương thức thanh toán
+            PaymentMethod paymentMethod = hoaDon.getPaymentMethod();
+            
+            if (paymentMethod == PaymentMethod.COD) {
+                // COD: Giữ nguyên trạng thái "Chờ thanh toán" (0)
+                // Sẽ chuyển sang "Đã thanh toán" khi giao hàng thành công
+                System.out.println("💵 [HoaDonService] Đơn COD - Giữ trạng thái 'Chờ thanh toán'");
+                // Không set trangThaiThanhToan và ngayThanhToan
+            } else if (paymentMethod == PaymentMethod.QR || paymentMethod == PaymentMethod.CASH) {
+                // QR/CASH: Đã thanh toán trước khi xác nhận
+                System.out.println("💳 [HoaDonService] Đơn " + paymentMethod + " - Set trạng thái 'Đã thanh toán'");
+                hoaDon.setTrangThaiThanhToan(1); // Đã thanh toán
+                hoaDon.setNgayThanhToan(Instant.now());
+                hoaDon.setPaymentConfirmedAt(Instant.now());
+            } else {
+                // Mặc định: Nếu không có paymentMethod, giả định là đã thanh toán (backward compatibility)
+                System.out.println("⚠️ [HoaDonService] Không xác định được phương thức thanh toán, mặc định là đã thanh toán");
+                hoaDon.setTrangThaiThanhToan(1);
+                hoaDon.setNgayThanhToan(Instant.now());
+            }
             
             // 7. Gán nhân viên xác nhận (nếu có)
             if (nhanVienId != null) {

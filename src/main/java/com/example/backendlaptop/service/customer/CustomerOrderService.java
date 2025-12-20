@@ -5,6 +5,8 @@ import com.example.backendlaptop.dto.hoadon.HoaDonDetailResponse;
 import com.example.backendlaptop.dto.hoadon.HoaDonListResponse;
 import com.example.backendlaptop.entity.*;
 import com.example.backendlaptop.expection.ApiException;
+import com.example.backendlaptop.model.PaymentMethod;
+import com.example.backendlaptop.model.SalesChannel;
 import com.example.backendlaptop.model.TrangThaiHoaDon;
 import com.example.backendlaptop.repository.KhachHangRepository;
 import com.example.backendlaptop.repository.banhang.HoaDonChiTietRepository;
@@ -64,6 +66,18 @@ public class CustomerOrderService {
             hoaDon.setNgayTao(Instant.now());
             hoaDon.setTrangThai(TrangThaiHoaDon.CHO_THANH_TOAN); // Chờ thanh toán
             hoaDon.setTrangThaiThanhToan(0); // Chưa thanh toán
+            
+            // Map payment method từ request (0=COD, 1=Online)
+            if (request.getPhuongThucThanhToan() != null) {
+                if (request.getPhuongThucThanhToan() == 0) {
+                    hoaDon.setPaymentMethod(PaymentMethod.COD);
+                } else if (request.getPhuongThucThanhToan() == 1) {
+                    hoaDon.setPaymentMethod(PaymentMethod.QR);
+                }
+            }
+            
+            // Set sales channel
+            hoaDon.setSalesChannel(SalesChannel.ONLINE);
 
             // 3. Tạo mã hóa đơn
             String maHoaDon = "HD" + System.currentTimeMillis();

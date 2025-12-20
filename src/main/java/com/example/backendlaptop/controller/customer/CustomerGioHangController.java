@@ -2,6 +2,7 @@ package com.example.backendlaptop.controller.customer;
 
 import com.example.backendlaptop.dto.giohang.customer.AddToCartRequest;
 import com.example.backendlaptop.dto.giohang.customer.CartResponse;
+import com.example.backendlaptop.dto.giohang.customer.CartValidationResponse;
 import com.example.backendlaptop.dto.giohang.customer.UpdateCartItemRequest;
 import com.example.backendlaptop.model.response.ResponseObject;
 import com.example.backendlaptop.service.banhang.CustomerGioHangService;
@@ -12,6 +13,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+import java.util.UUID;
 import java.util.UUID;
 
 @RestController
@@ -74,6 +77,26 @@ public class CustomerGioHangController {
             @PathVariable UUID itemId) {
         CartResponse cart = customerGioHangService.removeCartItem(khachHangId, itemId);
         return ResponseEntity.ok(new ResponseObject<>(cart, "Xóa sản phẩm khỏi giỏ hàng thành công"));
+    }
+
+    /**
+     * Validate cart stock before checkout
+     * POST /api/customer/gio-hang/validate
+     */
+    @Operation(summary = "Kiểm tra tồn kho", description = "Kiểm tra tồn kho trước khi thanh toán")
+    @PostMapping("/validate")
+    public ResponseEntity<ResponseObject<CartValidationResponse>> validateCart(
+            @RequestParam("khachHangId") UUID khachHangId,
+            @RequestBody(required = false) List<UUID> selectedItemIds) {
+        CartValidationResponse validation = customerGioHangService.validateCartStock(khachHangId, selectedItemIds);
+        
+        // Always return 200 OK, validation result is in the response body
+        if (validation.getIsValid()) {
+            return ResponseEntity.ok(new ResponseObject<>(validation, "Giỏ hàng hợp lệ"));
+        } else {
+            // Return 200 OK but with isValid = false
+            return ResponseEntity.ok(new ResponseObject<>(validation, validation.getMessage()));
+        }
     }
 
     /**

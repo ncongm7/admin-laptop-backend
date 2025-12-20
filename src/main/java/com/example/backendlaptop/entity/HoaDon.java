@@ -1,5 +1,7 @@
 package com.example.backendlaptop.entity;
 
+import com.example.backendlaptop.model.PaymentMethod;
+import com.example.backendlaptop.model.SalesChannel;
 import com.example.backendlaptop.model.TrangThaiHoaDon;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -101,5 +103,47 @@ public class HoaDon {
 
     @Column(name = "so_tien_quy_doi", precision = 18, scale = 2)
     private BigDecimal soTienQuyDoi;
+
+    // ========== NEW FIELDS FOR STATISTICS SYSTEM ==========
+    
+    /**
+     * Phương thức thanh toán
+     * CASH: Tiền mặt (xác nhận ngay)
+     * QR: Chuyển khoản (xác nhận khi có payment_confirmed_at)
+     * COD: Thu tiền khi giao (xác nhận khi status = HOAN_THANH)
+     */
+    @Convert(converter = com.example.backendlaptop.converter.PaymentMethodConverter.class)
+    @Column(name = "payment_method", length = 20)
+    private PaymentMethod paymentMethod;
+    
+    /**
+     * Kênh bán hàng
+     * POS: Bán tại quầy
+     * ONLINE: Bán online qua website
+     */
+    @Convert(converter = com.example.backendlaptop.converter.SalesChannelConverter.class)
+    @Column(name = "sales_channel", length = 20)
+    private SalesChannel salesChannel;
+    
+    /**
+     * Thời điểm xác nhận thanh toán
+     * - CASH: Set ngay khi tạo đơn
+     * - QR: Set khi nhận được tiền
+     * - COD: Set khi đơn hàng được giao thành công (status = HOAN_THANH)
+     */
+    @Column(name = "payment_confirmed_at")
+    private Instant paymentConfirmedAt;
+    
+    /**
+     * Audit trail - Log các sự kiện thanh toán
+     */
+    @OneToMany(mappedBy = "hoaDon", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<PaymentLog> paymentLogs;
+    
+    /**
+     * Audit trail - Log các thay đổi trạng thái
+     */
+    @OneToMany(mappedBy = "hoaDon", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<OrderStatusLog> orderStatusLogs;
 
 }
