@@ -145,6 +145,17 @@ public class CustomerOrderService {
                         throw new ApiException("Sản phẩm " + tenSanPham + " vừa hết hàng trong khi bạn đang thao tác.", "OUT_OF_STOCK_RACE");
                     }
                 }
+                
+                // === DEDUCT INVENTORY IMMEDIATELY ===
+                // Trừ tồn kho ngay khi đặt hàng online (không đợi admin xác nhận)
+                // Lý do: Đảm bảo khách online được ưu tiên khi đã đặt trước, tránh bị khách tại quầy mua mất
+                int soLuongTonHienTai = ctsp.getSoLuongTon();
+                ctsp.setSoLuongTon(soLuongTonHienTai - sp.getSoLuong());
+                chiTietSanPhamRepository.save(ctsp);
+                
+                System.out.println("📦 [CustomerOrder] Đã trừ tồn kho ngay: " + 
+                    tenSanPham + " (" + sp.getSoLuong() + " máy). " +
+                    "Tồn kho cũ: " + soLuongTonHienTai + " → Tồn kho mới: " + ctsp.getSoLuongTon());
             }
 
             // 4.5. Cập nhật tổng tiền
@@ -285,7 +296,24 @@ public class CustomerOrderService {
                 throw new ApiException("Chỉ có thể hủy đơn hàng ở trạng thái 'Chờ thanh toán'. Trạng thái hiện tại: " + hoaDon.getTrangThai(), "INVALID_STATUS");
             }
 
-            // 4. Giải phóng serials đã giữ
+            // 4. Hoàn lại tồn kho (vì đã trừ khi đặt hàng)
+            List<HoaDonChiTiet> chiTietList = new ArrayList<>(hoaDon.getHoaDonChiTiets());
+            for (HoaDonChiTiet hdct : chiTietList) {
+                ChiTietSanPham ctsp = hdct.getChiTietSanPham();
+                int soLuongHoan = hdct.getSoLuong();
+                String tenSanPham = ctsp.getSanPham() != null ? ctsp.getSanPham().getTenSanPham() : "Sản phẩm";
+                
+                // Hoàn lại tồn kho
+                int soLuongTonHienTai = ctsp.getSoLuongTon();
+                ctsp.setSoLuongTon(soLuongTonHienTai + soLuongHoan);
+                chiTietSanPhamRepository.save(ctsp);
+                
+                System.out.println("📦 [CustomerOrder] Hoàn lại tồn kho: " + 
+                    tenSanPham + " (+" + soLuongHoan + " máy). " +
+                    "Tồn kho cũ: " + soLuongTonHienTai + " → Tồn kho mới: " + ctsp.getSoLuongTon());
+            }
+
+            // 4.5. Giải phóng serials đã giữ
             serialService.cancelReservation(hoaDon);
 
             // 5. Cập nhật trạng thái thành DA_HUY
@@ -318,6 +346,19 @@ public class CustomerOrderService {
             
             // Chỉ hủy nếu chưa thanh toán
             if (hoaDon.getTrangThaiThanhToan() == 1) return; // Đã thanh toán thì không hủy
+            
+            // Hoàn lại tồn kho (vì đã trừ khi đặt hàng)
+            List<HoaDonChiTiet> chiTietList = new ArrayList<>(hoaDon.getHoaDonChiTiets());
+            for (HoaDonChiTiet hdct : chiTietList) {
+                ChiTietSanPham ctsp = hdct.getChiTietSanPham();
+                int soLuongHoan = hdct.getSoLuong();
+                
+                int soLuongTonHienTai = ctsp.getSoLuongTon();
+                ctsp.setSoLuongTon(soLuongTonHienTai + soLuongHoan);
+                chiTietSanPhamRepository.save(ctsp);
+                
+                System.out.println("📦 [SYSTEM] Hoàn lại tồn kho: " + soLuongHoan + " máy. Tồn kho mới: " + ctsp.getSoLuongTon());
+            }
             
             // Giải phóng serials
             serialService.cancelReservation(hoaDon);

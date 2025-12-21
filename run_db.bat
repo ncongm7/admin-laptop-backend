@@ -30,6 +30,12 @@ if %errorlevel% neq 0 (
     echo Error running datareal4.sql. Continuing...
 )
 
+echo 5. Running datareal5.sql (Statistics System Enhancement)...
+sqlcmd -S . -E -i datareal5.sql
+if %errorlevel% neq 0 (
+    echo Error running datareal5.sql. Continuing...
+)
+
 echo ==============================================
 echo DONE. DATABASE RE-CREATED SUCESSFULLY.
 echo ==============================================

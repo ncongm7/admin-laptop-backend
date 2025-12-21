@@ -610,53 +610,8 @@ CREATE TABLE sanpham_danhmuc (
     danh_muc_id UNIQUEIDENTIFIER
 );
 
--- Returns
-CREATE TABLE yeu_cau_tra_hang (
-   id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-   id_hoa_don UNIQUEIDENTIFIER NOT NULL,
-   id_khach_hang UNIQUEIDENTIFIER,
-   id_nhan_vien_xu_ly UNIQUEIDENTIFIER,
-   ma_yeu_cau VARCHAR(50) UNIQUE,
-   ly_do_tra_hang NVARCHAR(MAX),
-   ngay_mua DATETIME2,
-   ngay_yeu_cau DATETIME2 DEFAULT GETDATE(),
-   ngay_duyet DATETIME2,
-   ngay_hoan_tat DATETIME2,
-   trang_thai INT,
-   so_ngay_sau_mua INT,
-   loai_yeu_cau INT,
-   hinh_thuc_hoan_tien INT,
-   so_tien_hoan DECIMAL(18, 2),
-   ly_do_tu_choi NVARCHAR(MAX),
-   ghi_chu NVARCHAR(MAX),
-   ngay_tao DATETIME2 DEFAULT GETDATE(),
-   ngay_sua DATETIME2
-);
-
-CREATE TABLE chi_tiet_tra_hang (
-   id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-   id_yeu_cau_tra_hang UNIQUEIDENTIFIER NOT NULL,
-   id_hoa_don_chi_tiet UNIQUEIDENTIFIER NOT NULL,
-   id_serial_da_ban UNIQUEIDENTIFIER,
-   so_luong INT,
-   don_gia DECIMAL(18, 2),
-   thanh_tien DECIMAL(18, 2),
-   tinh_trang_luc_tra NVARCHAR(100),
-   mo_ta_tinh_trang NVARCHAR(MAX),
-   hinh_anh NVARCHAR(MAX),
-   ngay_tao DATETIME2 DEFAULT GETDATE()
-);
-
-CREATE TABLE lich_su_tra_hang (
-   id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-   id_yeu_cau_tra_hang UNIQUEIDENTIFIER NOT NULL,
-   id_nhan_vien UNIQUEIDENTIFIER,
-   hanh_dong NVARCHAR(100),
-   mo_ta NVARCHAR(MAX),
-   thoi_gian DATETIME2 DEFAULT GETDATE()
-);
-
-CREATE TABLE lc_subdistrict (
+-- Categories
+CREATE TABLE danh_muc (
     id            INT           NOT NULL PRIMARY KEY,
     district_id   INT           NOT NULL,
     district_code NVARCHAR(20)  NOT NULL,
@@ -772,15 +727,6 @@ ALTER TABLE chi_tiet_lich_su_diem ADD CONSTRAINT FK_CTLSD_LSD FOREIGN KEY (lich_
 ALTER TABLE sanpham_danhmuc ADD CONSTRAINT FK_SPDM_SP FOREIGN KEY (san_pham_id) REFERENCES san_pham(id);
 ALTER TABLE sanpham_danhmuc ADD CONSTRAINT FK_SPDM_DM FOREIGN KEY (danh_muc_id) REFERENCES danh_muc(id);
 
--- Returns
-ALTER TABLE yeu_cau_tra_hang ADD CONSTRAINT FK_YCTH_HD FOREIGN KEY (id_hoa_don) REFERENCES hoa_don(id);
-ALTER TABLE yeu_cau_tra_hang ADD CONSTRAINT FK_YCTH_KH FOREIGN KEY (id_khach_hang) REFERENCES khach_hang(user_id);
-ALTER TABLE yeu_cau_tra_hang ADD CONSTRAINT FK_YCTH_NV FOREIGN KEY (id_nhan_vien_xu_ly) REFERENCES nhan_vien(user_id);
-ALTER TABLE chi_tiet_tra_hang ADD CONSTRAINT FK_CTTH_YCTH FOREIGN KEY (id_yeu_cau_tra_hang) REFERENCES yeu_cau_tra_hang(id);
-ALTER TABLE chi_tiet_tra_hang ADD CONSTRAINT FK_CTTH_HDCT FOREIGN KEY (id_hoa_don_chi_tiet) REFERENCES hoa_don_chi_tiet(id);
-ALTER TABLE chi_tiet_tra_hang ADD CONSTRAINT FK_CTTH_Serial FOREIGN KEY (id_serial_da_ban) REFERENCES serial_da_ban(id);
-ALTER TABLE lich_su_tra_hang ADD CONSTRAINT FK_LSTH_YCTH FOREIGN KEY (id_yeu_cau_tra_hang) REFERENCES yeu_cau_tra_hang(id);
-ALTER TABLE lich_su_tra_hang ADD CONSTRAINT FK_LSTH_NV FOREIGN KEY (id_nhan_vien) REFERENCES nhan_vien(user_id);
 
 PRINT '>> Da tao xong Constraints.';
 GO
