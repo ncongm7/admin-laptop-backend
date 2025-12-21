@@ -45,6 +45,7 @@ public class CustomerOrderService {
     private final WebSocketNotificationService webSocketNotificationService;
     private final com.example.backendlaptop.service.SerialService serialService;
     private final com.example.backendlaptop.repository.DotGiamGiaChiTietRepository dotGiamGiaChiTietRepository;
+    private final com.example.backendlaptop.repository.PhieuGiamGiaKhachHangRepository phieuGiamGiaKhachHangRepository;
 
     /**
      * Tạo đơn hàng từ customer
@@ -183,24 +184,75 @@ public class CustomerOrderService {
             hoaDon.setTongTien(tongTien);
 
             // 5. Xử lý phiếu giảm giá (nếu có)
+            // 5. Xử lý phiếu giảm giá (nếu có)
             BigDecimal tienDuocGiam = BigDecimal.ZERO;
             if (request.getMaPhieuGiamGia() != null && !request.getMaPhieuGiamGia().trim().isEmpty()) {
                 PhieuGiamGia phieuGiamGia = phieuGiamGiaRepository.findByMaIgnoreCase(request.getMaPhieuGiamGia())
-                        .orElse(null);
+                        .orElseThrow(() -> new ApiException("Mã giảm giá không tồn tại", "VOUCHER_NOT_FOUND"));
 
-                if (phieuGiamGia != null && phieuGiamGia.getTrangThai() == 1) {
-                    hoaDon.setIdPhieuGiamGia(phieuGiamGia);
+                // VALIDATE VOUCHER (Logic đồng bộ với Offline/KhuyenMaiService)
+                Instant now = Instant.now();
 
-                    if (phieuGiamGia.getLoaiPhieuGiamGia() == 0) { // Phần trăm
-                        tienDuocGiam = tongTien.multiply(phieuGiamGia.getGiaTriGiamGia())
-                                .divide(BigDecimal.valueOf(100));
-                    } else { // Số tiền cố định
-                        tienDuocGiam = phieuGiamGia.getGiaTriGiamGia();
+                // 1. Trạng thái
+                if (phieuGiamGia.getTrangThai() != 1) {
+                    throw new ApiException("Mã giảm giá không hoạt động", "VOUCHER_INACTIVE");
+                }
+
+                // 2. Ngày hiệu lực
+                if (phieuGiamGia.getNgayBatDau() != null && now.isBefore(phieuGiamGia.getNgayBatDau())) {
+                    throw new ApiException("Mã giảm giá chưa đến thời gian hiệu lực", "VOUCHER_NOT_STARTED");
+                }
+                if (phieuGiamGia.getNgayKetThuc() != null && now.isAfter(phieuGiamGia.getNgayKetThuc())) {
+                    throw new ApiException("Mã giảm giá đã hết hạn", "VOUCHER_EXPIRED");
+                }
+
+                // 3. Số lượng (nếu không phải riêng tư)
+                if (!Boolean.TRUE.equals(phieuGiamGia.getRiengTu())) {
+                    if (phieuGiamGia.getSoLuongDung() != null && phieuGiamGia.getSoLuongDung() <= 0) {
+                        throw new ApiException("Mã giảm giá đã hết lượt sử dụng", "VOUCHER_OUT_OF_STOCK");
                     }
+                }
 
-                    if (tienDuocGiam.compareTo(tongTien) > 0) {
-                        tienDuocGiam = tongTien;
+                // 4. Giá trị đơn tối thiểu
+                if (phieuGiamGia.getHoaDonToiThieu() != null
+                        && tongTien.compareTo(phieuGiamGia.getHoaDonToiThieu()) < 0) {
+                    throw new ApiException("Đơn hàng chưa đủ điều kiện tối thiểu để áp dụng mã giảm giá",
+                            "INSUFFICIENT_ORDER_VALUE");
+                }
+
+                // 5. Check quyền sở hữu (nếu riêng tư)
+                if (Boolean.TRUE.equals(phieuGiamGia.getRiengTu())) {
+                    boolean coQuyen = phieuGiamGiaKhachHangRepository
+                            .existsByPhieuGiamGia_IdAndKhachHang_Id(phieuGiamGia.getId(), khachHang.getId());
+                    if (!coQuyen) {
+                        throw new ApiException("Bạn không có quyền sử dụng mã giảm giá này", "VOUCHER_NO_PERMISSION");
                     }
+                }
+
+                // CALCULATE DISCOUNT
+                if (phieuGiamGia.getLoaiPhieuGiamGia() == 0) { // Phần trăm
+                    tienDuocGiam = tongTien.multiply(phieuGiamGia.getGiaTriGiamGia())
+                            .divide(BigDecimal.valueOf(100));
+
+                    // Max Discount Limit
+                    if (phieuGiamGia.getSoTienGiamToiDa() != null
+                            && tienDuocGiam.compareTo(phieuGiamGia.getSoTienGiamToiDa()) > 0) {
+                        tienDuocGiam = phieuGiamGia.getSoTienGiamToiDa();
+                    }
+                } else { // Số tiền cố định
+                    tienDuocGiam = phieuGiamGia.getGiaTriGiamGia();
+                }
+
+                if (tienDuocGiam.compareTo(tongTien) > 0) {
+                    tienDuocGiam = tongTien;
+                }
+
+                hoaDon.setIdPhieuGiamGia(phieuGiamGia);
+
+                // Giảm số lượng voucher
+                if (phieuGiamGia.getSoLuongDung() != null && phieuGiamGia.getSoLuongDung() > 0) {
+                    phieuGiamGia.setSoLuongDung(phieuGiamGia.getSoLuongDung() - 1);
+                    phieuGiamGiaRepository.save(phieuGiamGia);
                 }
             }
 
