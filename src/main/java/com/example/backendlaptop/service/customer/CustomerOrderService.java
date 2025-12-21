@@ -44,6 +44,7 @@ public class CustomerOrderService {
     private final SerialRepository serialRepository;
     private final WebSocketNotificationService webSocketNotificationService;
     private final com.example.backendlaptop.service.SerialService serialService;
+    private final com.example.backendlaptop.repository.DotGiamGiaChiTietRepository dotGiamGiaChiTietRepository;
 
     /**
      * Tạo đơn hàng từ customer
@@ -66,7 +67,7 @@ public class CustomerOrderService {
             hoaDon.setNgayTao(Instant.now());
             hoaDon.setTrangThai(TrangThaiHoaDon.CHO_THANH_TOAN); // Chờ thanh toán
             hoaDon.setTrangThaiThanhToan(0); // Chưa thanh toán
-            
+
             // Map payment method từ request (0=COD, 1=Online)
             if (request.getPhuongThucThanhToan() != null) {
                 if (request.getPhuongThucThanhToan() == 0) {
@@ -75,7 +76,7 @@ public class CustomerOrderService {
                     hoaDon.setPaymentMethod(PaymentMethod.QR);
                 }
             }
-            
+
             // Set sales channel
             hoaDon.setSalesChannel(SalesChannel.ONLINE);
 
@@ -96,29 +97,29 @@ public class CustomerOrderService {
 
             for (TaoDonHangCustomerRequest.SanPhamDonHang sp : request.getSanPhams()) {
                 ChiTietSanPham ctsp = chiTietSanPhamRepository.findById(sp.getIdCtsp())
-                        .orElseThrow(() -> new ApiException("Không tìm thấy sản phẩm: " + sp.getIdCtsp(), "PRODUCT_NOT_FOUND"));
+                        .orElseThrow(() -> new ApiException("Không tìm thấy sản phẩm: " + sp.getIdCtsp(),
+                                "PRODUCT_NOT_FOUND"));
 
                 String tenSanPham = ctsp.getSanPham() != null ? ctsp.getSanPham().getTenSanPham() : "Sản phẩm";
-                
+
                 // Kiểm tra số lượng khả dụng (tính cả tạm giữ của đơn offline)
                 // Số lượng khả dụng = Tồn kho - Tạm giữ (của đơn offline)
                 int soLuongTon = ctsp.getSoLuongTon() != null ? ctsp.getSoLuongTon() : 0;
                 int soLuongTamGiu = ctsp.getSoLuongTamGiu() != null ? ctsp.getSoLuongTamGiu() : 0;
                 int soLuongKhaDung = soLuongTon - soLuongTamGiu;
-                
+
                 // Kiểm tra số lượng Serial có sẵn (trangThai = 1)
                 int soLuongSerialKhaDung = serialRepository.countByCtspIdAndTrangThai(sp.getIdCtsp(), 1);
-                
+
                 // Số lượng khả dụng thực tế = min(soLuongKhaDung, soLuongSerialKhaDung)
                 int soLuongKhaDungThucTe = Math.min(soLuongKhaDung, soLuongSerialKhaDung);
-                
+
                 if (soLuongKhaDungThucTe < sp.getSoLuong()) {
                     throw new ApiException(
-                        "Sản phẩm " + tenSanPham + " không đủ số lượng. " +
-                        "Cần: " + sp.getSoLuong() + ", " +
-                        "Có sẵn: " + soLuongKhaDungThucTe,
-                        "INSUFFICIENT_STOCK"
-                    );
+                            "Sản phẩm " + tenSanPham + " không đủ số lượng. " +
+                                    "Cần: " + sp.getSoLuong() + ", " +
+                                    "Có sẵn: " + soLuongKhaDungThucTe,
+                            "INSUFFICIENT_STOCK");
                 }
 
                 HoaDonChiTiet chiTiet = new HoaDonChiTiet();
@@ -126,8 +127,25 @@ public class CustomerOrderService {
                 chiTiet.setChiTietSanPham(ctsp);
                 chiTiet.setSoLuong(sp.getSoLuong());
 
-                // Tính giá: sử dụng giá bán
-                BigDecimal donGia = ctsp.getGiaBan() != null ? ctsp.getGiaBan() : BigDecimal.ZERO;
+                // Tính giá: sử dụng giá sau giảm (nếu có)
+                BigDecimal donGia = calculateDiscountedPrice(ctsp);
+
+                // VALIDATION: Kiểm tra giá mong đợi từ frontend (nếu có gửi lên)
+                if (sp.getDonGia() != null) {
+                    // Chấp nhận sai số nhỏ (ví dụ 1000đ hoặc 0.1%) để tránh lỗi làm tròn
+                    BigDecimal expectedPrice = sp.getDonGia();
+                    BigDecimal diff = donGia.subtract(expectedPrice).abs();
+
+                    // Nếu sai lệch > 0 (chính xác tuyệt đối vì BigDecimal)
+                    // Hoặc có thể cho phép sai số nhỏ nếu cần
+                    if (diff.compareTo(BigDecimal.valueOf(100)) > 0) { // Sai lệch quá 100 đồng
+                        throw new ApiException(
+                                "Giá sản phẩm '" + tenSanPham + "' đã thay đổi từ " +
+                                        expectedPrice + " thành " + donGia + ". Vui lòng đặt hàng lại.",
+                                "PRICE_CHANGE");
+                    }
+                }
+
                 chiTiet.setDonGia(donGia);
 
                 BigDecimal thanhTien = donGia.multiply(BigDecimal.valueOf(sp.getSoLuong()));
@@ -137,25 +155,28 @@ public class CustomerOrderService {
                 // === RESERVATION LOGIC ===
                 // Reserve serials for this item (hoaDon đã có ID)
                 Instant expiry = Instant.now().plusSeconds(1800); // Default 30 mins for COD
-                
+
                 for (int i = 0; i < sp.getSoLuong(); i++) {
                     Serial reservedSerial = serialService.findAndReserveSerial(ctsp.getId(), hoaDon, expiry);
                     if (reservedSerial == null) {
-                        // Double check failure (should be caught by count check above, but racing could cause this)
-                        throw new ApiException("Sản phẩm " + tenSanPham + " vừa hết hàng trong khi bạn đang thao tác.", "OUT_OF_STOCK_RACE");
+                        // Double check failure (should be caught by count check above, but racing could
+                        // cause this)
+                        throw new ApiException("Sản phẩm " + tenSanPham + " vừa hết hàng trong khi bạn đang thao tác.",
+                                "OUT_OF_STOCK_RACE");
                     }
                 }
-                
+
                 // === DEDUCT INVENTORY IMMEDIATELY ===
                 // Trừ tồn kho ngay khi đặt hàng online (không đợi admin xác nhận)
-                // Lý do: Đảm bảo khách online được ưu tiên khi đã đặt trước, tránh bị khách tại quầy mua mất
+                // Lý do: Đảm bảo khách online được ưu tiên khi đã đặt trước, tránh bị khách tại
+                // quầy mua mất
                 int soLuongTonHienTai = ctsp.getSoLuongTon();
                 ctsp.setSoLuongTon(soLuongTonHienTai - sp.getSoLuong());
                 chiTietSanPhamRepository.save(ctsp);
-                
-                System.out.println("📦 [CustomerOrder] Đã trừ tồn kho ngay: " + 
-                    tenSanPham + " (" + sp.getSoLuong() + " máy). " +
-                    "Tồn kho cũ: " + soLuongTonHienTai + " → Tồn kho mới: " + ctsp.getSoLuongTon());
+
+                System.out.println("📦 [CustomerOrder] Đã trừ tồn kho ngay: " +
+                        tenSanPham + " (" + sp.getSoLuong() + " máy). " +
+                        "Tồn kho cũ: " + soLuongTonHienTai + " → Tồn kho mới: " + ctsp.getSoLuongTon());
             }
 
             // 4.5. Cập nhật tổng tiền
@@ -189,14 +210,15 @@ public class CustomerOrderService {
             // 6. Xử lý điểm tích lũy (nếu có)
             if (request.getSoDiemSuDung() != null && request.getSoDiemSuDung() > 0) {
                 hoaDon.setSoDiemSuDung(request.getSoDiemSuDung());
-                BigDecimal soTienQuyDoi = BigDecimal.valueOf(request.getSoDiemSuDung()).multiply(BigDecimal.valueOf(1000));
+                BigDecimal soTienQuyDoi = BigDecimal.valueOf(request.getSoDiemSuDung())
+                        .multiply(BigDecimal.valueOf(1000));
                 hoaDon.setSoTienQuyDoi(soTienQuyDoi);
                 hoaDon.setTongTienSauGiam(hoaDon.getTongTienSauGiam().subtract(soTienQuyDoi));
             }
 
             // 7. Cập nhật lại hóa đơn với totals cuối cùng
             hoaDon = hoaDonRepository.save(hoaDon);
-            
+
             // 8. Lưu chi tiết (hoaDon đã có ID từ trước)
             for (HoaDonChiTiet chiTiet : chiTietList) {
                 hoaDonChiTietRepository.save(chiTiet);
@@ -205,12 +227,13 @@ public class CustomerOrderService {
             // 9. Gửi WebSocket notification cho đơn hàng mới
             try {
                 webSocketNotificationService.notifyNewOnlineOrder(
-                    hoaDon.getId(),
-                    hoaDon.getMa(),
-                    hoaDon.getTenKhachHang()
-                );
+                        hoaDon.getId(),
+                        hoaDon.getMa(),
+                        hoaDon.getTenKhachHang());
             } catch (Exception e) {
-                System.err.println("⚠️ [CustomerOrderService] Lỗi khi gửi WebSocket notification (không ảnh hưởng đến tạo đơn): " + e.getMessage());
+                System.err.println(
+                        "⚠️ [CustomerOrderService] Lỗi khi gửi WebSocket notification (không ảnh hưởng đến tạo đơn): "
+                                + e.getMessage());
             }
 
             return new HoaDonDetailResponse(hoaDon);
@@ -273,27 +296,30 @@ public class CustomerOrderService {
 
             // 2. Kiểm tra quyền: đơn hàng phải thuộc về khách hàng này
             System.out.println("[CustomerOrderService] huyDonHang - khachHangId từ request: " + khachHangId);
-            System.out.println("[CustomerOrderService] huyDonHang - hoaDon.getIdKhachHang(): " + hoaDon.getIdKhachHang());
-            
+            System.out
+                    .println("[CustomerOrderService] huyDonHang - hoaDon.getIdKhachHang(): " + hoaDon.getIdKhachHang());
+
             if (hoaDon.getIdKhachHang() == null) {
                 System.out.println("⚠️ [CustomerOrderService] huyDonHang - Đơn hàng không có khách hàng (khách lẻ)");
                 throw new ApiException("Bạn không có quyền hủy đơn hàng này", "UNAUTHORIZED");
             }
-            
+
             UUID orderKhachHangId = hoaDon.getIdKhachHang().getId();
             System.out.println("🔍 [CustomerOrderService] huyDonHang - orderKhachHangId: " + orderKhachHangId);
-            System.out.println("🔍 [CustomerOrderService] huyDonHang - IDs match: " + orderKhachHangId.equals(khachHangId));
-            
+            System.out.println(
+                    "🔍 [CustomerOrderService] huyDonHang - IDs match: " + orderKhachHangId.equals(khachHangId));
+
             if (!orderKhachHangId.equals(khachHangId)) {
                 System.out.println("❌ [CustomerOrderService] huyDonHang - ID không khớp!");
                 throw new ApiException("Bạn không có quyền hủy đơn hàng này", "UNAUTHORIZED");
             }
-            
+
             System.out.println("✅ [CustomerOrderService] huyDonHang - Quyền hợp lệ, tiếp tục hủy đơn hàng");
 
             // 3. Kiểm tra trạng thái: chỉ hủy được khi CHO_THANH_TOAN (chưa trừ kho)
             if (hoaDon.getTrangThai() != TrangThaiHoaDon.CHO_THANH_TOAN) {
-                throw new ApiException("Chỉ có thể hủy đơn hàng ở trạng thái 'Chờ thanh toán'. Trạng thái hiện tại: " + hoaDon.getTrangThai(), "INVALID_STATUS");
+                throw new ApiException("Chỉ có thể hủy đơn hàng ở trạng thái 'Chờ thanh toán'. Trạng thái hiện tại: "
+                        + hoaDon.getTrangThai(), "INVALID_STATUS");
             }
 
             // 4. Hoàn lại tồn kho (vì đã trừ khi đặt hàng)
@@ -302,15 +328,15 @@ public class CustomerOrderService {
                 ChiTietSanPham ctsp = hdct.getChiTietSanPham();
                 int soLuongHoan = hdct.getSoLuong();
                 String tenSanPham = ctsp.getSanPham() != null ? ctsp.getSanPham().getTenSanPham() : "Sản phẩm";
-                
+
                 // Hoàn lại tồn kho
                 int soLuongTonHienTai = ctsp.getSoLuongTon();
                 ctsp.setSoLuongTon(soLuongTonHienTai + soLuongHoan);
                 chiTietSanPhamRepository.save(ctsp);
-                
-                System.out.println("📦 [CustomerOrder] Hoàn lại tồn kho: " + 
-                    tenSanPham + " (+" + soLuongHoan + " máy). " +
-                    "Tồn kho cũ: " + soLuongTonHienTai + " → Tồn kho mới: " + ctsp.getSoLuongTon());
+
+                System.out.println("📦 [CustomerOrder] Hoàn lại tồn kho: " +
+                        tenSanPham + " (+" + soLuongHoan + " máy). " +
+                        "Tồn kho cũ: " + soLuongTonHienTai + " → Tồn kho mới: " + ctsp.getSoLuongTon());
             }
 
             // 4.5. Giải phóng serials đã giữ
@@ -341,46 +367,86 @@ public class CustomerOrderService {
         try {
             HoaDon hoaDon = hoaDonRepository.findById(idHoaDon)
                     .orElse(null);
-            
-            if (hoaDon == null) return;
-            
+
+            if (hoaDon == null)
+                return;
+
             // Chỉ hủy nếu chưa thanh toán
-            if (hoaDon.getTrangThaiThanhToan() == 1) return; // Đã thanh toán thì không hủy
-            
+            if (hoaDon.getTrangThaiThanhToan() == 1)
+                return; // Đã thanh toán thì không hủy
+
             // Hoàn lại tồn kho (vì đã trừ khi đặt hàng)
             List<HoaDonChiTiet> chiTietList = new ArrayList<>(hoaDon.getHoaDonChiTiets());
             for (HoaDonChiTiet hdct : chiTietList) {
                 ChiTietSanPham ctsp = hdct.getChiTietSanPham();
                 int soLuongHoan = hdct.getSoLuong();
-                
+
                 int soLuongTonHienTai = ctsp.getSoLuongTon();
                 ctsp.setSoLuongTon(soLuongTonHienTai + soLuongHoan);
                 chiTietSanPhamRepository.save(ctsp);
-                
-                System.out.println("📦 [SYSTEM] Hoàn lại tồn kho: " + soLuongHoan + " máy. Tồn kho mới: " + ctsp.getSoLuongTon());
+
+                System.out.println(
+                        "📦 [SYSTEM] Hoàn lại tồn kho: " + soLuongHoan + " máy. Tồn kho mới: " + ctsp.getSoLuongTon());
             }
-            
+
             // Giải phóng serials
             serialService.cancelReservation(hoaDon);
-            
+
             // Cập nhật trạng thái
             hoaDon.setTrangThai(TrangThaiHoaDon.DA_HUY);
             hoaDon.setGhiChu((hoaDon.getGhiChu() != null ? hoaDon.getGhiChu() : "") + " [" + reason + "]");
             hoaDonRepository.save(hoaDon);
-            
+
             System.out.println("SYSTEM CANCELLED ORDER: " + idHoaDon + " Reason: " + reason);
-            
+
             // Notify via WebSocket
             try {
-                webSocketNotificationService.notifyOrderCancelled(hoaDon.getId(), "Hệ thống hủy đơn hàng do hết hạn giữ hàng.");
+                webSocketNotificationService.notifyOrderCancelled(hoaDon.getId(),
+                        "Hệ thống hủy đơn hàng do hết hạn giữ hàng.");
             } catch (Exception e) {
                 // Ignore socket error
             }
-            
+
         } catch (Exception e) {
             System.err.println("Lỗi khi hủy đơn hệ thống: " + e.getMessage());
             e.printStackTrace();
         }
     }
-}
 
+    /**
+     * Helper: Tính giá bán sau khi áp dụng khuyến mãi (nếu có)
+     * Logic giống CustomerGioHangService
+     */
+    private BigDecimal calculateDiscountedPrice(ChiTietSanPham ctsp) {
+        Instant now = Instant.now();
+
+        // Tìm đợt giảm giá chi tiết hợp lệ
+        // Mặc định trả về giá gốc
+        BigDecimal finalPrice = ctsp.getGiaBan();
+
+        if (ctsp.getId() == null)
+            return finalPrice;
+
+        List<com.example.backendlaptop.entity.DotGiamGiaChiTiet> discounts = dotGiamGiaChiTietRepository.findAll();
+
+        java.util.Optional<com.example.backendlaptop.entity.DotGiamGiaChiTiet> activeDiscount = discounts.stream()
+                .filter(d -> d.getIdCtsp() != null && d.getIdCtsp().getId().equals(ctsp.getId()))
+                .filter(d -> d.getDotGiamGia() != null && d.getDotGiamGia().getTrangThai() == 1) // Kích hoạt
+                .filter(d -> {
+                    com.example.backendlaptop.entity.DotGiamGia promo = d.getDotGiamGia();
+                    return promo.getNgayBatDau() != null && promo.getNgayKetThuc() != null
+                            && !now.isBefore(promo.getNgayBatDau())
+                            && !now.isAfter(promo.getNgayKetThuc());
+                })
+                .findFirst();
+
+        if (activeDiscount.isPresent()) {
+            com.example.backendlaptop.entity.DotGiamGiaChiTiet discount = activeDiscount.get();
+            if (discount.getGiaSauKhiGiam() != null) {
+                finalPrice = discount.getGiaSauKhiGiam();
+            }
+        }
+
+        return finalPrice;
+    }
+}

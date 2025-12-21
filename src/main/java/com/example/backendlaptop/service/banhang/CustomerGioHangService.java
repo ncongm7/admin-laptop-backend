@@ -361,10 +361,12 @@ public class CustomerGioHangService {
         }
         item.setVariantName(variantName.toString());
 
-        item.setPrice(chiTiet.getDonGia());
+        // Use current calculated price instead of stored price
+        BigDecimal currentPrice = calculateDiscountedPrice(ctsp);
+        item.setPrice(currentPrice);
         item.setQuantity(chiTiet.getSoLuong());
         item.setMaxQuantity(getAvailableQuantity(ctsp));
-        item.setSubtotal(chiTiet.getDonGia().multiply(BigDecimal.valueOf(chiTiet.getSoLuong())));
+        item.setSubtotal(currentPrice.multiply(BigDecimal.valueOf(chiTiet.getSoLuong())));
         item.setSelected(false); // Default not selected
 
         return item;
