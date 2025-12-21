@@ -66,4 +66,7 @@ public interface SerialRepository extends JpaRepository<Serial, UUID> {
                      "WHERE hd.idKhachHang.id = :userId " +
                      "AND hd.trangThai IN (1, 3, 4)") // DA_THANH_TOAN, DANG_GIAO, HOAN_THANH
        List<Serial> findByUserId(@Param("userId") UUID userId);
+
+       // Tìm serial đang được reserved bởi một order cụ thể
+       List<Serial> findByReservedInOrderId(UUID orderId);
 }

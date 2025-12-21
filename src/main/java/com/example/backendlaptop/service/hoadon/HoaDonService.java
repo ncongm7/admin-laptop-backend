@@ -47,6 +47,7 @@ public class HoaDonService {
     private final SerialDaBanRepository serialDaBanRepository;
     private final NhanVienRepository nhanVienRepository;
     private final WebSocketNotificationService webSocketNotificationService;
+    private final com.example.backendlaptop.service.SerialService serialService;
 
     /**
      * Tìm kiếm và lọc hóa đơn với phân trang
@@ -54,19 +55,19 @@ public class HoaDonService {
     public Page<HoaDonListResponse> searchHoaDon(HoaDonSearchRequest request) {
         try {
             System.out.println("🔍 [HoaDonService] Bắt đầu tìm kiếm hóa đơn với request: " + request);
-            
+
             // Tạo Pageable
             Pageable pageable = PageRequest.of(
-                request.getPage() != null ? request.getPage() : 0,
-                request.getSize() != null ? request.getSize() : 10,
-                Sort.by(Sort.Direction.DESC, "ngayTao") // Sắp xếp mới nhất trước
+                    request.getPage() != null ? request.getPage() : 0,
+                    request.getSize() != null ? request.getSize() : 10,
+                    Sort.by(Sort.Direction.DESC, "ngayTao") // Sắp xếp mới nhất trước
             );
 
             // Tạo Specification để build query động
             Specification<HoaDon> spec = buildSpecification(request);
 
             System.out.println("📊 [HoaDonService] Thực hiện query với spec...");
-            
+
             // Thực hiện query
             Page<HoaDon> hoaDonPage = hoaDonRepository.findAll(spec, pageable);
 
@@ -77,7 +78,8 @@ public class HoaDonService {
                 try {
                     return new HoaDonListResponse(hoaDon);
                 } catch (Exception e) {
-                    System.err.println("❌ [HoaDonService] Lỗi khi map HoaDon sang HoaDonListResponse: " + e.getMessage());
+                    System.err
+                            .println("❌ [HoaDonService] Lỗi khi map HoaDon sang HoaDonListResponse: " + e.getMessage());
                     e.printStackTrace();
                     throw new RuntimeException("Lỗi khi chuyển đổi dữ liệu hóa đơn: " + e.getMessage(), e);
                 }
@@ -100,27 +102,27 @@ public class HoaDonService {
     public HoaDonDetailResponse getHoaDonDetail(UUID idHoaDon) {
         try {
             System.out.println("🔍 [HoaDonService] Lấy chi tiết hóa đơn: " + idHoaDon);
-            
+
             HoaDon hoaDon = hoaDonRepository.findById(idHoaDon)
-                .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn với ID: " + idHoaDon, "NOT_FOUND"));
+                    .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn với ID: " + idHoaDon, "NOT_FOUND"));
 
             System.out.println("✅ [HoaDonService] Tìm thấy hóa đơn: " + hoaDon.getMa());
-            
+
             // Load serial numbers cho từng chi tiết hóa đơn
             HoaDonDetailResponse response = new HoaDonDetailResponse(hoaDon);
-            
+
             // Map serial numbers vào từng sản phẩm
             if (response.getChiTietList() != null) {
                 for (HoaDonDetailResponse.SanPhamInfo sanPham : response.getChiTietList()) {
                     List<SerialDaBan> serials = serialDaBanRepository.findByIdHoaDonChiTiet_Id(sanPham.getId());
                     List<String> serialNumbers = serials.stream()
-                        .map(sdb -> sdb.getIdSerial() != null ? sdb.getIdSerial().getSerialNo() : null)
-                        .filter(sn -> sn != null)
-                        .collect(Collectors.toList());
+                            .map(sdb -> sdb.getIdSerial() != null ? sdb.getIdSerial().getSerialNo() : null)
+                            .filter(sn -> sn != null)
+                            .collect(Collectors.toList());
                     sanPham.setSerialNumbers(serialNumbers);
                 }
             }
-            
+
             return response;
         } catch (ApiException e) {
             throw e;
@@ -145,23 +147,20 @@ public class HoaDonService {
                     root.fetch("idNhanVien", jakarta.persistence.criteria.JoinType.LEFT);
                 }
             }
-            
+
             List<Predicate> predicates = new ArrayList<>();
 
             // 1. Tìm kiếm theo keyword (mã HĐ, tên KH, SĐT)
             if (request.getKeyword() != null && !request.getKeyword().trim().isEmpty()) {
                 String keyword = "%" + request.getKeyword().trim().toLowerCase() + "%";
-                
+
                 Predicate maPredicate = criteriaBuilder.like(
-                    criteriaBuilder.lower(root.get("ma")), keyword
-                );
+                        criteriaBuilder.lower(root.get("ma")), keyword);
                 Predicate tenKhPredicate = criteriaBuilder.like(
-                    criteriaBuilder.lower(root.get("tenKhachHang")), keyword
-                );
+                        criteriaBuilder.lower(root.get("tenKhachHang")), keyword);
                 Predicate sdtPredicate = criteriaBuilder.like(
-                    criteriaBuilder.lower(root.get("sdt")), keyword
-                );
-                
+                        criteriaBuilder.lower(root.get("sdt")), keyword);
+
                 predicates.add(criteriaBuilder.or(maPredicate, tenKhPredicate, sdtPredicate));
             }
 
@@ -184,12 +183,11 @@ public class HoaDonService {
             if (request.getStartDate() != null) {
                 try {
                     Instant startInstant = request.getStartDate()
-                        .atStartOfDay(ZoneId.systemDefault())
-                        .toInstant();
+                            .atStartOfDay(ZoneId.systemDefault())
+                            .toInstant();
                     predicates.add(criteriaBuilder.greaterThanOrEqualTo(
-                        root.get("ngayTao"),
-                        startInstant
-                    ));
+                            root.get("ngayTao"),
+                            startInstant));
                 } catch (Exception e) {
                     System.err.println("❌ [HoaDonService] Lỗi khi convert startDate: " + e.getMessage());
                     // Bỏ qua filter này nếu có lỗi
@@ -199,13 +197,12 @@ public class HoaDonService {
             if (request.getEndDate() != null) {
                 try {
                     Instant endInstant = request.getEndDate()
-                        .atTime(23, 59, 59)
-                        .atZone(ZoneId.systemDefault())
-                        .toInstant();
+                            .atTime(23, 59, 59)
+                            .atZone(ZoneId.systemDefault())
+                            .toInstant();
                     predicates.add(criteriaBuilder.lessThanOrEqualTo(
-                        root.get("ngayTao"),
-                        endInstant
-                    ));
+                            root.get("ngayTao"),
+                            endInstant));
                 } catch (Exception e) {
                     System.err.println("❌ [HoaDonService] Lỗi khi convert endDate: " + e.getMessage());
                     // Bỏ qua filter này nếu có lỗi
@@ -222,13 +219,13 @@ public class HoaDonService {
     public HoaDonDetailResponse capNhatTrangThai(UUID idHoaDon, Integer trangThai) {
         try {
             System.out.println("🔄 [HoaDonService] Cập nhật trạng thái hóa đơn: " + idHoaDon + " -> " + trangThai);
-            
+
             HoaDon hoaDon = hoaDonRepository.findById(idHoaDon)
-                .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn với ID: " + idHoaDon, "NOT_FOUND"));
+                    .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn với ID: " + idHoaDon, "NOT_FOUND"));
 
             // Lưu trạng thái cũ trước khi thay đổi
             Integer oldStatus = hoaDon.getTrangThai() != null ? hoaDon.getTrangThai().ordinal() : null;
-            
+
             // Convert integer to enum
             TrangThaiHoaDon newTrangThai = TrangThaiHoaDon.values()[trangThai];
             hoaDon.setTrangThai(newTrangThai);
@@ -238,8 +235,9 @@ public class HoaDonService {
                 hoaDon.setNgayThanhToan(Instant.now());
                 hoaDon.setTrangThaiThanhToan(1); // Đã thanh toán
             }
-            
-            // Nếu là đơn COD và chuyển sang "Hoàn thành" → Đã thanh toán (khách đã nhận hàng và trả tiền)
+
+            // Nếu là đơn COD và chuyển sang "Hoàn thành" → Đã thanh toán (khách đã nhận
+            // hàng và trả tiền)
             if (newTrangThai == TrangThaiHoaDon.HOAN_THANH && hoaDon.getPaymentMethod() == PaymentMethod.COD) {
                 if (hoaDon.getTrangThaiThanhToan() != 1) {
                     System.out.println("💵 [HoaDonService] Đơn COD hoàn thành → Set 'Đã thanh toán'");
@@ -249,23 +247,78 @@ public class HoaDonService {
                 }
             }
 
+            // Nếu trạng thái mới là "Đã hủy" -> Cần hoàn kho và trả serial
+            if (newTrangThai == TrangThaiHoaDon.DA_HUY) {
+                System.out.println("⚠️ [HoaDonService] Chuyển sang trạng thái HỦY -> Tiến hành hoàn kho và trả serial");
+
+                // 1. Hoàn tồn kho
+                if (hoaDon.getHoaDonChiTiets() != null) {
+                    for (HoaDonChiTiet hdct : hoaDon.getHoaDonChiTiets()) {
+                        ChiTietSanPham ctsp = hdct.getChiTietSanPham();
+                        int soLuongHoan = hdct.getSoLuong();
+
+                        // Hoàn lại tồn kho
+                        int soLuongTonHienTai = ctsp.getSoLuongTon();
+                        ctsp.setSoLuongTon(soLuongTonHienTai + soLuongHoan);
+                        chiTietSanPhamRepository.save(ctsp);
+
+                        System.out.println("📦 [HoaDonService] Hoàn lại tồn kho: " +
+                                (ctsp.getSanPham() != null ? ctsp.getSanPham().getTenSanPham() : "Sản phẩm") +
+                                " (+" + soLuongHoan + " máy). Tồn kho mới: " + ctsp.getSoLuongTon());
+                    }
+                }
+
+                // 2. Xử lý Serial đã bán (cho đơn Đang giao/Hoàn thành)
+                if (hoaDon.getHoaDonChiTiets() != null) {
+                    for (HoaDonChiTiet hdct : hoaDon.getHoaDonChiTiets()) {
+                        // Tìm serial đã bán gắn với chi tiết này
+                        List<SerialDaBan> serialsDaBan = serialDaBanRepository.findByIdHoaDonChiTiet_Id(hdct.getId());
+
+                        if (!serialsDaBan.isEmpty()) {
+                            System.out.println("♻️ [HoaDonService] Tìm thấy " + serialsDaBan.size()
+                                    + " serial đã bán cho sản phẩm " +
+                                    (hdct.getChiTietSanPham().getSanPham() != null
+                                            ? hdct.getChiTietSanPham().getSanPham().getTenSanPham()
+                                            : "")
+                                    +
+                                    ". Tiến hành hoàn trả.");
+
+                            for (SerialDaBan sdb : serialsDaBan) {
+                                Serial serial = sdb.getIdSerial();
+                                if (serial != null) {
+                                    serial.setTrangThai(1); // Set về Available (1)
+                                    serialRepository.save(serial);
+                                    System.out.println("  - Serial " + serial.getSerialNo() + " -> Available");
+                                }
+                            }
+                            // Xóa bản ghi đã bán
+                            serialDaBanRepository.deleteAll(serialsDaBan);
+                        }
+                    }
+                }
+
+                // 3. Giải phóng serials đang giữ (cho đơn Chờ thanh toán)
+                serialService.cancelReservation(hoaDon);
+            }
+
             hoaDon = hoaDonRepository.save(hoaDon);
-            
+
             System.out.println("✅ [HoaDonService] Cập nhật trạng thái thành công");
-            
+
             // Gửi WebSocket notification về thay đổi trạng thái (nếu có thay đổi)
             if (oldStatus != null && !oldStatus.equals(trangThai)) {
                 try {
                     webSocketNotificationService.notifyOrderStatusChanged(
-                        hoaDon.getId(),
-                        oldStatus,
-                        trangThai
-                    );
+                            hoaDon.getId(),
+                            oldStatus,
+                            trangThai);
                 } catch (Exception e) {
-                    System.err.println("⚠️ [HoaDonService] Lỗi khi gửi WebSocket notification (không ảnh hưởng đến cập nhật): " + e.getMessage());
+                    System.err.println(
+                            "⚠️ [HoaDonService] Lỗi khi gửi WebSocket notification (không ảnh hưởng đến cập nhật): "
+                                    + e.getMessage());
                 }
             }
-            
+
             return new HoaDonDetailResponse(hoaDon);
         } catch (ApiException e) {
             throw e;
@@ -284,17 +337,17 @@ public class HoaDonService {
     public Page<HoaDonListResponse> getCustomerOrders(UUID khachHangId, String trangThai, Pageable pageable) {
         try {
             System.out.println("🔍 [HoaDonService] Lấy đơn hàng khách: " + khachHangId + ", trạng thái: " + trangThai);
-            
+
             if (khachHangId == null) {
                 throw new ApiException("Thiếu thông tin khách hàng", "MISSING_CUSTOMER_ID");
             }
 
             Specification<HoaDon> spec = (root, query, criteriaBuilder) -> {
                 List<Predicate> predicates = new ArrayList<>();
-                
+
                 // Filter theo khách hàng
                 predicates.add(criteriaBuilder.equal(root.get("idKhachHang"), khachHangId));
-                
+
                 // Filter theo trạng thái nếu có
                 if (trangThai != null && !trangThai.trim().isEmpty()) {
                     try {
@@ -304,7 +357,7 @@ public class HoaDonService {
                         System.err.println("⚠️ [HoaDonService] Trạng thái không hợp lệ: " + trangThai);
                     }
                 }
-                
+
                 return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
             };
 
@@ -325,9 +378,9 @@ public class HoaDonService {
     public HoaDonDetailResponse getOrderDetailForCustomer(UUID orderId, UUID khachHangId) {
         try {
             System.out.println("🔍 [HoaDonService] Lấy chi tiết đơn: " + orderId + ", khách: " + khachHangId);
-            
+
             HoaDon hoaDon = hoaDonRepository.findById(orderId)
-                .orElseThrow(() -> new ApiException("Không tìm thấy đơn hàng", "NOT_FOUND"));
+                    .orElseThrow(() -> new ApiException("Không tìm thấy đơn hàng", "NOT_FOUND"));
 
             // Kiểm tra quyền: chỉ cho phép xem đơn hàng của mình
             if (khachHangId != null && !hoaDon.getIdKhachHang().equals(khachHangId)) {
@@ -352,9 +405,9 @@ public class HoaDonService {
     public boolean cancelOrderForCustomer(UUID orderId, UUID khachHangId) {
         try {
             System.out.println("🚫 [HoaDonService] Hủy đơn: " + orderId + ", khách: " + khachHangId);
-            
+
             HoaDon hoaDon = hoaDonRepository.findById(orderId)
-                .orElseThrow(() -> new ApiException("Không tìm thấy đơn hàng", "NOT_FOUND"));
+                    .orElseThrow(() -> new ApiException("Không tìm thấy đơn hàng", "NOT_FOUND"));
 
             // Kiểm tra quyền
             if (khachHangId != null && !hoaDon.getIdKhachHang().equals(khachHangId)) {
@@ -369,7 +422,7 @@ public class HoaDonService {
 
             hoaDon.setTrangThai(TrangThaiHoaDon.DA_HUY);
             hoaDonRepository.save(hoaDon);
-            
+
             System.out.println("✅ [HoaDonService] Đã hủy đơn hàng");
             return true;
         } catch (SecurityException e) {
@@ -390,9 +443,9 @@ public class HoaDonService {
     public boolean reorderForCustomer(UUID orderId, UUID khachHangId) {
         try {
             System.out.println("🔄 [HoaDonService] Mua lại đơn: " + orderId + ", khách: " + khachHangId);
-            
+
             HoaDon hoaDon = hoaDonRepository.findById(orderId)
-                .orElseThrow(() -> new ApiException("Không tìm thấy đơn hàng", "NOT_FOUND"));
+                    .orElseThrow(() -> new ApiException("Không tìm thấy đơn hàng", "NOT_FOUND"));
 
             // Kiểm tra quyền
             if (khachHangId != null && !hoaDon.getIdKhachHang().equals(khachHangId)) {
@@ -401,7 +454,7 @@ public class HoaDonService {
 
             // TODO: Implement logic thêm các sản phẩm trong đơn vào giỏ hàng
             // Cần inject GioHangService và thêm từng chi tiết hóa đơn vào giỏ
-            
+
             System.out.println("⚠️ [HoaDonService] Chức năng mua lại chưa được implement đầy đủ");
             return true;
         } catch (SecurityException e) {
@@ -419,18 +472,19 @@ public class HoaDonService {
      * Xác nhận đơn hàng online và trừ kho
      * Chỉ áp dụng cho đơn hàng online (loaiHoaDon = 1) ở trạng thái CHO_THANH_TOAN
      * 
-     * @param idHoaDon ID của hóa đơn
+     * @param idHoaDon   ID của hóa đơn
      * @param nhanVienId ID nhân viên xác nhận
      * @return HoaDonDetailResponse
      */
     @Transactional
     public HoaDonDetailResponse xacNhanDonHangOnline(UUID idHoaDon, UUID nhanVienId) {
         try {
-            System.out.println("✅ [HoaDonService] Xác nhận đơn hàng online: " + idHoaDon + ", nhân viên: " + nhanVienId);
-            
+            System.out
+                    .println("✅ [HoaDonService] Xác nhận đơn hàng online: " + idHoaDon + ", nhân viên: " + nhanVienId);
+
             // 1. Tìm hóa đơn
             HoaDon hoaDon = hoaDonRepository.findById(idHoaDon)
-                .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn với ID: " + idHoaDon, "NOT_FOUND"));
+                    .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn với ID: " + idHoaDon, "NOT_FOUND"));
 
             // 2. Kiểm tra loại hóa đơn (phải là online = 1)
             if (hoaDon.getLoaiHoaDon() == null || hoaDon.getLoaiHoaDon() != 1) {
@@ -439,11 +493,16 @@ public class HoaDonService {
 
             // 3. Kiểm tra trạng thái (phải là CHO_THANH_TOAN)
             if (hoaDon.getTrangThai() != TrangThaiHoaDon.CHO_THANH_TOAN) {
-                throw new ApiException("Chỉ có thể xác nhận đơn hàng ở trạng thái 'Chờ thanh toán'. Trạng thái hiện tại: " + hoaDon.getTrangThai(), "INVALID_STATUS");
+                throw new ApiException(
+                        "Chỉ có thể xác nhận đơn hàng ở trạng thái 'Chờ thanh toán'. Trạng thái hiện tại: "
+                                + hoaDon.getTrangThai(),
+                        "INVALID_STATUS");
             }
 
-            // 3.1. KIỂM TRA THANH TOÁN QR: Nếu phương thức thanh toán là QR, bắt buộc đã thanh toán
-            // TODO: Cần thêm field phuongThucThanhToan vào HoaDon entity hoặc check qua ChiTietThanhToan
+            // 3.1. KIỂM TRA THANH TOÁN QR: Nếu phương thức thanh toán là QR, bắt buộc đã
+            // thanh toán
+            // TODO: Cần thêm field phuongThucThanhToan vào HoaDon entity hoặc check qua
+            // ChiTietThanhToan
             // Tạm thời: Nếu trangThaiThanhToan = 0 (chưa thanh toán), chỉ cho phép với COD
             // Nếu đã có thông tin thanh toán hoặc trangThaiThanhToan = 1, cho phép xác nhận
             if (hoaDon.getTrangThaiThanhToan() == null || hoaDon.getTrangThaiThanhToan() == 0) {
@@ -470,42 +529,44 @@ public class HoaDonService {
                 if (soLuongKhaDung < soLuongCan) {
                     String tenSanPham = ctsp.getSanPham() != null ? ctsp.getSanPham().getTenSanPham() : "Sản phẩm";
                     throw new ApiException(
-                        "Sản phẩm " + tenSanPham + " không đủ số lượng. Cần: " + soLuongCan + ", Có sẵn: " + soLuongKhaDung,
-                        "INSUFFICIENT_STOCK"
-                    );
+                            "Sản phẩm " + tenSanPham + " không đủ số lượng. Cần: " + soLuongCan + ", Có sẵn: "
+                                    + soLuongKhaDung,
+                            "INSUFFICIENT_STOCK");
                 }
 
                 // 5.2. Kiểm tra số lượng tồn kho (tính cả tạm giữ của đơn offline)
-                // QUAN TRỌNG: Đơn offline tạm giữ ngay khi thêm sản phẩm, nên đơn online cần tính tạm giữ
+                // QUAN TRỌNG: Đơn offline tạm giữ ngay khi thêm sản phẩm, nên đơn online cần
+                // tính tạm giữ
                 int soLuongTon = ctsp.getSoLuongTon() != null ? ctsp.getSoLuongTon() : 0;
                 int soLuongTamGiu = ctsp.getSoLuongTamGiu() != null ? ctsp.getSoLuongTamGiu() : 0;
                 int soLuongKhaDungThucTe = soLuongTon - soLuongTamGiu;
-                
+
                 if (soLuongKhaDungThucTe < soLuongCan) {
                     String tenSanPham = ctsp.getSanPham() != null ? ctsp.getSanPham().getTenSanPham() : "Sản phẩm";
                     throw new ApiException(
-                        "Sản phẩm " + tenSanPham + " không đủ tồn kho. " +
-                        "Cần: " + soLuongCan + ", " +
-                        "Có sẵn: " + soLuongKhaDungThucTe + 
-                        " (Tồn kho: " + soLuongTon + ", Tạm giữ: " + soLuongTamGiu + ")",
-                        "INSUFFICIENT_STOCK"
-                    );
+                            "Sản phẩm " + tenSanPham + " không đủ tồn kho. " +
+                                    "Cần: " + soLuongCan + ", " +
+                                    "Có sẵn: " + soLuongKhaDungThucTe +
+                                    " (Tồn kho: " + soLuongTon + ", Tạm giữ: " + soLuongTamGiu + ")",
+                            "INSUFFICIENT_STOCK");
                 }
 
                 // 5.3. Lấy danh sách Serial có sẵn (trangThai = 1)
                 List<Serial> serials = serialRepository.findByCtspIdAndTrangThai(ctsp.getId(), 1);
-                
+
                 // 5.4. Xử lý từng Serial cần trừ
                 for (int i = 0; i < soLuongCan; i++) {
                     if (i >= serials.size()) {
-                        throw new ApiException("Không đủ Serial để trừ kho cho sản phẩm: " + ctsp.getId(), "INSUFFICIENT_SERIAL");
+                        throw new ApiException("Không đủ Serial để trừ kho cho sản phẩm: " + ctsp.getId(),
+                                "INSUFFICIENT_SERIAL");
                     }
 
                     Serial serial = serials.get(i);
 
                     // 5.5. Kiểm tra Serial chưa được bán
                     if (serialDaBanRepository.existsBySerialId(serial.getId())) {
-                        throw new ApiException("Serial " + serial.getSerialNo() + " đã được sử dụng", "SERIAL_ALREADY_SOLD");
+                        throw new ApiException("Serial " + serial.getSerialNo() + " đã được sử dụng",
+                                "SERIAL_ALREADY_SOLD");
                     }
 
                     // 5.6. Cập nhật trạng thái Serial thành "Đã bán" (2)
@@ -524,21 +585,24 @@ public class HoaDonService {
                 // 5.8. Cập nhật tồn kho (trừ một lần sau khi xử lý tất cả serial)
                 int soLuongTonMoi = soLuongTon - soLuongCan;
                 if (soLuongTonMoi < 0) {
-                    throw new ApiException("Lỗi: Số lượng tồn kho không thể âm cho sản phẩm: " + ctsp.getId(), "INVALID_STOCK");
+                    throw new ApiException("Lỗi: Số lượng tồn kho không thể âm cho sản phẩm: " + ctsp.getId(),
+                            "INVALID_STOCK");
                 }
                 ctsp.setSoLuongTon(soLuongTonMoi);
                 chiTietSanPhamRepository.save(ctsp);
-                
-                System.out.println("✅ [HoaDonService] Đã trừ " + soLuongCan + " sản phẩm, tồn kho còn: " + soLuongTonMoi);
+
+                System.out
+                        .println("✅ [HoaDonService] Đã trừ " + soLuongCan + " sản phẩm, tồn kho còn: " + soLuongTonMoi);
             }
 
             // 6. Cập nhật trạng thái hóa đơn
-            // Đơn hàng online sau khi xác nhận sẽ chuyển sang "Đang giao" (vì cần giao hàng)
+            // Đơn hàng online sau khi xác nhận sẽ chuyển sang "Đang giao" (vì cần giao
+            // hàng)
             hoaDon.setTrangThai(TrangThaiHoaDon.DANG_GIAO);
-            
+
             // 6.1. Xử lý trạng thái thanh toán dựa trên phương thức thanh toán
             PaymentMethod paymentMethod = hoaDon.getPaymentMethod();
-            
+
             if (paymentMethod == PaymentMethod.COD) {
                 // COD: Giữ nguyên trạng thái "Chờ thanh toán" (0)
                 // Sẽ chuyển sang "Đã thanh toán" khi giao hàng thành công
@@ -551,19 +615,23 @@ public class HoaDonService {
                 hoaDon.setNgayThanhToan(Instant.now());
                 hoaDon.setPaymentConfirmedAt(Instant.now());
             } else {
-                // Mặc định: Nếu không có paymentMethod, giả định là đã thanh toán (backward compatibility)
-                System.out.println("⚠️ [HoaDonService] Không xác định được phương thức thanh toán, mặc định là đã thanh toán");
+                // Mặc định: Nếu không có paymentMethod, giả định là đã thanh toán (backward
+                // compatibility)
+                System.out.println(
+                        "⚠️ [HoaDonService] Không xác định được phương thức thanh toán, mặc định là đã thanh toán");
                 hoaDon.setTrangThaiThanhToan(1);
                 hoaDon.setNgayThanhToan(Instant.now());
             }
-            
+
             // 7. Gán nhân viên xác nhận (nếu có)
             if (nhanVienId != null) {
                 try {
                     NhanVien nhanVien = nhanVienRepository.findById(nhanVienId)
-                        .orElseThrow(() -> new ApiException("Không tìm thấy nhân viên với ID: " + nhanVienId, "NOT_FOUND"));
+                            .orElseThrow(() -> new ApiException("Không tìm thấy nhân viên với ID: " + nhanVienId,
+                                    "NOT_FOUND"));
                     hoaDon.setIdNhanVien(nhanVien);
-                    System.out.println("✅ [HoaDonService] Đã gán nhân viên xác nhận: " + nhanVien.getHoTen() + " (ID: " + nhanVienId + ")");
+                    System.out.println("✅ [HoaDonService] Đã gán nhân viên xác nhận: " + nhanVien.getHoTen() + " (ID: "
+                            + nhanVienId + ")");
                 } catch (ApiException e) {
                     System.err.println("⚠️ [HoaDonService] Không tìm thấy nhân viên với ID: " + nhanVienId);
                     // Không throw exception, chỉ log warning để không block việc xác nhận đơn hàng
@@ -573,33 +641,35 @@ public class HoaDonService {
             hoaDon = hoaDonRepository.save(hoaDon);
 
             System.out.println("✅ [HoaDonService] Xác nhận đơn hàng thành công, đã trừ kho");
-            
+
             // Load serial numbers cho từng chi tiết hóa đơn (giống như getHoaDonDetail)
             HoaDonDetailResponse response = new HoaDonDetailResponse(hoaDon);
-            
+
             // Map serial numbers vào từng sản phẩm
             if (response.getChiTietList() != null) {
                 for (HoaDonDetailResponse.SanPhamInfo sanPham : response.getChiTietList()) {
                     List<SerialDaBan> serials = serialDaBanRepository.findByIdHoaDonChiTiet_Id(sanPham.getId());
                     List<String> serialNumbers = serials.stream()
-                        .map(sdb -> sdb.getIdSerial() != null ? sdb.getIdSerial().getSerialNo() : null)
-                        .filter(sn -> sn != null)
-                        .collect(Collectors.toList());
+                            .map(sdb -> sdb.getIdSerial() != null ? sdb.getIdSerial().getSerialNo() : null)
+                            .filter(sn -> sn != null)
+                            .collect(Collectors.toList());
                     sanPham.setSerialNumbers(serialNumbers);
                 }
             }
-            
+
             // Gửi WebSocket notification về thay đổi trạng thái
             try {
                 webSocketNotificationService.notifyOrderStatusChanged(
-                    hoaDon.getId(),
-                    0, // CHO_THANH_TOAN
-                    3  // DANG_GIAO (Đang giao hàng)
+                        hoaDon.getId(),
+                        0, // CHO_THANH_TOAN
+                        3 // DANG_GIAO (Đang giao hàng)
                 );
             } catch (Exception e) {
-                System.err.println("⚠️ [HoaDonService] Lỗi khi gửi WebSocket notification (không ảnh hưởng đến xác nhận đơn): " + e.getMessage());
+                System.err.println(
+                        "⚠️ [HoaDonService] Lỗi khi gửi WebSocket notification (không ảnh hưởng đến xác nhận đơn): "
+                                + e.getMessage());
             }
-            
+
             return response;
         } catch (ApiException e) {
             throw e;
@@ -620,9 +690,9 @@ public class HoaDonService {
     public HoaDonDetailResponse huyDonHangOnline(UUID idHoaDon, UUID nhanVienId) {
         try {
             System.out.println("🚫 [HoaDonService] Hủy đơn hàng online: " + idHoaDon);
-            
+
             HoaDon hoaDon = hoaDonRepository.findById(idHoaDon)
-                .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn với ID: " + idHoaDon, "NOT_FOUND"));
+                    .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn với ID: " + idHoaDon, "NOT_FOUND"));
 
             // Kiểm tra loại hóa đơn
             if (hoaDon.getLoaiHoaDon() == null || hoaDon.getLoaiHoaDon() != 1) {
@@ -636,24 +706,47 @@ public class HoaDonService {
 
             // Lưu trạng thái cũ trước khi thay đổi
             Integer oldStatus = hoaDon.getTrangThai() != null ? hoaDon.getTrangThai().ordinal() : 0;
-            
+
             // Cập nhật trạng thái thành DA_HUY
             hoaDon.setTrangThai(TrangThaiHoaDon.DA_HUY);
             hoaDon = hoaDonRepository.save(hoaDon);
 
-            System.out.println("✅ [HoaDonService] Đã hủy đơn hàng online");
-            
+            // Hoàn lại tồn kho (vì đã trừ khi đặt hàng - logic
+            // CustomerOrderService.taoDonHang)
+            if (hoaDon.getHoaDonChiTiets() != null) {
+                for (HoaDonChiTiet hdct : hoaDon.getHoaDonChiTiets()) {
+                    ChiTietSanPham ctsp = hdct.getChiTietSanPham();
+                    int soLuongHoan = hdct.getSoLuong();
+
+                    // Hoàn lại tồn kho
+                    int soLuongTonHienTai = ctsp.getSoLuongTon();
+                    ctsp.setSoLuongTon(soLuongTonHienTai + soLuongHoan);
+                    chiTietSanPhamRepository.save(ctsp);
+
+                    System.out.println("📦 [HoaDonService] Hoàn lại tồn kho: " +
+                            (ctsp.getSanPham() != null ? ctsp.getSanPham().getTenSanPham() : "Sản phẩm") +
+                            " (+" + soLuongHoan + " máy). Tồn kho mới: " + ctsp.getSoLuongTon());
+                }
+            }
+
+            // Giải phóng serials đã giữ
+            serialService.cancelReservation(hoaDon);
+
+            System.out.println("✅ [HoaDonService] Đã hủy đơn hàng online và hoàn kho/serial");
+
             // Gửi WebSocket notification về thay đổi trạng thái
             try {
                 webSocketNotificationService.notifyOrderStatusChanged(
-                    hoaDon.getId(),
-                    oldStatus,
-                    4  // DA_HUY
+                        hoaDon.getId(),
+                        oldStatus,
+                        4 // DA_HUY
                 );
             } catch (Exception e) {
-                System.err.println("⚠️ [HoaDonService] Lỗi khi gửi WebSocket notification (không ảnh hưởng đến hủy đơn): " + e.getMessage());
+                System.err
+                        .println("⚠️ [HoaDonService] Lỗi khi gửi WebSocket notification (không ảnh hưởng đến hủy đơn): "
+                                + e.getMessage());
             }
-            
+
             return new HoaDonDetailResponse(hoaDon);
         } catch (ApiException e) {
             throw e;
@@ -675,40 +768,41 @@ public class HoaDonService {
     public List<PendingOrderResponse> getPendingOnlineOrders() {
         try {
             System.out.println("📋 [HoaDonService] Lấy danh sách đơn hàng online chờ xác nhận");
-            
-            // Query: loai_hoa_don = 1 (Online) AND trang_thai = 0 (CHO_THANH_TOAN) AND trang_thai_thanh_toan = 0 (Chưa thanh toán)
+
+            // Query: loai_hoa_don = 1 (Online) AND trang_thai = 0 (CHO_THANH_TOAN) AND
+            // trang_thai_thanh_toan = 0 (Chưa thanh toán)
             Specification<HoaDon> spec = (root, query, criteriaBuilder) -> {
                 List<Predicate> predicates = new ArrayList<>();
-                
+
                 // Lọc theo loại hóa đơn = 1 (Online)
                 predicates.add(criteriaBuilder.equal(root.get("loaiHoaDon"), 1));
-                
+
                 // Lọc theo trạng thái = CHO_THANH_TOAN (0) - Chờ thanh toán
                 predicates.add(criteriaBuilder.equal(root.get("trangThai"), TrangThaiHoaDon.CHO_THANH_TOAN));
-                
+
                 // Lọc theo trạng thái thanh toán = 0 (Chưa thanh toán)
                 predicates.add(criteriaBuilder.equal(root.get("trangThaiThanhToan"), 0));
-                
+
                 return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
             };
-            
+
             // Sắp xếp theo ngày tạo mới nhất, giới hạn 50 đơn
             Pageable pageable = PageRequest.of(0, 50, Sort.by(Sort.Direction.DESC, "ngayTao"));
             Page<HoaDon> hoaDonPage = hoaDonRepository.findAll(spec, pageable);
-            
+
             // Map sang PendingOrderResponse
             List<PendingOrderResponse> result = hoaDonPage.getContent().stream()
-                .map(hoaDon -> {
-                    PendingOrderResponse response = new PendingOrderResponse();
-                    response.setId(hoaDon.getId());
-                    response.setMa(hoaDon.getMa());
-                    response.setTenKhachHang(hoaDon.getTenKhachHang());
-                    response.setNgayTao(hoaDon.getNgayTao());
-                    response.setTongTienSauGiam(hoaDon.getTongTienSauGiam());
-                    return response;
-                })
-                .collect(Collectors.toList());
-            
+                    .map(hoaDon -> {
+                        PendingOrderResponse response = new PendingOrderResponse();
+                        response.setId(hoaDon.getId());
+                        response.setMa(hoaDon.getMa());
+                        response.setTenKhachHang(hoaDon.getTenKhachHang());
+                        response.setNgayTao(hoaDon.getNgayTao());
+                        response.setTongTienSauGiam(hoaDon.getTongTienSauGiam());
+                        return response;
+                    })
+                    .collect(Collectors.toList());
+
             System.out.println("✅ [HoaDonService] Tìm thấy " + result.size() + " đơn hàng chờ xác nhận");
             return result;
         } catch (Exception e) {
@@ -716,7 +810,8 @@ public class HoaDonService {
             System.err.println("  - Error: " + e.getClass().getName());
             System.err.println("  - Message: " + e.getMessage());
             e.printStackTrace();
-            throw new ApiException("Lỗi khi lấy danh sách đơn hàng chờ xác nhận: " + e.getMessage(), "GET_PENDING_ORDERS_ERROR");
+            throw new ApiException("Lỗi khi lấy danh sách đơn hàng chờ xác nhận: " + e.getMessage(),
+                    "GET_PENDING_ORDERS_ERROR");
         }
     }
 
@@ -729,17 +824,17 @@ public class HoaDonService {
     public StatusCountResponse getStatusCounts() {
         try {
             System.out.println("📊 [HoaDonService] Lấy số lượng hóa đơn theo trạng thái");
-            
+
             // Đếm tổng số hóa đơn
             Long total = hoaDonRepository.count();
-            
+
             // Đếm theo từng trạng thái
             Long choThanhToan = hoaDonRepository.countByTrangThai(TrangThaiHoaDon.CHO_THANH_TOAN);
             Long daThanhToan = hoaDonRepository.countByTrangThai(TrangThaiHoaDon.DA_THANH_TOAN);
             Long dangGiao = hoaDonRepository.countByTrangThai(TrangThaiHoaDon.DANG_GIAO);
             Long hoanThanh = hoaDonRepository.countByTrangThai(TrangThaiHoaDon.HOAN_THANH);
             Long daHuy = hoaDonRepository.countByTrangThai(TrangThaiHoaDon.DA_HUY);
-            
+
             StatusCountResponse response = new StatusCountResponse();
             response.setTotal(total);
             response.setCHO_THANH_TOAN(choThanhToan);
@@ -747,29 +842,30 @@ public class HoaDonService {
             response.setDANG_GIAO(dangGiao);
             response.setHOAN_THANH(hoanThanh);
             response.setDA_HUY(daHuy);
-            
-            System.out.println("✅ [HoaDonService] Status counts - Total: " + total + 
-                ", CHO_THANH_TOAN: " + choThanhToan + 
-                ", DA_THANH_TOAN: " + daThanhToan +
-                ", DANG_GIAO: " + dangGiao +
-                ", HOAN_THANH: " + hoanThanh +
-                ", DA_HUY: " + daHuy);
-            
+
+            System.out.println("✅ [HoaDonService] Status counts - Total: " + total +
+                    ", CHO_THANH_TOAN: " + choThanhToan +
+                    ", DA_THANH_TOAN: " + daThanhToan +
+                    ", DANG_GIAO: " + dangGiao +
+                    ", HOAN_THANH: " + hoanThanh +
+                    ", DA_HUY: " + daHuy);
+
             return response;
         } catch (Exception e) {
             System.err.println("❌ [HoaDonService] Lỗi khi lấy số lượng hóa đơn theo trạng thái:");
             System.err.println("  - Error: " + e.getClass().getName());
             System.err.println("  - Message: " + e.getMessage());
             e.printStackTrace();
-            throw new ApiException("Lỗi khi lấy số lượng hóa đơn theo trạng thái: " + e.getMessage(), "GET_STATUS_COUNTS_ERROR");
+            throw new ApiException("Lỗi khi lấy số lượng hóa đơn theo trạng thái: " + e.getMessage(),
+                    "GET_STATUS_COUNTS_ERROR");
         }
     }
-    
+
     /**
      * Hủy đơn hàng và hoàn tiền (cho thanh toán QR)
      * 
-     * @param idHoaDon ID hóa đơn
-     * @param lyDoHuy Lý do hủy
+     * @param idHoaDon   ID hóa đơn
+     * @param lyDoHuy    Lý do hủy
      * @param nhanVienId ID nhân viên thực hiện (optional)
      * @return Thông tin hóa đơn đã hủy
      */
@@ -777,49 +873,51 @@ public class HoaDonService {
     public HoaDonDetailResponse cancelOrderWithRefund(UUID idHoaDon, String lyDoHuy, UUID nhanVienId) {
         try {
             System.out.println("🔄 [HoaDonService] Hủy đơn hàng có hoàn tiền: " + idHoaDon);
-            
+
             // 1. Tìm hóa đơn
             HoaDon hoaDon = hoaDonRepository.findById(idHoaDon)
-                .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn", "NOT_FOUND"));
-            
-            // 2. Kiểm tra trạng thái: Chỉ hủy được khi CHO_THANH_TOAN hoặc DANG_GIAO (chưa hoàn thành)
+                    .orElseThrow(() -> new ApiException("Không tìm thấy hóa đơn", "NOT_FOUND"));
+
+            // 2. Kiểm tra trạng thái: Chỉ hủy được khi CHO_THANH_TOAN hoặc DANG_GIAO (chưa
+            // hoàn thành)
             if (hoaDon.getTrangThai() == TrangThaiHoaDon.HOAN_THANH) {
                 throw new ApiException("Không thể hủy đơn hàng đã hoàn thành", "INVALID_STATUS");
             }
-            
+
             if (hoaDon.getTrangThai() == TrangThaiHoaDon.DA_HUY) {
                 throw new ApiException("Đơn hàng đã được hủy trước đó", "ALREADY_CANCELLED");
             }
-            
-            // 3. Kiểm tra thanh toán: Nếu đã thanh toán (trangThaiThanhToan = 1), cần xử lý refund
+
+            // 3. Kiểm tra thanh toán: Nếu đã thanh toán (trangThaiThanhToan = 1), cần xử lý
+            // refund
             boolean needRefund = (hoaDon.getTrangThaiThanhToan() != null && hoaDon.getTrangThaiThanhToan() == 1);
-            
+
             if (needRefund) {
                 System.out.println("💰 [HoaDonService] Đơn hàng đã thanh toán, cần xử lý hoàn tiền");
                 // TODO: Tích hợp với payment gateway để process refund
                 // Hiện tại chỉ log, admin sẽ hoàn tiền thủ công
                 System.out.println("  - Số tiền cần hoàn: " + hoaDon.getTongTienSauGiam());
                 System.out.println("  - Lý do hủy: " + lyDoHuy);
-                
+
                 // Lưu thông tin refund vào ghi chú
                 String ghiChuRefund = "HỦY ĐƠN - HOÀN TIỀN\n" +
                         "Số tiền: " + hoaDon.getTongTienSauGiam() + " VNĐ\n" +
                         "Lý do: " + lyDoHuy + "\n" +
                         "Thời gian: " + Instant.now();
-                hoaDon.setGhiChu(hoaDon.getGhiChu() != null 
-                        ? hoaDon.getGhiChu() + "\n\n" + ghiChuRefund 
+                hoaDon.setGhiChu(hoaDon.getGhiChu() != null
+                        ? hoaDon.getGhiChu() + "\n\n" + ghiChuRefund
                         : ghiChuRefund);
             }
-            
+
             // 4. Nếu đơn đã xác nhận (DANG_GIAO), cần hoàn kho
             if (hoaDon.getTrangThai() == TrangThaiHoaDon.DANG_GIAO) {
                 System.out.println("📦 [HoaDonService] Đơn hàng đang giao, cần hoàn kho");
-                
+
                 List<HoaDonChiTiet> chiTietList = new ArrayList<>(hoaDon.getHoaDonChiTiets());
                 for (HoaDonChiTiet hdct : chiTietList) {
                     ChiTietSanPham ctsp = hdct.getChiTietSanPham();
                     int soLuongHoan = hdct.getSoLuong();
-                    
+
                     // Hoàn lại serial: tìm serial đã bán, set về trạng thái khả dụng
                     List<SerialDaBan> serialDaBan = serialDaBanRepository.findByIdHoaDonChiTiet_Id(hdct.getId());
                     for (SerialDaBan sdb : serialDaBan) {
@@ -831,38 +929,38 @@ public class HoaDonService {
                     }
                     // Xóa bản ghi serial đã bán
                     serialDaBanRepository.deleteAll(serialDaBan);
-                    
+
                     // Hoàn số lượng tồn kho
                     int soLuongTonHienTai = ctsp.getSoLuongTon();
                     ctsp.setSoLuongTon(soLuongTonHienTai + soLuongHoan);
                     chiTietSanPhamRepository.save(ctsp);
-                    
-                    System.out.println("✅ [HoaDonService] Hoàn " + soLuongHoan + " sản phẩm về kho. Tồn kho mới: " + ctsp.getSoLuongTon());
+
+                    System.out.println("✅ [HoaDonService] Hoàn " + soLuongHoan + " sản phẩm về kho. Tồn kho mới: "
+                            + ctsp.getSoLuongTon());
                 }
             }
-            
+
             // 5. Cập nhật trạng thái hóa đơn
             hoaDon.setTrangThai(TrangThaiHoaDon.DA_HUY);
             hoaDon = hoaDonRepository.save(hoaDon);
-            
+
             System.out.println("✅ [HoaDonService] Đã hủy đơn hàng: " + hoaDon.getMa());
-            
+
             // 6. Gửi WebSocket notification
             try {
                 webSocketNotificationService.notifyOrderStatusChanged(
                         hoaDon.getId(),
                         hoaDon.getTrangThai().ordinal(),
-                        TrangThaiHoaDon.DA_HUY.ordinal()
-                );
+                        TrangThaiHoaDon.DA_HUY.ordinal());
             } catch (Exception e) {
                 System.err.println("⚠️ [HoaDonService] Lỗi khi gửi WebSocket notification: " + e.getMessage());
             }
-            
+
             // 7. Build response
             HoaDonDetailResponse response = new HoaDonDetailResponse(hoaDon);
-            
+
             return response;
-            
+
         } catch (ApiException e) {
             throw e;
         } catch (Exception e) {
@@ -872,4 +970,3 @@ public class HoaDonService {
         }
     }
 }
-

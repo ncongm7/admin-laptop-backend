@@ -26,38 +26,38 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Transactional
 public class SerialService {
-    
+
     private final SerialRepository serialRepository;
     private final ChiTietSanPhamRepository chiTietSanPhamRepository;
-    
+
     public SerialResponse createSerial(SerialRequest request) {
         // Check if CTSP exists
         ChiTietSanPham ctsp = chiTietSanPhamRepository.findById(request.getCtspId())
                 .orElseThrow(() -> new RuntimeException("Chi tiết sản phẩm không tồn tại"));
-        
+
         // Check if serial already exists
         if (serialRepository.existsBySerialNo(request.getSerialNo())) {
             throw new RuntimeException("Serial number đã tồn tại: " + request.getSerialNo());
         }
-        
+
         Serial serial = new Serial();
         serial.setId(UUID.randomUUID());
         serial.setCtsp(ctsp);
         serial.setSerialNo(request.getSerialNo());
         serial.setTrangThai(request.getTrangThai());
         serial.setNgayNhap(Instant.now());
-        
+
         Serial savedSerial = serialRepository.save(serial);
-        
+
         // Update stock count
         updateStockCount(request.getCtspId());
-        
+
         return mapToResponse(savedSerial);
     }
-    
+
     public List<SerialResponse> createSerialsBatch(List<SerialRequest> requests) {
         List<SerialResponse> responses = new ArrayList<>();
-        
+
         for (SerialRequest request : requests) {
             try {
                 SerialResponse response = createSerial(request);
@@ -67,13 +67,13 @@ public class SerialService {
                 System.err.println("Error creating serial " + request.getSerialNo() + ": " + e.getMessage());
             }
         }
-        
+
         return responses;
     }
-    
+
     public List<SerialResponse> importSerialsFromExcel(UUID ctspId, MultipartFile file) throws IOException {
         List<String> serialNumbers = new ArrayList<>();
-        
+
         if (file.getOriginalFilename().endsWith(".csv")) {
             // Parse CSV
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream()))) {
@@ -95,13 +95,13 @@ public class SerialService {
             try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
                 Sheet sheet = workbook.getSheetAt(0);
                 boolean isFirstRow = true;
-                
+
                 for (Row row : sheet) {
                     if (isFirstRow) {
                         isFirstRow = false;
                         continue; // Skip header
                     }
-                    
+
                     Cell cell = row.getCell(0);
                     if (cell != null) {
                         String serialNo = "";
@@ -110,7 +110,7 @@ public class SerialService {
                         } else if (cell.getCellType() == CellType.NUMERIC) {
                             serialNo = String.valueOf((long) cell.getNumericCellValue());
                         }
-                        
+
                         if (!serialNo.isEmpty()) {
                             serialNumbers.add(serialNo);
                         }
@@ -120,7 +120,7 @@ public class SerialService {
         } else {
             throw new RuntimeException("Định dạng file không được hỗ trợ. Chỉ hỗ trợ .csv, .xlsx, .xls");
         }
-        
+
         // Create serial requests
         List<SerialRequest> requests = serialNumbers.stream()
                 .map(serialNo -> {
@@ -131,10 +131,10 @@ public class SerialService {
                     return request;
                 })
                 .toList();
-        
+
         return createSerialsBatch(requests);
     }
-    
+
     public List<SerialResponse> getSerialsByUserId(UUID userId) {
         List<Serial> serials = serialRepository.findByUserId(userId);
         return serials.stream().map(this::mapToResponse).toList();
@@ -144,51 +144,49 @@ public class SerialService {
         System.out.println("SerialService: getAllSerial called");
         List<Serial> serials = serialRepository.findAll();
         System.out.println("Found " + serials.size() + " total serials");
-        
+
         List<SerialResponse> responses = serials.stream().map(this::mapToResponse).toList();
         System.out.println("Returning " + responses.size() + " serial responses");
         return responses;
     }
-    
+
     public List<SerialResponse> getSerialsByCtspId(UUID ctspId) {
         System.out.println("SerialService: getSerialsByCtspId called for ctspId: " + ctspId);
         List<Serial> serials = serialRepository.findByCtspId(ctspId);
         System.out.println("Found " + serials.size() + " serials");
-        
+
         for (Serial serial : serials) {
             System.out.println("Serial: " + serial.getSerialNo() + ", Status: " + serial.getTrangThai());
         }
-        
+
         List<SerialResponse> responses = serials.stream().map(this::mapToResponse).toList();
         System.out.println("Returning " + responses.size() + " serial responses");
         return responses;
     }
-    
 
-    
     public SerialResponse getSerialById(UUID id) {
         Serial serial = serialRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Serial không tồn tại"));
         return mapToResponse(serial);
     }
-    
+
     public SerialResponse updateSerial(UUID id, SerialRequest request) {
         Serial serial = serialRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Serial không tồn tại"));
-        
+
         // Check if new serial number already exists (if changed)
-        if (!serial.getSerialNo().equals(request.getSerialNo()) && 
-            serialRepository.existsBySerialNo(request.getSerialNo())) {
+        if (!serial.getSerialNo().equals(request.getSerialNo()) &&
+                serialRepository.existsBySerialNo(request.getSerialNo())) {
             throw new RuntimeException("Serial number đã tồn tại: " + request.getSerialNo());
         }
-        
+
         serial.setSerialNo(request.getSerialNo());
         serial.setTrangThai(request.getTrangThai());
-        
+
         Serial updatedSerial = serialRepository.save(serial);
         return mapToResponse(updatedSerial);
     }
-    
+
     public void updateSerialStatus(UUID id, Integer trangThai) {
         Serial serial = serialRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Serial không tồn tại"));
@@ -200,32 +198,32 @@ public class SerialService {
             updateStockCount(serial.getCtsp().getId());
         }
     }
-    
+
     public void deleteSerial(UUID id) {
         Serial serial = serialRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Serial không tồn tại"));
-        
+
         UUID ctspId = serial.getCtsp().getId();
         serialRepository.delete(serial);
-        
+
         // Update stock count
         updateStockCount(ctspId);
     }
-    
+
     private void updateStockCount(UUID ctspId) {
         int count = serialRepository.countByCtspIdAndTrangThai(ctspId, 1); // Count available serials
         ChiTietSanPham ctsp = chiTietSanPhamRepository.findById(ctspId)
                 .orElseThrow(() -> new RuntimeException("Chi tiết sản phẩm không tồn tại"));
-        
+
         // Đảm bảo version không null (Hibernate @Version yêu cầu giá trị không null)
         if (ctsp.getVersion() == null) {
             ctsp.setVersion(0L);
         }
-        
+
         ctsp.setSoLuongTon(count);
         chiTietSanPhamRepository.save(ctsp);
     }
-    
+
     private SerialResponse mapToResponse(Serial serial) {
         SerialResponse response = new SerialResponse();
         response.setId(serial.getId());
@@ -233,7 +231,7 @@ public class SerialService {
         response.setSerialNo(serial.getSerialNo());
         response.setTrangThai(serial.getTrangThai());
         response.setNgayNhap(serial.getNgayNhap());
-        
+
         // Add product info
         if (serial.getCtsp() != null) {
             response.setMaCtsp(serial.getCtsp().getMaCtsp());
@@ -241,27 +239,28 @@ public class SerialService {
                 response.setTenSanPham(serial.getCtsp().getSanPham().getTenSanPham());
             }
         }
-        
+
         return response;
     }
+
     /**
      * Tìm và giữ serial cho đơn hàng Online
      * Chỉ lấy serial "sạch" (chưa bán và chưa ai giữ)
      */
     public Serial findAndReserveSerial(UUID ctspId, HoaDon order, Instant expiry) {
         List<Serial> availableSerials = serialRepository.findAvailableAndNotReserved(ctspId);
-        
+
         if (availableSerials.isEmpty()) {
             return null; // Không còn hàng sạch
         }
-        
+
         // Lấy cái đầu tiên
         Serial serial = availableSerials.get(0);
         serial.setReservedInOrder(order);
         serial.setReservedExpiredAt(expiry);
         return serialRepository.save(serial);
     }
-    
+
     /**
      * Tìm serial cho POS (ưu tiên sạch, nếu hết thì CƯỚP của Online COD)
      */
@@ -274,60 +273,64 @@ public class SerialService {
             serial.setReservedExpiredAt(Instant.now().plusSeconds(600)); // POS giữ 10 phút nếu chưa thanh toán
             return serialRepository.save(serial);
         }
-        
+
         // 2. Nếu hết hàng sạch, đi CƯỚP của đơn Online COD
         List<Serial> stealableSerials = serialRepository.findStealableSerials(ctspId);
         if (!stealableSerials.isEmpty()) {
             Serial serialToSteal = stealableSerials.get(0);
-            
+
             // Log hành động cướp
-            System.out.println("⚠️ [SerialService] POS Order " + posOrder.getMa() + " đang CƯỚP serial " + serialToSteal.getSerialNo() + 
-                               " từ Online Order " + serialToSteal.getReservedInOrder().getMa());
-            
+            System.out.println("⚠️ [SerialService] POS Order " + posOrder.getMa() + " đang CƯỚP serial "
+                    + serialToSteal.getSerialNo() +
+                    " từ Online Order " + serialToSteal.getReservedInOrder().getMa());
+
             // TODO: Bắn WebSocket thông báo cho user Online bị mất hàng (Future Phase)
-            
+
             // Cập nhật chủ sở hữu mới
             serialToSteal.setReservedInOrder(posOrder);
             serialToSteal.setReservedExpiredAt(Instant.now().plusSeconds(600));
             return serialRepository.save(serialToSteal);
         }
-        
+
         return null; // Hết sạch hàng
     }
-    
+
     /**
      * Hủy giữ serial (khi hủy đơn hoặc hết hạn)
      */
     public void cancelReservation(HoaDon order) {
-        List<Serial> reservedSerials = serialRepository.findAll().stream() // TODO: Optimize query later
-                .filter(s -> s.getReservedInOrder() != null && s.getReservedInOrder().getId().equals(order.getId()))
-                .toList();
-                
+        System.out.println("🔍 [SerialService] cancelReservation called for Order: " + order.getMa());
+        List<Serial> reservedSerials = serialRepository.findByReservedInOrderId(order.getId());
+
+        System.out.println("🔍 [SerialService] Found " + reservedSerials.size() + " reserved serials.");
+
         for (Serial serial : reservedSerials) {
+            System.out.println("  - Releasing Serial: " + serial.getSerialNo());
             serial.setReservedInOrder(null);
             serial.setReservedExpiredAt(null);
             serialRepository.save(serial);
         }
     }
-    
+
     /**
      * Đếm số lượng khả dụng (chỉ tính hàng sạch)
      */
     public int countAvailableClean(UUID ctspId) {
         return serialRepository.findAvailableAndNotReserved(ctspId).size();
     }
+
     /**
      * Giải phóng một số lượng serial cụ thể (khi xóa sản phẩm khỏi giỏ/hóa đơn)
      */
     public void releaseSerials(HoaDon order, UUID ctspId, int quantity) {
         // TODO: Optimize with custom query to fetch limit
-        List<Serial> reservedSerials = serialRepository.findAll().stream() 
-                .filter(s -> s.getReservedInOrder() != null 
+        List<Serial> reservedSerials = serialRepository.findAll().stream()
+                .filter(s -> s.getReservedInOrder() != null
                         && s.getReservedInOrder().getId().equals(order.getId())
                         && s.getCtsp().getId().equals(ctspId))
                 .limit(quantity)
                 .toList();
-        
+
         for (Serial serial : reservedSerials) {
             serial.setReservedInOrder(null);
             serial.setReservedExpiredAt(null);
