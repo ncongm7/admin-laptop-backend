@@ -8,6 +8,31 @@
 USE QuanLyBanHangLaptop_TheoERD1_New;
 GO
 
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[chat_sessions]') AND name = 'current_state')
+BEGIN
+    ALTER TABLE chat_sessions ADD current_state NVARCHAR(50);
+END
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[chat_sessions]') AND name = 'goal')
+BEGIN
+    ALTER TABLE chat_sessions ADD goal NVARCHAR(50);
+END
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[chat_sessions]') AND name = 'progress_data')
+BEGIN
+    ALTER TABLE chat_sessions ADD progress_data NVARCHAR(MAX);
+END
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[chat_sessions]') AND name = 'step_count')
+BEGIN
+    ALTER TABLE chat_sessions ADD step_count INT;
+END
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[chat_sessions]') AND name = 'is_stuck')
+BEGIN
+    ALTER TABLE chat_sessions ADD is_stuck BIT;
+END
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[chat_sessions]') AND name = 'context_data')
+BEGIN
+    ALTER TABLE chat_sessions ADD context_data NVARCHAR(MAX);
+END
+
 -- Add new columns to hoa_don table
 ALTER TABLE hoa_don 
 ADD payment_method VARCHAR(20),

@@ -210,6 +210,7 @@ public class ChatController {
                     consultationData.getUserMessage() != null ? consultationData.getUserMessage()
                             : "Tư vấn chọn laptop",
                     null, // khachHangId can be null for anonymous consultation
+                    null, // conversationId
                     consultationMap);
 
             // Fallback to database-based recommendations if Gemini fails

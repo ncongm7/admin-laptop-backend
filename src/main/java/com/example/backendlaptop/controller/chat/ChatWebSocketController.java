@@ -27,6 +27,7 @@ public class ChatWebSocketController {
     private final ChatbotService chatbotService;
     private final com.example.backendlaptop.service.chat.GeminiChatService geminiChatService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final com.example.backendlaptop.repository.ChatSessionRepository chatSessionRepo;
 
     /**
      * Xử lý tin nhắn mới từ client với AI Chatbot integration
@@ -70,6 +71,14 @@ public class ChatWebSocketController {
 
             // 2. Nếu tin nhắn từ khách hàng → Ưu tiên Gemini, fallback về ChatbotService
             if (Boolean.TRUE.equals(request.getIsFromCustomer())) {
+                // Check if escalated to human
+                if (conversationId != null) {
+                    java.util.Optional<com.example.backendlaptop.entity.ChatSession> sessionOpt = chatSessionRepo.findByConversationId(conversationId);
+                    if (sessionOpt.isPresent() && Boolean.TRUE.equals(sessionOpt.get().getIsEscalated())) {
+                       log.info("🚫 [WebSocket] Conversation {} is escalated to human. Chatbot response skipped.", conversationId);
+                       return;
+                    }
+                }
                 log.info("🤖 [WebSocket] Triggering chatbot for customer message");
 
                 try {
@@ -98,6 +107,7 @@ public class ChatWebSocketController {
                         botResponse = geminiChatService.consultWithGemini(
                                 request.getNoiDung(),
                                 request.getKhachHangId(),
+                                conversationId,
                                 consultationMap);
 
                         if (botResponse != null) {
