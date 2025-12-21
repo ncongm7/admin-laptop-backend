@@ -6,10 +6,12 @@ import com.example.backendlaptop.dto.auth.RegisterRequest;
 import com.example.backendlaptop.entity.KhachHang;
 import com.example.backendlaptop.entity.NhanVien;
 import com.example.backendlaptop.entity.TaiKhoan;
+import com.example.backendlaptop.entity.VaiTro;
 import com.example.backendlaptop.expection.ApiException;
 import com.example.backendlaptop.repository.KhachHangRepository;
 import com.example.backendlaptop.repository.NhanVienRepository;
 import com.example.backendlaptop.repository.TaiKhoanRepository;
+import com.example.backendlaptop.repository.VaiTroRepository;
 import com.example.backendlaptop.service.PhanQuyenSer.KhachHangService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -37,6 +39,9 @@ public class AuthService {
 
     @Autowired
     private KhachHangService khachHangService;
+
+    @Autowired
+    private VaiTroRepository vaiTroRepository;
 
     /**
      * Đăng nhập người dùng
@@ -176,7 +181,14 @@ public class AuthService {
 
         taiKhoan.setTrangThai(1); // Active
         taiKhoan.setNgayTao(Instant.now());
-        taiKhoan.setMaVaiTro(null); // Khách hàng không có vai trò
+        
+        // Gán vai trò KHACH_HANG cho tài khoản khách hàng
+        VaiTro vaiTroKhachHang = vaiTroRepository.findByMaVaiTro("KHACH_HANG")
+                .orElse(null);
+        if (vaiTroKhachHang != null) {
+            taiKhoan.setMaVaiTro(vaiTroKhachHang);
+        }
+        
         taiKhoanRepository.save(taiKhoan);
 
         // 5. Tạo mã khách hàng
