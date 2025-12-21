@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import com.example.backendlaptop.model.TrangThaiHoaDon;
 
 @Service
 public class CustomerVoucherService {
@@ -30,22 +31,25 @@ public class CustomerVoucherService {
     @Autowired
     private PhieuGiamGiaKhachHangRepository phieuGiamGiaKhachHangRepository;
 
+    @Autowired
+    private com.example.backendlaptop.repository.banhang.HoaDonRepository hoaDonRepository;
+
     /**
      * Lấy danh sách voucher khả dụng cho khách hàng
      */
     public List<PhieuGiamGiaResponse> getAvailableVouchers() {
         Instant now = Instant.now();
-        
+
         // Lấy tất cả voucher còn hiệu lực
         List<PhieuGiamGia> allVouchers = phieuGiamGiaRepository.findAll();
-        
+
         return allVouchers.stream()
                 .filter(v -> {
                     // Kiểm tra trạng thái active (1)
                     if (v.getTrangThai() == null || v.getTrangThai() != 1) {
                         return false;
                     }
-                    
+
                     // Kiểm tra thời gian
                     if (v.getNgayBatDau() != null && now.isBefore(v.getNgayBatDau())) {
                         return false;
@@ -53,17 +57,17 @@ public class CustomerVoucherService {
                     if (v.getNgayKetThuc() != null && now.isAfter(v.getNgayKetThuc())) {
                         return false;
                     }
-                    
+
                     // Kiểm tra số lượng còn lại
                     if (v.getSoLuongDung() != null && v.getSoLuongDung() <= 0) {
                         return false;
                     }
-                    
+
                     // Không lấy voucher riêng tư (riengTu = true)
                     if (v.getRiengTu() != null && v.getRiengTu()) {
                         return false;
                     }
-                    
+
                     return true;
                 })
                 .map(PhieuGiamGiaResponse::new)
@@ -79,7 +83,8 @@ public class CustomerVoucherService {
                 .orElseThrow(() -> new ApiException("Mã giảm giá không tồn tại", "VOUCHER_NOT_FOUND"));
 
         // Validate voucher
-        String validationError = validateVoucher(voucher);
+        // Validate voucher
+        String validationError = validateVoucher(voucher, khachHangId);
         if (validationError != null) {
             VoucherApplyResponse response = new VoucherApplyResponse();
             response.setSuccess(false);
@@ -91,13 +96,13 @@ public class CustomerVoucherService {
 
         // Lấy giỏ hàng hiện tại
         var cart = customerGioHangService.getCart(khachHangId);
-        
+
         // Validate giá trị đơn hàng tối thiểu
-        if (voucher.getHoaDonToiThieu() != null && 
-            cart.getSubtotal().compareTo(voucher.getHoaDonToiThieu()) < 0) {
+        if (voucher.getHoaDonToiThieu() != null &&
+                cart.getSubtotal().compareTo(voucher.getHoaDonToiThieu()) < 0) {
             VoucherApplyResponse response = new VoucherApplyResponse();
             response.setSuccess(false);
-            response.setMessage("Đơn hàng tối thiểu " + formatCurrency(voucher.getHoaDonToiThieu()) 
+            response.setMessage("Đơn hàng tối thiểu " + formatCurrency(voucher.getHoaDonToiThieu())
                     + " để áp dụng mã giảm giá này");
             response.setDiscountAmount(BigDecimal.ZERO);
             response.setUpdatedCart(null);
@@ -125,7 +130,10 @@ public class CustomerVoucherService {
     /**
      * Validate voucher có thể sử dụng hay không
      */
-    private String validateVoucher(PhieuGiamGia voucher) {
+    /**
+     * Validate voucher có thể sử dụng hay không
+     */
+    private String validateVoucher(PhieuGiamGia voucher, UUID khachHangId) {
         Instant now = Instant.now();
 
         // Kiểm tra trạng thái
@@ -141,9 +149,36 @@ public class CustomerVoucherService {
             return "Mã giảm giá đã hết hạn";
         }
 
-        // Kiểm tra số lượng
-        if (voucher.getSoLuongDung() != null && voucher.getSoLuongDung() <= 0) {
-            return "Mã giảm giá đã hết lượt sử dụng";
+        // Kiểm tra số lượng (với voucher thường hoặc voucher riêng tư nhưng tính số
+        // lượng chung)
+        if (!Boolean.TRUE.equals(voucher.getRiengTu())) {
+            if (voucher.getSoLuongDung() != null && voucher.getSoLuongDung() <= 0) {
+                return "Mã giảm giá đã hết lượt sử dụng";
+            }
+        }
+
+        // Kiểm tra voucher riêng tư
+        if (Boolean.TRUE.equals(voucher.getRiengTu())) {
+            if (khachHangId == null) {
+                return "Mã giảm giá này chỉ dành cho khách hàng thành viên";
+            }
+
+            // Kiểm tra khách hàng có quyền sử dụng
+            boolean coQuyen = phieuGiamGiaKhachHangRepository.existsByPhieuGiamGia_IdAndKhachHang_Id(
+                    voucher.getId(), khachHangId);
+            if (!coQuyen) {
+                return "Bạn không có quyền sử dụng mã giảm giá này";
+            }
+
+            // Kiểm tra lịch sử sử dụng (đã dùng chưa)
+            // Lưu ý: Không truyền idHoaDon vì ở đây là check trước khi tạo đơn/áp dụng vào
+            // giỏ
+            boolean daSuDung = hoaDonRepository
+                    .existsByIdKhachHang_IdAndIdPhieuGiamGia_IdAndTrangThaiNot(
+                            khachHangId, voucher.getId(), TrangThaiHoaDon.DA_HUY);
+            if (daSuDung) {
+                return "Bạn đã sử dụng mã giảm giá này rồi";
+            }
         }
 
         return null; // Valid
@@ -159,10 +194,10 @@ public class CustomerVoucherService {
             // Giảm theo phần trăm
             discount = orderTotal.multiply(voucher.getGiaTriGiamGia())
                     .divide(BigDecimal.valueOf(100), 2, BigDecimal.ROUND_HALF_UP);
-            
+
             // Áp dụng giới hạn giảm tối đa
-            if (voucher.getSoTienGiamToiDa() != null && 
-                discount.compareTo(voucher.getSoTienGiamToiDa()) > 0) {
+            if (voucher.getSoTienGiamToiDa() != null &&
+                    discount.compareTo(voucher.getSoTienGiamToiDa()) > 0) {
                 discount = voucher.getSoTienGiamToiDa();
             }
         } else if (voucher.getLoaiPhieuGiamGia() == 1) {
@@ -183,7 +218,7 @@ public class CustomerVoucherService {
      * Tái sử dụng logic từ KhuyenMaiService nhưng dựa trên giỏ hàng thay vì hóa đơn
      * Bao gồm cả phiếu giảm giá cá nhân (riêng tư)
      * 
-     * @param khachHangId - ID khách hàng (null nếu chưa đăng nhập)
+     * @param khachHangId     - ID khách hàng (null nếu chưa đăng nhập)
      * @param tongTienGioHang - Tổng tiền giỏ hàng
      * @return Danh sách voucher suggestions
      */
@@ -191,77 +226,42 @@ public class CustomerVoucherService {
         System.out.println("🔍 [CustomerVoucherService] Lấy gợi ý voucher cho giỏ hàng");
         System.out.println("  - ID khách hàng: " + khachHangId);
         System.out.println("  - Tổng tiền giỏ hàng: " + tongTienGioHang);
-        
+
         Instant now = Instant.now();
-        
+
         // Lấy tất cả voucher
         List<PhieuGiamGia> phieuGiamGias = phieuGiamGiaRepository.findAll();
         System.out.println("  - Tổng số voucher trong DB: " + phieuGiamGias.size());
-        
+
         List<VoucherSuggestionResponse> suggestions = phieuGiamGias.stream()
                 .filter(pgg -> {
-                    System.out.println("  🔍 Kiểm tra voucher: " + pgg.getMa() + " - " + pgg.getTenPhieuGiamGia());
-                    
-                    // Kiểm tra trạng thái (1 = Hoạt động)
-                    if (pgg.getTrangThai() == null || pgg.getTrangThai() != 1) {
-                        System.out.println("    ❌ Bị loại: Trạng thái không hoạt động");
+                    // Sử dụng hàm validateVoucher để kiểm tra tất cả điều kiện
+                    // Lưu ý: validateVoucher trả về null nếu hợp lệ
+                    String error = validateVoucher(pgg, khachHangId);
+
+                    if (error != null) {
                         return false;
                     }
-                    
-                    // Kiểm tra ngày hiệu lực
-                    if (pgg.getNgayBatDau() != null && pgg.getNgayBatDau().isAfter(now)) {
-                        System.out.println("    ❌ Bị loại: Chưa đến ngày bắt đầu");
-                        return false;
-                    }
-                    if (pgg.getNgayKetThuc() != null && pgg.getNgayKetThuc().isBefore(now)) {
-                        System.out.println("    ❌ Bị loại: Đã hết hạn");
-                        return false;
-                    }
-                    
-                    // Kiểm tra số lượng còn lại
-                    if (pgg.getSoLuongDung() != null && pgg.getSoLuongDung() <= 0) {
-                        System.out.println("    ❌ Bị loại: Hết lượt sử dụng");
-                        return false;
-                    }
-                    
+
                     // Kiểm tra điều kiện hóa đơn tối thiểu
                     if (pgg.getHoaDonToiThieu() != null && tongTienGioHang.compareTo(pgg.getHoaDonToiThieu()) < 0) {
-                        System.out.println("    ❌ Bị loại: Tổng tiền chưa đủ");
                         return false;
                     }
-                    
-                    // Kiểm tra voucher riêng tư
-                    if (Boolean.TRUE.equals(pgg.getRiengTu())) {
-                        // Voucher riêng tư - chỉ áp dụng cho khách hàng cụ thể
-                        if (khachHangId == null) {
-                            System.out.println("    ❌ Bị loại: Voucher riêng tư nhưng không có khách hàng");
-                            return false;
-                        }
-                        // Kiểm tra khách hàng có quyền sử dụng voucher này không
-                        boolean coQuyen = phieuGiamGiaKhachHangRepository.existsByPhieuGiamGia_IdAndKhachHang_Id(
-                            pgg.getId(), khachHangId);
-                        if (!coQuyen) {
-                            System.out.println("    ❌ Bị loại: Khách hàng không có quyền sử dụng voucher riêng tư này");
-                            return false;
-                        }
-                        System.out.println("    ✅ Khách hàng có quyền sử dụng voucher riêng tư");
-                    }
-                    
-                    System.out.println("    ✅ Voucher hợp lệ!");
+
                     return true;
                 })
                 .map(pgg -> VoucherSuggestionResponse.fromPhieuGiamGia(pgg, tongTienGioHang))
                 .collect(Collectors.toList());
-        
+
         // Sắp xếp theo số tiền giảm dự kiến (giảm dần)
         suggestions.sort((a, b) -> {
             BigDecimal tienGiamA = a.getTienGiamDuKien() != null ? a.getTienGiamDuKien() : BigDecimal.ZERO;
             BigDecimal tienGiamB = b.getTienGiamDuKien() != null ? b.getTienGiamDuKien() : BigDecimal.ZERO;
             return tienGiamB.compareTo(tienGiamA); // Giảm dần
         });
-        
+
         System.out.println("✅ [CustomerVoucherService] Tìm thấy " + suggestions.size() + " voucher hợp lệ");
-        
+
         return suggestions;
     }
 
@@ -272,4 +272,3 @@ public class CustomerVoucherService {
         return String.format("%,dđ", amount.longValue());
     }
 }
-

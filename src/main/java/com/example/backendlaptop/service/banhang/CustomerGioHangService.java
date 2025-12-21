@@ -39,6 +39,9 @@ public class CustomerGioHangService {
     @Autowired
     private HinhAnhRepository hinhAnhRepository;
 
+    @Autowired
+    private com.example.backendlaptop.repository.DotGiamGiaChiTietRepository dotGiamGiaChiTietRepository;
+
     /**
      * Lấy giỏ hàng của khách hàng
      */
@@ -49,7 +52,7 @@ public class CustomerGioHangService {
 
         // Lấy danh sách items trong giỏ
         List<GioHangChiTiet> chiTietList = gioHangChiTietRepository.findByGioHangId(gioHang.getId());
-        
+
         List<CartItemResponse> items = new ArrayList<>();
         BigDecimal subtotal = BigDecimal.ZERO;
 
@@ -101,7 +104,8 @@ public class CustomerGioHangService {
             // Cập nhật số lượng
             int newQuantity = existingItem.getSoLuong() + request.getQuantity();
             if (newQuantity > availableQuantity) {
-                throw new ApiException("Số lượng sản phẩm không đủ. Còn lại: " + availableQuantity, "INSUFFICIENT_STOCK");
+                throw new ApiException("Số lượng sản phẩm không đủ. Còn lại: " + availableQuantity,
+                        "INSUFFICIENT_STOCK");
             }
             existingItem.setSoLuong(newQuantity);
             gioHangChiTietRepository.save(existingItem);
@@ -112,7 +116,11 @@ public class CustomerGioHangService {
             chiTiet.setGioHang(gioHang);
             chiTiet.setChiTietSanPham(ctsp);
             chiTiet.setSoLuong(request.getQuantity());
-            chiTiet.setDonGia(ctsp.getGiaBan());
+
+            // Tính giá sau giảm (nếu có)
+            BigDecimal finalPrice = calculateDiscountedPrice(ctsp);
+            chiTiet.setDonGia(finalPrice);
+
             chiTiet.setNgayThem(Instant.now());
             gioHangChiTietRepository.save(chiTiet);
         }
@@ -144,7 +152,8 @@ public class CustomerGioHangService {
         if (newQuantity > currentQuantity) {
             int availableQuantity = getAvailableQuantity(chiTiet.getChiTietSanPham());
             if (newQuantity > availableQuantity) {
-                throw new ApiException("Số lượng sản phẩm không đủ. Còn lại: " + availableQuantity, "INSUFFICIENT_STOCK");
+                throw new ApiException("Số lượng sản phẩm không đủ. Còn lại: " + availableQuantity,
+                        "INSUFFICIENT_STOCK");
             }
         }
 
@@ -201,20 +210,22 @@ public class CustomerGioHangService {
     /**
      * Validate stock availability for cart items before checkout
      * Kiểm tra tồn kho cho các sản phẩm trong giỏ hàng trước khi thanh toán
-     * @param khachHangId ID khách hàng
-     * @param selectedItemIds Danh sách ID các sản phẩm được chọn để thanh toán (nếu null thì check tất cả)
+     * 
+     * @param khachHangId     ID khách hàng
+     * @param selectedItemIds Danh sách ID các sản phẩm được chọn để thanh toán (nếu
+     *                        null thì check tất cả)
      */
     public CartValidationResponse validateCartStock(UUID khachHangId, List<UUID> selectedItemIds) {
         System.out.println("🔍 [CustomerGioHangService] Validating cart stock for customer: " + khachHangId);
         System.out.println("  - Selected items: " + (selectedItemIds != null ? selectedItemIds.size() : "ALL"));
-        
+
         // Lấy giỏ hàng
         GioHang gioHang = gioHangRepository.findByKhachHangId(khachHangId)
                 .orElseThrow(() -> new ApiException("Giỏ hàng không tồn tại", "CART_NOT_FOUND"));
 
         // Lấy danh sách items trong giỏ
         List<GioHangChiTiet> chiTietList = gioHangChiTietRepository.findByGioHangId(gioHang.getId());
-        
+
         // Filter only selected items if selectedItemIds is provided
         if (selectedItemIds != null && !selectedItemIds.isEmpty()) {
             chiTietList = chiTietList.stream()
@@ -222,62 +233,64 @@ public class CustomerGioHangService {
                     .collect(Collectors.toList());
             System.out.println("  - Filtered to " + chiTietList.size() + " selected items");
         }
-        
+
         if (chiTietList.isEmpty()) {
             return new CartValidationResponse(false, "Không có sản phẩm nào được chọn", new ArrayList<>());
         }
 
         // Kiểm tra từng sản phẩm
         List<CartValidationResponse.OutOfStockItem> outOfStockItems = new ArrayList<>();
-        
+
         for (GioHangChiTiet chiTiet : chiTietList) {
             ChiTietSanPham ctsp = chiTiet.getChiTietSanPham();
             int requestedQuantity = chiTiet.getSoLuong();
             int availableStock = getAvailableQuantity(ctsp);
-            
-            System.out.println("  - Checking: " + ctsp.getSanPham().getTenSanPham() + 
-                             " | Requested: " + requestedQuantity + 
-                             " | Available: " + availableStock);
-            
+
+            System.out.println("  - Checking: " + ctsp.getSanPham().getTenSanPham() +
+                    " | Requested: " + requestedQuantity +
+                    " | Available: " + availableStock);
+
             if (availableStock < requestedQuantity) {
                 // Build variant name
                 StringBuilder variantName = new StringBuilder();
-                if (ctsp.getMauSac() != null) variantName.append(ctsp.getMauSac().getTenMau());
+                if (ctsp.getMauSac() != null)
+                    variantName.append(ctsp.getMauSac().getTenMau());
                 if (ctsp.getCpu() != null) {
-                    if (variantName.length() > 0) variantName.append(" - ");
+                    if (variantName.length() > 0)
+                        variantName.append(" - ");
                     variantName.append(ctsp.getCpu().getTenCpu());
                 }
                 if (ctsp.getRam() != null) {
-                    if (variantName.length() > 0) variantName.append("/");
+                    if (variantName.length() > 0)
+                        variantName.append("/");
                     variantName.append(ctsp.getRam().getTenRam());
                 }
                 if (ctsp.getOCung() != null) {
-                    if (variantName.length() > 0) variantName.append("/");
+                    if (variantName.length() > 0)
+                        variantName.append("/");
                     variantName.append(ctsp.getOCung().getDungLuong());
                 }
-                
-                CartValidationResponse.OutOfStockItem outOfStockItem = 
-                    new CartValidationResponse.OutOfStockItem(
+
+                CartValidationResponse.OutOfStockItem outOfStockItem = new CartValidationResponse.OutOfStockItem(
                         ctsp.getId().toString(),
                         ctsp.getSanPham().getTenSanPham(),
                         variantName.toString(),
                         requestedQuantity,
-                        availableStock
-                    );
+                        availableStock);
                 outOfStockItems.add(outOfStockItem);
-                
+
                 System.out.println("    ❌ OUT OF STOCK!");
             } else {
                 System.out.println("    ✅ Stock OK");
             }
         }
-        
+
         if (!outOfStockItems.isEmpty()) {
             String message = "Có " + outOfStockItems.size() + " sản phẩm không đủ hàng trong kho";
             System.out.println("❌ [CustomerGioHangService] Validation FAILED: " + message);
             return new CartValidationResponse(false, message, outOfStockItems);
         }
-        
+
         System.out.println("✅ [CustomerGioHangService] Validation PASSED");
         return new CartValidationResponse(true, "Tất cả sản phẩm đều có sẵn", new ArrayList<>());
     }
@@ -313,7 +326,7 @@ public class CustomerGioHangService {
         item.setCtspId(ctsp.getId());
         item.setTenSanPham(sanPham.getTenSanPham());
         item.setMaSanPham(sanPham.getMaSanPham());
-        
+
         // Get main image from repository
         String imageUrl = hinhAnhRepository.findMainImageByCtspId(ctsp.getId())
                 .map(HinhAnh::getUrl)
@@ -325,26 +338,29 @@ public class CustomerGioHangService {
                             .orElse("https://via.placeholder.com/80");
                 });
         item.setImageUrl(imageUrl);
-        
+
         // Build variant name
         StringBuilder variantName = new StringBuilder();
         if (ctsp.getMauSac() != null) {
             variantName.append(ctsp.getMauSac().getTenMau());
         }
         if (ctsp.getCpu() != null) {
-            if (variantName.length() > 0) variantName.append(" - ");
+            if (variantName.length() > 0)
+                variantName.append(" - ");
             variantName.append(ctsp.getCpu().getTenCpu());
         }
         if (ctsp.getRam() != null) {
-            if (variantName.length() > 0) variantName.append("/");
+            if (variantName.length() > 0)
+                variantName.append("/");
             variantName.append(ctsp.getRam().getTenRam());
         }
         if (ctsp.getOCung() != null) {
-            if (variantName.length() > 0) variantName.append("/");
+            if (variantName.length() > 0)
+                variantName.append("/");
             variantName.append(ctsp.getOCung().getDungLuong());
         }
         item.setVariantName(variantName.toString());
-        
+
         item.setPrice(chiTiet.getDonGia());
         item.setQuantity(chiTiet.getSoLuong());
         item.setMaxQuantity(getAvailableQuantity(ctsp));
@@ -361,5 +377,40 @@ public class CustomerGioHangService {
         // Count available serials (trangThai = 1 means available)
         return serialRepository.countByCtspIdAndTrangThai(ctsp.getId(), 1);
     }
-}
 
+    /**
+     * Tính giá bán sau khi áp dụng khuyến mãi (nếu có)
+     */
+    private BigDecimal calculateDiscountedPrice(ChiTietSanPham ctsp) {
+        Instant now = Instant.now();
+
+        // Tìm đợt giảm giá chi tiết hợp lệ
+        // Mặc định trả về giá gốc
+        BigDecimal finalPrice = ctsp.getGiaBan();
+
+        if (ctsp.getId() == null)
+            return finalPrice;
+
+        List<com.example.backendlaptop.entity.DotGiamGiaChiTiet> discounts = dotGiamGiaChiTietRepository.findAll();
+
+        java.util.Optional<com.example.backendlaptop.entity.DotGiamGiaChiTiet> activeDiscount = discounts.stream()
+                .filter(d -> d.getIdCtsp() != null && d.getIdCtsp().getId().equals(ctsp.getId()))
+                .filter(d -> d.getDotGiamGia() != null && d.getDotGiamGia().getTrangThai() == 1) // Kích hoạt
+                .filter(d -> {
+                    com.example.backendlaptop.entity.DotGiamGia promo = d.getDotGiamGia();
+                    return promo.getNgayBatDau() != null && promo.getNgayKetThuc() != null
+                            && !now.isBefore(promo.getNgayBatDau())
+                            && !now.isAfter(promo.getNgayKetThuc());
+                })
+                .findFirst();
+
+        if (activeDiscount.isPresent()) {
+            com.example.backendlaptop.entity.DotGiamGiaChiTiet discount = activeDiscount.get();
+            if (discount.getGiaSauKhiGiam() != null) {
+                finalPrice = discount.getGiaSauKhiGiam();
+            }
+        }
+
+        return finalPrice;
+    }
+}
