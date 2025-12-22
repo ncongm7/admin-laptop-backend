@@ -210,8 +210,11 @@ public class SerialService {
         updateStockCount(ctspId);
     }
 
-    private void updateStockCount(UUID ctspId) {
-        int count = serialRepository.countByCtspIdAndTrangThai(ctspId, 1); // Count available serials
+    /**
+     * Đồng bộ tồn kho: Count Serial khả dụng -> Update SoLuongTon
+     */
+    public void updateStockCount(UUID ctspId) {
+        int count = serialRepository.countAvailableForStock(ctspId);
         ChiTietSanPham ctsp = chiTietSanPhamRepository.findById(ctspId)
                 .orElseThrow(() -> new RuntimeException("Chi tiết sản phẩm không tồn tại"));
 
@@ -258,7 +261,12 @@ public class SerialService {
         Serial serial = availableSerials.get(0);
         serial.setReservedInOrder(order);
         serial.setReservedExpiredAt(expiry);
-        return serialRepository.save(serial);
+        Serial saved = serialRepository.save(serial);
+
+        // Sync tồn kho ngay lập tức
+        updateStockCount(ctspId);
+
+        return saved;
     }
 
     /**
@@ -271,7 +279,12 @@ public class SerialService {
             Serial serial = availableSerials.get(0);
             serial.setReservedInOrder(posOrder); // POS giữ luôn (hoặc bán luôn nếu thanh toán xong)
             serial.setReservedExpiredAt(Instant.now().plusSeconds(600)); // POS giữ 10 phút nếu chưa thanh toán
-            return serialRepository.save(serial);
+            Serial saved = serialRepository.save(serial);
+
+            // Sync tồn kho ngay lập tức
+            updateStockCount(ctspId);
+
+            return saved;
         }
 
         // 2. Nếu hết hàng sạch, đi CƯỚP của đơn Online COD
@@ -289,7 +302,12 @@ public class SerialService {
             // Cập nhật chủ sở hữu mới
             serialToSteal.setReservedInOrder(posOrder);
             serialToSteal.setReservedExpiredAt(Instant.now().plusSeconds(600));
-            return serialRepository.save(serialToSteal);
+            Serial saved = serialRepository.save(serialToSteal);
+
+            // Sync tồn kho (thực ra không thay đổi tổng count, nhưng gọi cho chắc)
+            updateStockCount(ctspId);
+
+            return saved;
         }
 
         return null; // Hết sạch hàng
@@ -304,11 +322,26 @@ public class SerialService {
 
         System.out.println("🔍 [SerialService] Found " + reservedSerials.size() + " reserved serials.");
 
+        /*
+         * FIX: Dùng Set để lưu các ctspId cần update, tránh update nhiều lần cùng 1
+         * ctsp
+         */
+        java.util.Set<UUID> affectedCtspIds = new java.util.HashSet<>();
+
         for (Serial serial : reservedSerials) {
             System.out.println("  - Releasing Serial: " + serial.getSerialNo());
             serial.setReservedInOrder(null);
             serial.setReservedExpiredAt(null);
             serialRepository.save(serial);
+
+            if (serial.getCtsp() != null) {
+                affectedCtspIds.add(serial.getCtsp().getId());
+            }
+        }
+
+        // Update stock cho các sp bị ảnh hưởng
+        for (UUID ctspId : affectedCtspIds) {
+            updateStockCount(ctspId);
         }
     }
 
@@ -336,5 +369,8 @@ public class SerialService {
             serial.setReservedExpiredAt(null);
             serialRepository.save(serial);
         }
+
+        // Sync tồn kho ngay lập tức
+        updateStockCount(ctspId);
     }
 }

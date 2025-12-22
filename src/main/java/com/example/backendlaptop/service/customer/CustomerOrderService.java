@@ -167,17 +167,9 @@ public class CustomerOrderService {
                     }
                 }
 
-                // === DEDUCT INVENTORY IMMEDIATELY ===
-                // Trừ tồn kho ngay khi đặt hàng online (không đợi admin xác nhận)
-                // Lý do: Đảm bảo khách online được ưu tiên khi đã đặt trước, tránh bị khách tại
-                // quầy mua mất
-                int soLuongTonHienTai = ctsp.getSoLuongTon();
-                ctsp.setSoLuongTon(soLuongTonHienTai - sp.getSoLuong());
-                chiTietSanPhamRepository.save(ctsp);
-
-                System.out.println("📦 [CustomerOrder] Đã trừ tồn kho ngay: " +
-                        tenSanPham + " (" + sp.getSoLuong() + " máy). " +
-                        "Tồn kho cũ: " + soLuongTonHienTai + " → Tồn kho mới: " + ctsp.getSoLuongTon());
+                // === AUTO-SYNC INVENTORY ===
+                // Tồn kho đã được tự động trừ khi gọi findAndReserveSerial -> syncStock
+                System.out.println("📦 [CustomerOrder] Đã giữ Serial & Sync Tồn kho cho: " + tenSanPham);
             }
 
             // 4.5. Cập nhật tổng tiền
@@ -374,24 +366,9 @@ public class CustomerOrderService {
                         + hoaDon.getTrangThai(), "INVALID_STATUS");
             }
 
-            // 4. Hoàn lại tồn kho (vì đã trừ khi đặt hàng)
-            List<HoaDonChiTiet> chiTietList = new ArrayList<>(hoaDon.getHoaDonChiTiets());
-            for (HoaDonChiTiet hdct : chiTietList) {
-                ChiTietSanPham ctsp = hdct.getChiTietSanPham();
-                int soLuongHoan = hdct.getSoLuong();
-                String tenSanPham = ctsp.getSanPham() != null ? ctsp.getSanPham().getTenSanPham() : "Sản phẩm";
-
-                // Hoàn lại tồn kho
-                int soLuongTonHienTai = ctsp.getSoLuongTon();
-                ctsp.setSoLuongTon(soLuongTonHienTai + soLuongHoan);
-                chiTietSanPhamRepository.save(ctsp);
-
-                System.out.println("📦 [CustomerOrder] Hoàn lại tồn kho: " +
-                        tenSanPham + " (+" + soLuongHoan + " máy). " +
-                        "Tồn kho cũ: " + soLuongTonHienTai + " → Tồn kho mới: " + ctsp.getSoLuongTon());
-            }
-
-            // 4.5. Giải phóng serials đã giữ
+            // 4. Hoàn lại tồn kho & Giải phóng serials
+            // serialService.cancelReservation sẽ tự động giải phóng serial và gọi syncStock
+            // để tăng tồn kho lại
             serialService.cancelReservation(hoaDon);
 
             // 5. Cập nhật trạng thái thành DA_HUY
@@ -427,21 +404,7 @@ public class CustomerOrderService {
             if (hoaDon.getTrangThaiThanhToan() == 1)
                 return; // Đã thanh toán thì không hủy
 
-            // Hoàn lại tồn kho (vì đã trừ khi đặt hàng)
-            List<HoaDonChiTiet> chiTietList = new ArrayList<>(hoaDon.getHoaDonChiTiets());
-            for (HoaDonChiTiet hdct : chiTietList) {
-                ChiTietSanPham ctsp = hdct.getChiTietSanPham();
-                int soLuongHoan = hdct.getSoLuong();
-
-                int soLuongTonHienTai = ctsp.getSoLuongTon();
-                ctsp.setSoLuongTon(soLuongTonHienTai + soLuongHoan);
-                chiTietSanPhamRepository.save(ctsp);
-
-                System.out.println(
-                        "📦 [SYSTEM] Hoàn lại tồn kho: " + soLuongHoan + " máy. Tồn kho mới: " + ctsp.getSoLuongTon());
-            }
-
-            // Giải phóng serials
+            // Hoàn lại tồn kho & Giải phóng serials (Auto-Sync)
             serialService.cancelReservation(hoaDon);
 
             // Cập nhật trạng thái

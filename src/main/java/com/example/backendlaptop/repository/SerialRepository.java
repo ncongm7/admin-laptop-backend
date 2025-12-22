@@ -17,6 +17,9 @@ public interface SerialRepository extends JpaRepository<Serial, UUID> {
 
        boolean existsBySerialNo(String serialNo);
 
+       @Query("SELECT COUNT(s) FROM Serial s WHERE s.ctsp.id = :ctspId AND s.trangThai = 1 AND s.reservedInOrder IS NULL")
+       int countAvailableForStock(@Param("ctspId") UUID ctspId);
+
        @Query("SELECT COUNT(s) FROM Serial s WHERE s.ctsp.id = :ctspId AND s.trangThai = :trangThai")
        int countByCtspIdAndTrangThai(@Param("ctspId") UUID ctspId, @Param("trangThai") Integer trangThai);
 

@@ -90,6 +90,9 @@ public class ThanhToanService {
     @Autowired
     private com.example.backendlaptop.service.diem.TichDiemService tichDiemService;
 
+    @Autowired
+    private com.example.backendlaptop.service.SerialService serialService;
+
     /**
      * Xác Thực Serial Number
      * Endpoint: POST /api/v1/ban-hang/hoa-don/xac-thuc-serial
@@ -384,59 +387,25 @@ public class ThanhToanService {
             serialCountByProduct.put(ctspId, serialCountByProduct.getOrDefault(ctspId, 0) + 1);
         }
 
-        // 4.8. Cập nhật tồn kho cho từng sản phẩm (một lần sau khi xử lý tất cả serial)
+        // 4.8. Đồng bộ tồn kho (Auto-Sync)
+        // Sau khi đã bán (Serial 1 -> 2), tồn kho không đổi về mặt con số (vì Reserved
+        // cũng không tính là Available)
+        // Nhưng ta vẫn gọ sync để đảm bảo nhất quán dữ liệu.
         for (HoaDonChiTiet hdct : hoaDon.getHoaDonChiTiets()) {
-            ChiTietSanPham ctsp = hdct.getChiTietSanPham();
-            UUID ctspId = ctsp.getId();
-            int soLuongTrongDon = hdct.getSoLuong();
-            int soLuongSerialDaXuLy = serialCountByProduct.getOrDefault(ctspId, 0);
+            try {
+                serialService.updateStockCount(hdct.getChiTietSanPham().getId());
 
-            // Kiểm tra số lượng serial khớp với số lượng trong đơn
-            if (soLuongSerialDaXuLy != soLuongTrongDon) {
-                throw new ApiException(
-                        "Số lượng serial đã xử lý (" + soLuongSerialDaXuLy + ") không khớp với số lượng trong đơn ("
-                                + soLuongTrongDon + ")",
-                        "SERIAL_COUNT_MISMATCH");
+                // Reset tạm giữ về 0 (để sạch data, dù logic auto-sync không dùng đến nữa)
+                ChiTietSanPham ctsp = hdct.getChiTietSanPham();
+                ctsp.setSoLuongTamGiu(0);
+                chiTietSanPhamRepository.save(ctsp);
+
+            } catch (Exception e) {
+                System.err.println("⚠️ [ThanhToanService] Lỗi sync stock: " + e.getMessage());
             }
 
-            // Kiểm tra và cập nhật tồn kho
-            int soLuongTon = ctsp.getSoLuongTon() != null ? ctsp.getSoLuongTon() : 0;
-            int soLuongTamGiu = ctsp.getSoLuongTamGiu() != null ? ctsp.getSoLuongTamGiu() : 0;
-
-            // Kiểm tra số lượng tồn kho
-            if (soLuongTon < soLuongTrongDon) {
-                throw new ApiException(
-                        "Không đủ tồn kho cho sản phẩm. Cần: " + soLuongTrongDon + ", Tồn kho: " + soLuongTon,
-                        "INSUFFICIENT_STOCK");
-            }
-
-            // Kiểm tra số lượng tạm giữ
-            if (soLuongTamGiu < soLuongTrongDon) {
-                System.out.println("⚠️ [ThanhToanService] Cảnh báo: Số lượng tạm giữ (" + soLuongTamGiu
-                        + ") nhỏ hơn số lượng trong đơn (" + soLuongTrongDon + ")");
-            }
-
-            // Trừ tồn kho và giải phóng tạm giữ
-            int soLuongTonMoi = soLuongTon - soLuongTrongDon;
-            int soLuongTamGiuMoi = Math.max(0, soLuongTamGiu - soLuongTrongDon);
-
-            if (soLuongTonMoi < 0) {
-                throw new ApiException(
-                        "Lỗi: Số lượng tồn kho không thể âm. Tồn kho hiện tại: " + soLuongTon + ", Cần trừ: "
-                                + soLuongTrongDon,
-                        "INVALID_STOCK");
-            }
-
-            ctsp.setSoLuongTon(soLuongTonMoi);
-            ctsp.setSoLuongTamGiu(soLuongTamGiuMoi);
-
-            // Fix: Đảm bảo version field không null
-            ensureVersionNotNull(ctsp);
-
-            chiTietSanPhamRepository.save(ctsp);
-
-            System.out.println("✅ [ThanhToanService] Đã trừ " + soLuongTrongDon + " sản phẩm, tồn kho còn: "
-                    + soLuongTonMoi + ", tạm giữ còn: " + soLuongTamGiuMoi);
+            System.out.println("✅ [ThanhToanService] Đã thanh toán và đồng bộ kho cho SP: "
+                    + hdct.getChiTietSanPham().getMaCtsp());
         }
 
         // 5. Cập nhật trạng thái hóa đơn dựa trên canGiaoHang và isCOD
@@ -626,13 +595,7 @@ public class ThanhToanService {
     /**
      * Helper method: Đảm bảo version field của ChiTietSanPham không null
      */
-    private void ensureVersionNotNull(ChiTietSanPham ctsp) {
-        if (ctsp.getVersion() == null) {
-            ctsp.setVersion(0L);
-            System.out.println("⚠️ [ThanhToanService] Warning: ChiTietSanPham version was null, initialized to 0 for: "
-                    + ctsp.getMaCtsp());
-        }
-    }
+    // Removed ensureVersionNotNull as it's no longer used
 
     /**
      * Validate và tính lại voucher trước khi thanh toán

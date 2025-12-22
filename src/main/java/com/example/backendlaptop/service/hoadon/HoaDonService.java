@@ -252,21 +252,8 @@ public class HoaDonService {
                 System.out.println("⚠️ [HoaDonService] Chuyển sang trạng thái HỦY -> Tiến hành hoàn kho và trả serial");
 
                 // 1. Hoàn tồn kho
-                if (hoaDon.getHoaDonChiTiets() != null) {
-                    for (HoaDonChiTiet hdct : hoaDon.getHoaDonChiTiets()) {
-                        ChiTietSanPham ctsp = hdct.getChiTietSanPham();
-                        int soLuongHoan = hdct.getSoLuong();
-
-                        // Hoàn lại tồn kho
-                        int soLuongTonHienTai = ctsp.getSoLuongTon();
-                        ctsp.setSoLuongTon(soLuongTonHienTai + soLuongHoan);
-                        chiTietSanPhamRepository.save(ctsp);
-
-                        System.out.println("📦 [HoaDonService] Hoàn lại tồn kho: " +
-                                (ctsp.getSanPham() != null ? ctsp.getSanPham().getTenSanPham() : "Sản phẩm") +
-                                " (+" + soLuongHoan + " máy). Tồn kho mới: " + ctsp.getSoLuongTon());
-                    }
-                }
+                // Tự động xử lý bởi serialService.cancelReservation bên dưới (Auto-Sync)
+                System.out.println("📦 [HoaDonService] Hủy đơn -> Serial sẽ được release và Tồn kho tự động tăng lại.");
 
                 // 2. Xử lý Serial đã bán (cho đơn Đang giao/Hoàn thành)
                 if (hoaDon.getHoaDonChiTiets() != null) {
@@ -582,17 +569,18 @@ public class HoaDonService {
                     serialDaBanRepository.save(serialDaBan);
                 }
 
-                // 5.8. Cập nhật tồn kho (trừ một lần sau khi xử lý tất cả serial)
-                int soLuongTonMoi = soLuongTon - soLuongCan;
-                if (soLuongTonMoi < 0) {
-                    throw new ApiException("Lỗi: Số lượng tồn kho không thể âm cho sản phẩm: " + ctsp.getId(),
-                            "INVALID_STOCK");
+                // 5.8. Đồng bộ tồn kho (Auto-Sync)
+                // Serial chuyển từ Reserved (1) -> Sold (2). Cả 2 đều không được đếm vào Tồn
+                // Kho.
+                // Tuy nhiên gọi hàm sync để đảm bảo nhất quán.
+                try {
+                    serialService.updateStockCount(ctsp.getId());
+                } catch (Exception e) {
+                    System.err.println("⚠️ [HoaDonService] Lỗi sync stock: " + e.getMessage());
                 }
-                ctsp.setSoLuongTon(soLuongTonMoi);
-                chiTietSanPhamRepository.save(ctsp);
 
                 System.out
-                        .println("✅ [HoaDonService] Đã trừ " + soLuongCan + " sản phẩm, tồn kho còn: " + soLuongTonMoi);
+                        .println("✅ [HoaDonService] Đã xác nhận bán " + soLuongCan + " serial.");
             }
 
             // 6. Cập nhật trạng thái hóa đơn
@@ -711,23 +699,9 @@ public class HoaDonService {
             hoaDon.setTrangThai(TrangThaiHoaDon.DA_HUY);
             hoaDon = hoaDonRepository.save(hoaDon);
 
-            // Hoàn lại tồn kho (vì đã trừ khi đặt hàng - logic
-            // CustomerOrderService.taoDonHang)
-            if (hoaDon.getHoaDonChiTiets() != null) {
-                for (HoaDonChiTiet hdct : hoaDon.getHoaDonChiTiets()) {
-                    ChiTietSanPham ctsp = hdct.getChiTietSanPham();
-                    int soLuongHoan = hdct.getSoLuong();
-
-                    // Hoàn lại tồn kho
-                    int soLuongTonHienTai = ctsp.getSoLuongTon();
-                    ctsp.setSoLuongTon(soLuongTonHienTai + soLuongHoan);
-                    chiTietSanPhamRepository.save(ctsp);
-
-                    System.out.println("📦 [HoaDonService] Hoàn lại tồn kho: " +
-                            (ctsp.getSanPham() != null ? ctsp.getSanPham().getTenSanPham() : "Sản phẩm") +
-                            " (+" + soLuongHoan + " máy). Tồn kho mới: " + ctsp.getSoLuongTon());
-                }
-            }
+            // Hoàn lại tồn kho & Giải phóng serials (Auto-Sync)
+            // serialService.cancelReservation quản lý việc này
+            System.out.println("📦 [HoaDonService] Hủy đơn Online -> Release Serial & Sync Stock.");
 
             // Giải phóng serials đã giữ
             serialService.cancelReservation(hoaDon);
