@@ -25,16 +25,16 @@ public class SerialController {
     private final SerialService serialService;
     private final AuthService authService;
     private final TaiKhoanRepository taiKhoanRepository;
-    
+
     @GetMapping("/my-warranties")
     public ResponseEntity<List<SerialResponse>> getMyWarranties(@RequestHeader("Authorization") String authHeader) {
         try {
             LoginResponse.UserInfo user = getCurrentUserFromToken(authHeader);
-            
+
             // User ID from JWT is actually the TaiKhoan ID
             // We need to get customer from KhachHang table using this TaiKhoan ID
             UUID userId = user.getUserId();
-            
+
             List<SerialResponse> serials = serialService.getSerialsByUserId(userId);
             return ResponseEntity.ok(serials);
         } catch (Exception e) {
@@ -51,19 +51,19 @@ public class SerialController {
         String token = authHeader.substring(7);
         return authService.getCurrentUser(token);
     }
-    
+
     @PostMapping
     public ResponseEntity<SerialResponse> createSerial(@Valid @RequestBody SerialRequest request) {
         SerialResponse response = serialService.createSerial(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
-    
+
     @PostMapping("/batch")
     public ResponseEntity<List<SerialResponse>> createSerialsBatch(@Valid @RequestBody List<SerialRequest> requests) {
         List<SerialResponse> responses = serialService.createSerialsBatch(requests);
         return ResponseEntity.status(HttpStatus.CREATED).body(responses);
     }
-    
+
     @PostMapping("/import-excel/{ctspId}")
     public ResponseEntity<List<SerialResponse>> importSerialsFromExcel(
             @PathVariable UUID ctspId,
@@ -75,40 +75,47 @@ public class SerialController {
             return ResponseEntity.badRequest().build();
         }
     }
-    
+
     @GetMapping("/all")
     public ResponseEntity<List<SerialResponse>> getAllSerial() {
         List<SerialResponse> responses = serialService.getAllSerial();
         return ResponseEntity.ok(responses);
     }
-    
+
     @GetMapping("/ctsp/{ctspId}")
     public ResponseEntity<List<SerialResponse>> getSerialsByCtspId(@PathVariable UUID ctspId) {
         List<SerialResponse> responses = serialService.getSerialsByCtspId(ctspId);
         return ResponseEntity.ok(responses);
     }
-    
+
     @GetMapping("/{id}")
     public ResponseEntity<SerialResponse> getSerialById(@PathVariable UUID id) {
         SerialResponse response = serialService.getSerialById(id);
         return ResponseEntity.ok(response);
     }
-    
+
     @PutMapping("/{id}")
-    public ResponseEntity<SerialResponse> updateSerial(@PathVariable UUID id, @Valid @RequestBody SerialRequest request) {
+    public ResponseEntity<SerialResponse> updateSerial(@PathVariable UUID id,
+            @Valid @RequestBody SerialRequest request) {
         SerialResponse response = serialService.updateSerial(id, request);
         return ResponseEntity.ok(response);
     }
-    
+
     @PutMapping("/{id}/trang-thai")
     public ResponseEntity<Void> updateSerialStatus(@PathVariable UUID id, @RequestParam Integer trangThai) {
         serialService.updateSerialStatus(id, trangThai);
         return ResponseEntity.ok().build();
     }
-    
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteSerial(@PathVariable UUID id) {
         serialService.deleteSerial(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/sold")
+    public ResponseEntity<List<com.example.backendlaptop.dto.serial.SoldSerialResponse>> searchSoldSerials(
+            @RequestParam String keyword) {
+        return ResponseEntity.ok(serialService.searchSoldSerials(keyword));
     }
 }

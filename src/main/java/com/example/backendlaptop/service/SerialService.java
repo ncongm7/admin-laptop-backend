@@ -373,4 +373,11 @@ public class SerialService {
         // Sync tồn kho ngay lập tức
         updateStockCount(ctspId);
     }
+
+    /**
+     * Tìm kiếm serial đã bán để bảo hành
+     */
+    public List<com.example.backendlaptop.dto.serial.SoldSerialResponse> searchSoldSerials(String keyword) {
+        return serialRepository.findSoldSerialsByKeyword(keyword);
+    }
 }

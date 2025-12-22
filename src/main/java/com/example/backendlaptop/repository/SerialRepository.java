@@ -72,4 +72,20 @@ public interface SerialRepository extends JpaRepository<Serial, UUID> {
 
        // Tìm serial đang được reserved bởi một order cụ thể
        List<Serial> findByReservedInOrderId(UUID orderId);
+
+       // [Offline Warranty] Tìm kiếm serial đã bán
+       @Query("SELECT new com.example.backendlaptop.dto.serial.SoldSerialResponse(" +
+                     "s.id, s.serialNo, sp.tenSanPham, kh.hoTen, kh.soDienThoai, hd.id, kh.id, hdct.id, sdb.id, sdb.ngayTao) "
+                     +
+                     "FROM SerialDaBan sdb " +
+                     "JOIN sdb.idSerial s " +
+                     "JOIN s.ctsp ctsp " +
+                     "JOIN ctsp.sanPham sp " +
+                     "JOIN sdb.idHoaDonChiTiet hdct " +
+                     "JOIN hdct.hoaDon hd " +
+                     "JOIN hd.idKhachHang kh " +
+                     "WHERE (s.serialNo LIKE %:keyword% OR kh.soDienThoai LIKE %:keyword% OR hd.sdt LIKE %:keyword%) " +
+                     "AND hd.trangThai IN (1, 3, 4)") // Đã bán, Đang giao, Hoàn thành
+       List<com.example.backendlaptop.dto.serial.SoldSerialResponse> findSoldSerialsByKeyword(
+                     @Param("keyword") String keyword);
 }
