@@ -57,6 +57,27 @@ public class CustomerOrderService {
             KhachHang khachHang = khachHangRepository.findById(request.getKhachHangId())
                     .orElseThrow(() -> new ApiException("Không tìm thấy khách hàng", "CUSTOMER_NOT_FOUND"));
 
+            // [NEW] RULE: Giới hạn số lượng đơn hàng CHO_THANH_TOAN (Chờ xác nhận) <= 2
+            long pendingOrdersCount = hoaDonRepository.countByIdKhachHang_IdAndTrangThai(
+                    khachHang.getId(),
+                    TrangThaiHoaDon.CHO_THANH_TOAN);
+            if (pendingOrdersCount >= 2) {
+                throw new ApiException(
+                        "Bạn đang có " + pendingOrdersCount
+                                + " đơn hàng chờ xác nhận. Vui lòng hủy bớt hoặc chờ nhân viên xác nhận trước khi đặt thêm.",
+                        "ORDER_LIMIT_EXCEEDED");
+            }
+
+            // [NEW] RULE: Giới hạn số lượng sản phẩm trong đơn <= 2
+            int totalQuantity = request.getSanPhams().stream()
+                    .mapToInt(TaoDonHangCustomerRequest.SanPhamDonHang::getSoLuong)
+                    .sum();
+            if (totalQuantity > 2) {
+                throw new ApiException(
+                        "Mỗi đơn hàng online chỉ được mua tối đa 2 sản phẩm (Tổng số lượng).",
+                        "QUANTITY_LIMIT_EXCEEDED");
+            }
+
             // 2. Tạo hóa đơn mới
             HoaDon hoaDon = new HoaDon();
             hoaDon.setIdKhachHang(khachHang);
