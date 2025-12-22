@@ -27,6 +27,12 @@ public class ChatRequest {
     @NotNull(message = "isFromCustomer không được để trống")
     private Boolean isFromCustomer; // true = từ khách hàng, false = từ nhân viên
     
+    private Boolean isBotMessage; // true = tin nhắn từ bot tự động
+    
+    private java.math.BigDecimal botConfidence; // Độ tin cậy của bot (0.0 - 1.0)
+    
+    private String intentDetected; // Intent được phát hiện
+    
     // Consultation data for Gemini AI (optional)
     private java.util.Map<String, Object> consultationData;
 }

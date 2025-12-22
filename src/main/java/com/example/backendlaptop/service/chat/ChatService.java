@@ -88,6 +88,20 @@ public class ChatService {
         chat.setMessageType(request.getMessageType() != null ? request.getMessageType() : "text");
         chat.setFileUrl(request.getFileUrl());
         chat.setIsRead(false);
+        // Set isBotMessage if provided
+        if (request.getIsBotMessage() != null) {
+            chat.setIsBotMessage(request.getIsBotMessage());
+        } else {
+            chat.setIsBotMessage(false); // Default to false if not specified
+        }
+        
+        // Set bot metadata if provided (for bot messages)
+        if (request.getBotConfidence() != null) {
+            chat.setBotConfidence(request.getBotConfidence());
+        }
+        if (request.getIntentDetected() != null) {
+            chat.setIntentDetected(request.getIntentDetected());
+        }
 
         // Xử lý conversation_id
         UUID conversationId = request.getConversationId();
@@ -307,6 +321,17 @@ public class ChatService {
         if (chat.getReplyTo() != null) {
             response.setReplyToId(chat.getReplyTo().getId());
             response.setReplyTo(mapToResponse(chat.getReplyTo()));
+        }
+
+        // Map bot message fields
+        if (chat.getIsBotMessage() != null) {
+            response.setIsBotMessage(chat.getIsBotMessage());
+        }
+        if (chat.getBotConfidence() != null) {
+            response.setBotConfidence(chat.getBotConfidence());
+        }
+        if (chat.getIntentDetected() != null) {
+            response.setIntentDetected(chat.getIntentDetected());
         }
 
         return response;

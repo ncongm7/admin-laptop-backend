@@ -53,13 +53,19 @@ public class ChatWebSocketController {
 
                 // Broadcast tin nhắn (cả customer và staff) đến conversation
                 if (conversationId != null) {
-                    messagingTemplate.convertAndSend("/topic/conversation/" + conversationId, customerMessage);
+                    String topic = "/topic/conversation/" + conversationId;
+                    messagingTemplate.convertAndSend(topic, customerMessage);
                     String messageType = Boolean.TRUE.equals(request.getIsFromCustomer()) ? "customer" : "staff";
-                    log.info("✅ [WebSocket] Broadcasted {} message to /topic/conversation/{}", messageType,
-                            conversationId);
+                    log.info("✅ [WebSocket] Broadcasted {} message to topic: {}, messageId: {}, content: {}",
+                            messageType, topic, customerMessage.getId(),
+                            customerMessage.getNoiDung() != null 
+                                ? customerMessage.getNoiDung().substring(0, Math.min(50, customerMessage.getNoiDung().length()))
+                                : "null");
+                } else {
+                    log.warn(" [WebSocket] Cannot broadcast message: conversationId is null");
                 }
             } catch (Exception saveError) {
-                log.warn("⚠️ [WebSocket] Không thể lưu tin nhắn (có thể khách hàng chưa đăng ký): {}",
+                log.warn("[WebSocket] Không thể lưu tin nhắn (có thể khách hàng chưa đăng ký): {}",
                         saveError.getMessage());
                 // Vẫn tiếp tục xử lý để Gemini có thể trả lời
                 // Tạo conversationId tạm thời nếu chưa có
@@ -71,22 +77,35 @@ public class ChatWebSocketController {
 
             // 2. Nếu tin nhắn từ khách hàng → Ưu tiên Gemini, fallback về ChatbotService
             if (Boolean.TRUE.equals(request.getIsFromCustomer())) {
-                // Check if escalated to human
+                // Check if escalated to human (with error handling for missing database columns)
+                boolean isEscalated = false;
                 if (conversationId != null) {
-                    java.util.Optional<com.example.backendlaptop.entity.ChatSession> sessionOpt = chatSessionRepo.findByConversationId(conversationId);
-                    if (sessionOpt.isPresent() && Boolean.TRUE.equals(sessionOpt.get().getIsEscalated())) {
-                       log.info("🚫 [WebSocket] Conversation {} is escalated to human. Chatbot response skipped.", conversationId);
-                       return;
+                    try {
+                        java.util.Optional<com.example.backendlaptop.entity.ChatSession> sessionOpt = chatSessionRepo.findByConversationId(conversationId);
+                        if (sessionOpt.isPresent() && Boolean.TRUE.equals(sessionOpt.get().getIsEscalated())) {
+                            isEscalated = true;
+                            log.info(" [WebSocket] Conversation {} is escalated to human. Chatbot response skipped.", conversationId);
+                        }
+                    } catch (Exception dbError) {
+                        // Database schema might be missing columns (e.g., current_state)
+                        // Log warning but continue - bot should still respond
+                        log.warn(" [WebSocket] Error checking escalation status (database schema might need update): {}. Continuing with bot response.", dbError.getMessage());
+                        // Continue - don't block bot response due to schema issues
                     }
                 }
-                log.info("🤖 [WebSocket] Triggering chatbot for customer message");
+                
+                if (isEscalated) {
+                    return;
+                }
+                
+                log.info("🤖 [WebSocket] Triggering chatbot for customer message: {}", request.getNoiDung());
 
                 try {
                     ChatbotResponse botResponse = null;
 
                     // Ưu tiên 1: Thử Gemini AI trước (cho tất cả tin nhắn)
                     try {
-                        log.info("✨ [WebSocket] Attempting Gemini AI response");
+                        log.info("[WebSocket] Attempting Gemini AI response");
 
                         // Build consultation map từ tin nhắn thông thường
                         java.util.Map<String, Object> consultationMap = new java.util.HashMap<>();
@@ -111,12 +130,12 @@ public class ChatWebSocketController {
                                 consultationMap);
 
                         if (botResponse != null) {
-                            log.info("✅ [WebSocket] Gemini AI responded successfully");
+                            log.info(" [WebSocket] Gemini AI responded successfully");
                         } else {
-                            log.warn("⚠️ [WebSocket] Gemini returned null, falling back to ChatbotService");
+                            log.warn(" [WebSocket] Gemini returned null, falling back to ChatbotService");
                         }
                     } catch (Exception geminiError) {
-                        log.warn("⚠️ [WebSocket] Gemini AI error: {}, falling back to ChatbotService",
+                        log.warn(" [WebSocket] Gemini AI error: {}, falling back to ChatbotService",
                                 geminiError.getMessage());
                         botResponse = null;
                     }
@@ -124,17 +143,17 @@ public class ChatWebSocketController {
                     // Fallback: nếu Groq fail → dùng ChatbotService (không menu), nếu vẫn fail thì
                     // báo mềm
                     if (botResponse == null) {
-                        log.warn("🔄 [WebSocket] Groq null → fallback ChatbotService");
+                        log.warn(" [WebSocket] Groq null → fallback ChatbotService");
                         try {
                             ChatResponse tempCustomer = buildTempCustomerMessage(request, conversationId);
                             botResponse = chatbotService.processCustomerMessage(tempCustomer);
                         } catch (Exception fallbackErr) {
-                            log.warn("⚠️ [WebSocket] ChatbotService fallback error: {}", fallbackErr.getMessage());
+                            log.warn(" [WebSocket] ChatbotService fallback error: {}", fallbackErr.getMessage());
                         }
                     }
                     if (botResponse == null) {
                         log.warn(
-                                "🔄 [WebSocket] Both Groq and ChatbotService failed, using guaranteed fallback with menu");
+                                " [WebSocket] Both Groq and ChatbotService failed, using guaranteed fallback with menu");
 
                         // GUARANTEED FALLBACK - Never fails
                         java.util.List<com.example.backendlaptop.dto.chat.QuickReplyDTO> fallbackMenu = java.util.Arrays
@@ -146,7 +165,7 @@ public class ChatWebSocketController {
                                                 .icon("bi bi-laptop")
                                                 .build(),
                                         com.example.backendlaptop.dto.chat.QuickReplyDTO.builder()
-                                                .replyText("💰 Xem b ảng giá")
+                                                .replyText("💰 Xem bảng giá")
                                                 .replyValue("Cho tôi xem bảng giá laptop")
                                                 .replyType("intent_trigger")
                                                 .icon("bi bi-cash")
@@ -176,7 +195,7 @@ public class ChatWebSocketController {
                                 .build();
                     }
 
-                    // Gửi bot response (nếu có)
+                    // Gửi bot response (nếu có) - ĐẢM BẢO LUÔN CÓ RESPONSE
                     if (botResponse != null && botResponse.getResponseText() != null) {
                         // Tạo ChatResponse cho bot message
                         ChatResponse botMessageResponse = new ChatResponse();
@@ -185,29 +204,35 @@ public class ChatWebSocketController {
                         botMessageResponse.setNoiDung(botResponse.getResponseText());
                         botMessageResponse.setMessageType("text");
                         botMessageResponse.setIsFromCustomer(false);
-                        botMessageResponse.setIsBotMessage(true);
+                        botMessageResponse.setIsBotMessage(true); // QUAN TRỌNG: Đánh dấu là bot message
                         botMessageResponse.setBotConfidence(botResponse.getConfidence());
                         botMessageResponse.setIntentDetected(botResponse.getIntentCode());
+                        botMessageResponse.setNgayPhanHoi(java.time.Instant.now());
                         botMessageResponse.setCreatedAt(java.time.Instant.now());
 
                         // Attach quick replies if available
                         if (botResponse.getQuickReplies() != null && !botResponse.getQuickReplies().isEmpty()) {
                             botMessageResponse.setQuickReplies(botResponse.getQuickReplies());
+                            log.info("📋 [WebSocket] Bot response includes {} quick replies", botResponse.getQuickReplies().size());
                         }
 
                         // Delay nhỏ để realistic
-                        Thread.sleep(800);
+                        try {
+                            Thread.sleep(800);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
 
                         // Broadcast bot response
                         String topic = "/topic/conversation/" + conversationId;
                         messagingTemplate.convertAndSend(topic, botMessageResponse);
-                        log.info("🤖 [WebSocket] Sent bot response to topic: {}, intent: {}, message: {}",
+                        log.info("🤖 [WebSocket] ✅ Sent bot response to topic: {}, intent: {}, isBotMessage: true, message: {}",
                                 topic, botResponse.getIntentCode(),
                                 botMessageResponse.getNoiDung() != null ? botMessageResponse.getNoiDung().substring(0,
                                         Math.min(50, botMessageResponse.getNoiDung().length())) : "null");
 
-                        // Thử lưu bot message vào database (nếu có thể)
-                        if (messageSaved && Boolean.TRUE.equals(botResponse.getShouldSave())) {
+                        // ✅ QUAN TRỌNG: Luôn lưu bot message vào database để có lịch sử
+                        if (messageSaved) {
                             try {
                                 ChatRequest botRequest = new ChatRequest();
                                 botRequest.setKhachHangId(request.getKhachHangId());
@@ -216,11 +241,24 @@ public class ChatWebSocketController {
                                 botRequest.setConversationId(conversationId);
                                 botRequest.setMessageType("text");
                                 botRequest.setIsFromCustomer(false);
-                                chatService.sendMessage(botRequest);
+                                botRequest.setIsBotMessage(true); // QUAN TRỌNG: Đánh dấu là bot message
+                                botRequest.setBotConfidence(botResponse.getConfidence()); // Lưu confidence
+                                botRequest.setIntentDetected(botResponse.getIntentCode()); // Lưu intent
+                                ChatResponse savedBotMessage = chatService.sendMessage(botRequest);
+                                
+                                // Update botMessageResponse với ID thật từ database
+                                if (savedBotMessage != null && savedBotMessage.getId() != null) {
+                                    botMessageResponse.setId(savedBotMessage.getId());
+                                    log.info("💾 [WebSocket] Bot message saved to database with ID: {}, intent: {}", savedBotMessage.getId(), botResponse.getIntentCode());
+                                }
                             } catch (Exception saveBotError) {
-                                log.warn("⚠️ [WebSocket] Không thể lưu bot message: {}", saveBotError.getMessage());
+                                log.warn("⚠️ [WebSocket] Không thể lưu bot message vào database: {}. Message đã được broadcast nhưng không có trong lịch sử.", saveBotError.getMessage());
                             }
+                        } else {
+                            log.warn("⚠️ [WebSocket] Không thể lưu bot message vì customer message chưa được lưu (conversationId: {})", conversationId);
                         }
+                    } else {
+                        log.error("❌ [WebSocket] Bot response is NULL or empty! This should not happen due to guaranteed fallback.");
 
                         // Nếu cần escalate, gửi notification
                         if (Boolean.TRUE.equals(botResponse.getShouldEscalate())) {
@@ -233,19 +271,99 @@ public class ChatWebSocketController {
                     }
                 } catch (Exception botError) {
                     log.error("❌ [WebSocket] Lỗi khi xử lý chatbot: ", botError);
-                    // Không throw, để khách vẫn nhận được tin nhắn của họ
+                    
+                    // GUARANTEED FALLBACK: Ngay cả khi có lỗi, vẫn gửi response
+                    try {
+                        log.warn("🔄 [WebSocket] Using guaranteed fallback due to error");
+                        java.util.List<com.example.backendlaptop.dto.chat.QuickReplyDTO> fallbackMenu = java.util.Arrays.asList(
+                                com.example.backendlaptop.dto.chat.QuickReplyDTO.builder()
+                                        .replyText("🛒 Tư vấn chọn laptop")
+                                        .replyValue("Tư vấn chọn laptop phù hợp với nhu cầu của tôi")
+                                        .replyType("intent_trigger")
+                                        .icon("bi bi-laptop")
+                                        .build(),
+                                com.example.backendlaptop.dto.chat.QuickReplyDTO.builder()
+                                        .replyText("💰 Xem bảng giá")
+                                        .replyValue("Cho tôi xem bảng giá laptop")
+                                        .replyType("intent_trigger")
+                                        .icon("bi bi-cash")
+                                        .build(),
+                                com.example.backendlaptop.dto.chat.QuickReplyDTO.builder()
+                                        .replyText("🛡️ Chính sách bảo hành")
+                                        .replyValue("Thông tin về chính sách bảo hành")
+                                        .replyType("intent_trigger")
+                                        .icon("bi bi-shield-check")
+                                        .build(),
+                                com.example.backendlaptop.dto.chat.QuickReplyDTO.builder()
+                                        .replyText("👤 Kết nối nhân viên")
+                                        .replyValue("Tôi muốn nói chuyện với nhân viên")
+                                        .replyType("escalate")
+                                        .icon("bi bi-person-headset")
+                                        .build());
+
+                        ChatResponse fallbackResponse = new ChatResponse();
+                        fallbackResponse.setId(UUID.randomUUID());
+                        fallbackResponse.setConversationId(conversationId);
+                        fallbackResponse.setNoiDung("Xin chào! Mình là trợ lý AI của Dell Store. Mình có thể giúp gì cho bạn?\n\n" +
+                                "Bạn có thể chọn một trong các tùy chọn bên dưới hoặc gửi câu hỏi trực tiếp cho mình.");
+                        fallbackResponse.setMessageType("text");
+                        fallbackResponse.setIsFromCustomer(false);
+                        fallbackResponse.setIsBotMessage(true);
+                        fallbackResponse.setBotConfidence(java.math.BigDecimal.valueOf(1.0));
+                        fallbackResponse.setIntentDetected("GUARANTEED_FALLBACK");
+                        fallbackResponse.setNgayPhanHoi(java.time.Instant.now());
+                        fallbackResponse.setCreatedAt(java.time.Instant.now());
+                        fallbackResponse.setQuickReplies(fallbackMenu);
+
+                        String topic = "/topic/conversation/" + conversationId;
+                        messagingTemplate.convertAndSend(topic, fallbackResponse);
+                        log.info("🤖 [WebSocket] ✅ Sent guaranteed fallback response to topic: {}", topic);
+                        
+                        // ✅ Lưu guaranteed fallback message vào database
+                        if (messageSaved) {
+                            try {
+                                ChatRequest fallbackRequest = new ChatRequest();
+                                fallbackRequest.setKhachHangId(request.getKhachHangId());
+                                fallbackRequest.setNhanVienId(null);
+                                fallbackRequest.setNoiDung(fallbackResponse.getNoiDung());
+                                fallbackRequest.setConversationId(conversationId);
+                                fallbackRequest.setMessageType("text");
+                                fallbackRequest.setIsFromCustomer(false);
+                                fallbackRequest.setIsBotMessage(true);
+                                fallbackRequest.setBotConfidence(java.math.BigDecimal.valueOf(1.0));
+                                fallbackRequest.setIntentDetected("GUARANTEED_FALLBACK");
+                                ChatResponse savedFallback = chatService.sendMessage(fallbackRequest);
+                                if (savedFallback != null && savedFallback.getId() != null) {
+                                    fallbackResponse.setId(savedFallback.getId());
+                                    log.info("💾 [WebSocket] Guaranteed fallback message saved to database with ID: {}", savedFallback.getId());
+                                }
+                            } catch (Exception saveFallbackError) {
+                                log.warn("⚠️ [WebSocket] Không thể lưu guaranteed fallback message: {}", saveFallbackError.getMessage());
+                            }
+                        }
+                    } catch (Exception fallbackError) {
+                        log.error("❌ [WebSocket] Even guaranteed fallback failed: ", fallbackError);
+                    }
                 }
             } else {
                 // 3. Tin nhắn từ nhân viên → KHÔNG trigger chatbot, chỉ save và broadcast
                 log.info("👤 [WebSocket] Staff message, no chatbot involved");
 
                 // Staff message đã được lưu và broadcast ở bước 1
-                // Chỉ cần log để track
-                log.info("✅ [WebSocket] Staff message to conversation {}: {}",
-                        conversationId,
-                        request.getNoiDung() != null
-                                ? request.getNoiDung().substring(0, Math.min(50, request.getNoiDung().length()))
-                                : "null");
+                // Đảm bảo message đã được broadcast (nếu chưa thì broadcast lại)
+                if (conversationId != null && customerMessage != null) {
+                    String topic = "/topic/conversation/" + conversationId;
+                    // Broadcast lại để đảm bảo customer nhận được (nếu chưa nhận ở bước 1)
+                    messagingTemplate.convertAndSend(topic, customerMessage);
+                    log.info("✅ [WebSocket] Re-broadcasted staff message to topic: {}, messageId: {}, content: {}",
+                            topic, customerMessage.getId(),
+                            customerMessage.getNoiDung() != null
+                                    ? customerMessage.getNoiDung().substring(0, Math.min(50, customerMessage.getNoiDung().length()))
+                                    : "null");
+                } else {
+                    log.warn("⚠️ [WebSocket] Staff message not broadcasted: conversationId={}, customerMessage={}",
+                            conversationId, customerMessage != null ? "exists" : "null");
+                }
             }
 
         } catch (Exception e) {
