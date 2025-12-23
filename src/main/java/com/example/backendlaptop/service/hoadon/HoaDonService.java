@@ -29,7 +29,9 @@ import jakarta.persistence.criteria.Predicate;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -257,6 +259,9 @@ public class HoaDonService {
 
                 // 2. Xử lý Serial đã bán (cho đơn Đang giao/Hoàn thành)
                 if (hoaDon.getHoaDonChiTiets() != null) {
+                    // Tracking set để update tồn kho 1 lần/sản phẩm
+                    Set<UUID> affectedCtspIds = new HashSet<>();
+
                     for (HoaDonChiTiet hdct : hoaDon.getHoaDonChiTiets()) {
                         // Tìm serial đã bán gắn với chi tiết này
                         List<SerialDaBan> serialsDaBan = serialDaBanRepository.findByIdHoaDonChiTiet_Id(hdct.getId());
@@ -276,10 +281,30 @@ public class HoaDonService {
                                     serial.setTrangThai(1); // Set về Available (1)
                                     serialRepository.save(serial);
                                     System.out.println("  - Serial " + serial.getSerialNo() + " -> Available");
+
+                                    // Add to tracking set
+                                    if (serial.getCtsp() != null) {
+                                        affectedCtspIds.add(serial.getCtsp().getId());
+                                    }
                                 }
                             }
                             // Xóa bản ghi đã bán
                             serialDaBanRepository.deleteAll(serialsDaBan);
+                        }
+                    }
+
+                    // Cập nhật lại tồn kho (Sync Stock) cho các sản phẩm bị ảnh hưởng
+                    if (!affectedCtspIds.isEmpty()) {
+                        System.out.println("📦 [HoaDonService] Đang cập nhật lại tồn kho cho " + affectedCtspIds.size()
+                                + " sản phẩm...");
+                        for (UUID ctspId : affectedCtspIds) {
+                            try {
+                                serialService.updateStockCount(ctspId);
+                                System.out.println("   -> Updated stock for CTSP: " + ctspId);
+                            } catch (Exception e) {
+                                System.err.println(
+                                        "   ⚠️ Failed to update stock for CTSP " + ctspId + ": " + e.getMessage());
+                            }
                         }
                     }
                 }
