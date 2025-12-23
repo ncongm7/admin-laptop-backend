@@ -44,7 +44,7 @@ public class BanHangHoaDonService {
     @Transactional
     public HoaDonResponse taoHoaDonChoMoi(TaoHoaDonRequest request) {
         HoaDon hoaDon = new HoaDon();
-        
+
         // Sinh mã hóa đơn tự động
         hoaDon.setMa("HD" + System.currentTimeMillis());
         hoaDon.setNgayTao(Instant.now());
@@ -65,8 +65,10 @@ public class BanHangHoaDonService {
                 if (nhanVien != null) {
                     hoaDon.setIdNhanVien(nhanVien);
                 } else {
-                    // Log warning nhưng không throw exception - cho phép tạo hóa đơn không có nhân viên
-                    System.err.println("Warning: Không tìm thấy nhân viên với ID: " + request.getNhanVienId() + ". Tạo hóa đơn không có nhân viên.");
+                    // Log warning nhưng không throw exception - cho phép tạo hóa đơn không có nhân
+                    // viên
+                    System.err.println("Warning: Không tìm thấy nhân viên với ID: " + request.getNhanVienId()
+                            + ". Tạo hóa đơn không có nhân viên.");
                 }
             } catch (Exception e) {
                 System.err.println("Lỗi khi tìm nhân viên: " + e.getMessage());
@@ -77,7 +79,8 @@ public class BanHangHoaDonService {
         // Gán khách hàng (có thể null nếu là khách vãng lai)
         if (request.getKhachHangId() != null) {
             KhachHang khachHang = khachHangRepository.findById(request.getKhachHangId())
-                    .orElseThrow(() -> new ApiException("Không tìm thấy khách hàng với ID: " + request.getKhachHangId(), "NOT_FOUND"));
+                    .orElseThrow(() -> new ApiException("Không tìm thấy khách hàng với ID: " + request.getKhachHangId(),
+                            "NOT_FOUND"));
             hoaDon.setIdKhachHang(khachHang);
             hoaDon.setTenKhachHang(khachHang.getHoTen());
             hoaDon.setSdt(khachHang.getSoDienThoai());
@@ -112,8 +115,11 @@ public class BanHangHoaDonService {
      * Lấy danh sách hóa đơn chờ
      */
     public List<HoaDonResponse> getDanhSachHoaDonCho() {
-        List<HoaDon> danhSachHoaDon = hoaDonRepository.findByTrangThai(TrangThaiHoaDon.CHO_THANH_TOAN);
-        
+        // Chỉ lấy hóa đơn Tại quầy (0) có trang thái CHỜ THANH TOÁN
+        List<HoaDon> danhSachHoaDon = hoaDonRepository.findByTrangThaiAndLoaiHoaDon(
+                TrangThaiHoaDon.CHO_THANH_TOAN,
+                0);
+
         return danhSachHoaDon.stream()
                 .map(HoaDonResponse::new)
                 .collect(Collectors.toList());
@@ -128,7 +134,8 @@ public class BanHangHoaDonService {
     }
 
     /**
-     * Cập nhật khách hàng cho hóa đơn (thêm ID khách hàng hoặc set null để khách lẻ)
+     * Cập nhật khách hàng cho hóa đơn (thêm ID khách hàng hoặc set null để khách
+     * lẻ)
      */
     @Transactional
     public HoaDonResponse capNhatKhachHang(UUID idHoaDon, CapNhatKhachHangRequest request) {
@@ -136,7 +143,8 @@ public class BanHangHoaDonService {
 
         if (request.getKhachHangId() != null) {
             KhachHang khachHang = khachHangRepository.findById(request.getKhachHangId())
-                    .orElseThrow(() -> new ApiException("Không tìm thấy khách hàng với ID: " + request.getKhachHangId(), "NOT_FOUND"));
+                    .orElseThrow(() -> new ApiException("Không tìm thấy khách hàng với ID: " + request.getKhachHangId(),
+                            "NOT_FOUND"));
             hoaDon.setIdKhachHang(khachHang);
             hoaDon.setTenKhachHang(khachHang.getHoTen());
             hoaDon.setSdt(khachHang.getSoDienThoai());
@@ -183,16 +191,15 @@ public class BanHangHoaDonService {
     public void capNhatTongTien(HoaDon hoaDon) {
         BigDecimal tongTien = tinhLaiTongTien(hoaDon);
         hoaDon.setTongTien(tongTien);
-        
+
         BigDecimal tienDuocGiam = hoaDon.getTienDuocGiam() != null ? hoaDon.getTienDuocGiam() : BigDecimal.ZERO;
         BigDecimal tongTienSauGiam = tongTien.subtract(tienDuocGiam);
         if (tongTienSauGiam.compareTo(BigDecimal.ZERO) < 0) {
             tongTienSauGiam = BigDecimal.ZERO;
         }
         hoaDon.setTongTienSauGiam(tongTienSauGiam);
-        
+
         save(hoaDon);
     }
 
 }
-

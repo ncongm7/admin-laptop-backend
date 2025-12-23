@@ -14,6 +14,9 @@ public interface HoaDonRepository extends JpaRepository<HoaDon, UUID>, JpaSpecif
         // Tìm các hóa đơn theo trạng thái
         List<HoaDon> findByTrangThai(TrangThaiHoaDon trangThai);
 
+        // Tìm các hóa đơn theo trạng thái và loại hóa đơn
+        List<HoaDon> findByTrangThaiAndLoaiHoaDon(TrangThaiHoaDon trangThai, Integer loaiHoaDon);
+
         // Đếm số lượng hóa đơn theo trạng thái
         Long countByTrangThai(TrangThaiHoaDon trangThai);
 

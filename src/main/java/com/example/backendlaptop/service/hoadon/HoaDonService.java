@@ -511,46 +511,51 @@ public class HoaDonService {
                 ChiTietSanPham ctsp = hdct.getChiTietSanPham();
                 int soLuongCan = hdct.getSoLuong();
 
-                // 5.1. Kiểm tra số lượng Serial có sẵn
-                int soLuongKhaDung = serialRepository.countByCtspIdAndTrangThai(ctsp.getId(), 1);
-                if (soLuongKhaDung < soLuongCan) {
-                    String tenSanPham = ctsp.getSanPham() != null ? ctsp.getSanPham().getTenSanPham() : "Sản phẩm";
-                    throw new ApiException(
-                            "Sản phẩm " + tenSanPham + " không đủ số lượng. Cần: " + soLuongCan + ", Có sẵn: "
-                                    + soLuongKhaDung,
-                            "INSUFFICIENT_STOCK");
-                }
+                // [FIX] CHANGE LOGIC: TRUST RESERVATION
+                // Thay vì kiểm tra tồn kho (đã bị trừ về 0 khi đặt hàng), ta kiểm tra xem
+                // ta có đang giữ đủ Serial hay không.
 
-                // 5.2. Kiểm tra số lượng tồn kho (tính cả tạm giữ của đơn offline)
-                // QUAN TRỌNG: Đơn offline tạm giữ ngay khi thêm sản phẩm, nên đơn online cần
-                // tính tạm giữ
-                int soLuongTon = ctsp.getSoLuongTon() != null ? ctsp.getSoLuongTon() : 0;
-                int soLuongTamGiu = ctsp.getSoLuongTamGiu() != null ? ctsp.getSoLuongTamGiu() : 0;
-                int soLuongKhaDungThucTe = soLuongTon - soLuongTamGiu;
+                // 5.1. Lấy danh sách Serial đã giữ cho đơn hàng này
+                List<Serial> allReserved = serialRepository.findByReservedInOrderId(idHoaDon);
 
-                if (soLuongKhaDungThucTe < soLuongCan) {
-                    String tenSanPham = ctsp.getSanPham() != null ? ctsp.getSanPham().getTenSanPham() : "Sản phẩm";
-                    throw new ApiException(
-                            "Sản phẩm " + tenSanPham + " không đủ tồn kho. " +
-                                    "Cần: " + soLuongCan + ", " +
-                                    "Có sẵn: " + soLuongKhaDungThucTe +
-                                    " (Tồn kho: " + soLuongTon + ", Tạm giữ: " + soLuongTamGiu + ")",
-                            "INSUFFICIENT_STOCK");
-                }
+                // Lọc ra serial thuộc về sản phẩm này
+                List<Serial> myReservedSerials = allReserved.stream()
+                        .filter(s -> s.getCtsp().getId().equals(ctsp.getId()))
+                        .collect(Collectors.toList());
 
-                // 5.3. Lấy danh sách Serial có sẵn (trangThai = 1)
-                List<Serial> serials = serialRepository.findByCtspIdAndTrangThai(ctsp.getId(), 1);
+                int daGiu = myReservedSerials.size();
+                System.out.println("✅ [HoaDonService] Đang giữ " + daGiu + " serial cho sản phẩm " + ctsp.getMaCtsp());
 
-                // 5.4. Xử lý từng Serial cần trừ
-                for (int i = 0; i < soLuongCan; i++) {
-                    if (i >= serials.size()) {
-                        throw new ApiException("Không đủ Serial để trừ kho cho sản phẩm: " + ctsp.getId(),
-                                "INSUFFICIENT_SERIAL");
+                List<Serial> serialsToSell = new ArrayList<>();
+
+                if (daGiu >= soLuongCan) {
+                    // Đủ hàng đã giữ -> Dùng luôn
+                    serialsToSell.addAll(myReservedSerials.subList(0, soLuongCan));
+                } else {
+                    // Thiếu hàng (lạ, có thể do admin sửa số lượng?) -> Lấy hết hàng đã giữ + Tìm
+                    // thêm hàng ngoài
+                    System.out.println("⚠️ [HoaDonService] Thiếu serial đã giữ (Cần " + soLuongCan + ", Có " + daGiu
+                            + "). Tìm thêm...");
+                    serialsToSell.addAll(myReservedSerials);
+
+                    int canThem = soLuongCan - daGiu;
+                    List<Serial> availableFree = serialRepository.findByCtspIdAndTrangThai(ctsp.getId(), 1);
+
+                    if (availableFree.size() < canThem) {
+                        String tenSanPham = ctsp.getSanPham() != null ? ctsp.getSanPham().getTenSanPham() : "Sản phẩm";
+                        throw new ApiException(
+                                "Sản phẩm " + tenSanPham + " không đủ số lượng để xác nhận. " +
+                                        "(Đã giữ: " + daGiu + ", Kho ngoài: " + availableFree.size() + ", Cần tổng: "
+                                        + soLuongCan + ")",
+                                "INSUFFICIENT_STOCK");
                     }
 
-                    Serial serial = serials.get(i);
+                    serialsToSell.addAll(availableFree.subList(0, canThem));
+                }
 
-                    // 5.5. Kiểm tra Serial chưa được bán
+                // 5.4. Xử lý từng Serial (Chuyển trạng thái SOLD)
+                for (Serial serial : serialsToSell) {
+                    // 5.5. Kiểm tra Serial chưa được bán (Double check)
                     if (serialDaBanRepository.existsBySerialId(serial.getId())) {
                         throw new ApiException("Serial " + serial.getSerialNo() + " đã được sử dụng",
                                 "SERIAL_ALREADY_SOLD");
@@ -558,6 +563,10 @@ public class HoaDonService {
 
                     // 5.6. Cập nhật trạng thái Serial thành "Đã bán" (2)
                     serial.setTrangThai(2);
+                    // Clear reservation info (chuyển thành sold)
+                    serial.setReservedInOrder(null);
+                    serial.setReservedExpiredAt(null);
+
                     serialRepository.save(serial);
 
                     // 5.7. Tạo bản ghi SerialDaBan
@@ -570,9 +579,6 @@ public class HoaDonService {
                 }
 
                 // 5.8. Đồng bộ tồn kho (Auto-Sync)
-                // Serial chuyển từ Reserved (1) -> Sold (2). Cả 2 đều không được đếm vào Tồn
-                // Kho.
-                // Tuy nhiên gọi hàm sync để đảm bảo nhất quán.
                 try {
                     serialService.updateStockCount(ctsp.getId());
                 } catch (Exception e) {
